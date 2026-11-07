@@ -77,8 +77,9 @@ export function Renovate() {
                   </label>
                   {r.state.on && (
                     <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted">Renovation cost</span>
                       <div className="w-36"><MoneyInput value={r.state.budget} onChange={(v) => set(r.key, { budget: v })} /></div>
-                      <span className="w-24 text-right text-sm font-medium text-gum">+{money((r.state.budget ?? 0) * (r.state.mult ?? 1), { compact: true })}</span>
+                      <span className="w-24 text-right text-sm font-medium text-gum" title="Estimated value added">+{money((r.state.budget ?? 0) * (r.state.mult ?? 1), { compact: true })}<span className="block text-[10px] font-normal text-muted">value added</span></span>
                     </div>
                   )}
                 </div>
