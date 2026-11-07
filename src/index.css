@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ground: 238 241 236;
+  --surface: 255 255 255;
+  --raised: 246 248 244;
+  --line: 214 222 213;
+  --ink: 20 33 28;
+  --muted: 92 108 100;
+  --brass: 156 114 42;
+  --gum: 47 110 88;
+  --sky: 61 104 145;
+  --clay: 178 72 50;
+  --sage: 118 138 82;
+  color-scheme: light;
+}
+.dark {
+  --ground: 12 24 20;
+  --surface: 18 34 29;
+  --raised: 26 46 40;
+  --line: 40 63 55;
+  --ink: 231 236 227;
+  --muted: 146 164 154;
+  --brass: 205 166 96;
+  --gum: 118 176 150;
+  --sky: 126 164 200;
+  --clay: 222 120 94;
+  --sage: 176 194 152;
+  color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
+body {
+  @apply bg-ground text-ink font-sans antialiased;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+}
+h1, h2, h3, .font-display { font-family: 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.015em; }
+
+:focus-visible { outline: 2px solid rgb(var(--brass)); outline-offset: 2px; border-radius: 6px; }
+
+@layer components {
+  .field-label { @apply block text-sm font-medium text-ink mb-1.5; }
+  .field-hint { @apply text-xs text-muted mt-1; }
+  .input {
+    @apply w-full rounded-lg border border-line bg-raised px-3 py-2.5 text-[15px] text-ink placeholder:text-muted/70
+      focus:outline-none focus:border-brass focus:ring-2 focus:ring-brass/25 transition-colors;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors
+      disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-primary { @apply btn bg-brass text-ground hover:bg-brass/90; }
+  .btn-quiet { @apply btn border border-line text-ink hover:bg-raised; }
+  .btn-ghost { @apply btn text-muted hover:text-ink hover:bg-raised; }
+  .panel { @apply bg-surface border border-line rounded-2xl; }
+  .chip { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+.rise { animation: rise 0.5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+input[type=range] { accent-color: rgb(var(--brass)); }

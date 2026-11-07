@@ -1,0 +1,122 @@
+import type { Assumptions, Debt, Holding, Loan, Profile, Property } from './types';
+
+export const uid = () => Math.random().toString(36).slice(2, 10);
+
+export const defaultAssumptions: Assumptions = {
+  lvr: 80,
+  shareReturn: 7,
+  superReturn: 7,
+  inflation: 2.5,
+  rentGrowth: 3,
+  newPurchasePrice: 650000,
+  newPurchaseYield: 5,
+  newLoanRate: 6.2,
+  serviceBuffer: 3,
+};
+
+export const emptyLoan = (): Loan => ({ id: uid(), lender: '', balance: null, rate: null, type: 'pi', yearsLeft: 25, offset: null });
+export const emptyDebt = (): Debt => ({ id: uid(), kind: 'car', label: '', balance: null, monthlyRepayment: null, limit: null });
+
+export const emptyProperty = (): Property => ({
+  id: uid(), address: '', suburb: '', state: 'QLD', postcode: '', use: 'investment', kind: 'house', structure: 'personal',
+  purchasePrice: null, purchaseDate: '', valuations: [], growthRate: 5, loans: [emptyLoan()], weeklyRent: null,
+  vacancyWeeks: 2, managementPct: 7, annualCosts: null, bedrooms: null, yearBuilt: null,
+});
+
+export function blankProfile(name: string): Profile {
+  return {
+    version: 1,
+    mode: 'simple',
+    onboardingStep: 0,
+    onboarded: false,
+    household: {
+      state: 'QLD', hasPartner: false, dependants: [], otherIncome: null,
+      you: { name, age: null, salary: null, employment: 'payg', superBalance: null },
+      partner: { name: '', age: null, salary: null, employment: 'payg', superBalance: null },
+    },
+    finances: { livingMonthly: null, cash: null, offsetIsCash: true, buffer: null, debts: [] },
+    properties: [],
+    holdings: [],
+    goals: { retirementAge: 60, passiveIncome: 120000, targetProperties: 4, risk: 3, events: [] },
+    assumptions: { ...defaultAssumptions },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+const h = (code: string, exchange: Holding['exchange'], name: string, units: number, avgCost: number, firstBought: string, kind: Holding['kind']): Holding =>
+  ({ id: uid(), code, exchange, name, units, avgCost, firstBought, kind });
+
+export function demoProfile(): Profile {
+  const p = blankProfile('Tom');
+  p.onboarded = true;
+  p.onboardingStep = 7;
+  p.mode = 'thorough';
+  p.household = {
+    state: 'QLD', hasPartner: true, dependants: [4, 7], otherIncome: 6000,
+    you: { name: 'Tom', age: 35, salary: 165000, employment: 'payg', superBalance: 118000 },
+    partner: { name: 'Ana', age: 33, salary: 98000, employment: 'payg', superBalance: 74000 },
+  };
+  p.finances = {
+    livingMonthly: 5800, cash: 38000, offsetIsCash: true, buffer: 20000,
+    debts: [
+      { id: uid(), kind: 'car', label: 'Car loan', balance: 21000, monthlyRepayment: 640, limit: null },
+      { id: uid(), kind: 'credit-card', label: 'Credit card', balance: 1800, monthlyRepayment: null, limit: 12000 },
+    ],
+  };
+  const today = new Date().toISOString().slice(0, 10);
+  const props: Property[] = [
+    {
+      ...emptyProperty(), address: '14 Kirkland Avenue', suburb: 'Coorparoo', state: 'QLD', postcode: '4151', use: 'home', kind: 'house', structure: 'joint',
+      purchasePrice: 720000, purchaseDate: '2019-03', growthRate: 6, bedrooms: 4, yearBuilt: 1962, weeklyRent: null, annualCosts: 7200,
+      valuations: [
+        { id: uid(), source: 'realestate.com.au', value: 1150000, date: today },
+        { id: uid(), source: 'Domain', value: 1210000, date: today },
+        { id: uid(), source: 'RP Data', value: 1175000, date: today },
+      ],
+      loans: [{ id: uid(), lender: 'CBA', balance: 470000, rate: 6.09, type: 'pi', yearsLeft: 23, offset: 45000 }],
+    },
+    {
+      ...emptyProperty(), address: '8/22 Esplanade', suburb: 'Bargara', state: 'QLD', postcode: '4670', use: 'investment', kind: 'unit', structure: 'personal',
+      purchasePrice: 245000, purchaseDate: '2021-06', growthRate: 5, bedrooms: 2, yearBuilt: 2003, weeklyRent: 480, annualCosts: 6900,
+      valuations: [
+        { id: uid(), source: 'realestate.com.au', value: 395000, date: today },
+        { id: uid(), source: 'Domain', value: 410000, date: today },
+      ],
+      loans: [{ id: uid(), lender: 'Macquarie', balance: 196000, rate: 6.29, type: 'io', yearsLeft: 26, offset: 0 }],
+    },
+    {
+      ...emptyProperty(), address: '31 Ashgrove Road', suburb: 'Harlaxton', state: 'QLD', postcode: '4350', use: 'investment', kind: 'house', structure: 'personal',
+      purchasePrice: 510000, purchaseDate: '2023-02', growthRate: 5.5, bedrooms: 3, yearBuilt: 2014, weeklyRent: 560, annualCosts: 5400,
+      valuations: [
+        { id: uid(), source: 'realestate.com.au', value: 630000, date: today },
+        { id: uid(), source: 'RP Data', value: 652000, date: today },
+      ],
+      loans: [{ id: uid(), lender: 'ING', balance: 408000, rate: 6.39, type: 'io', yearsLeft: 27, offset: 0 }],
+    },
+  ];
+  p.properties = props;
+  p.holdings = [
+    h('VAS', 'ASX', 'Vanguard Australian Shares ETF', 420, 88.5, '2020-08-14', 'etf'),
+    h('VGS', 'ASX', 'Vanguard MSCI Intl Shares ETF', 260, 104.2, '2021-02-03', 'etf'),
+    h('CBA', 'ASX', 'Commonwealth Bank', 60, 98.4, '2020-11-20', 'share'),
+    h('BHP', 'ASX', 'BHP Group', 300, 41.1, '2022-05-11', 'share'),
+    h('CSL', 'ASX', 'CSL Limited', 25, 262.0, '2022-09-01', 'share'),
+    h('NDQ', 'ASX', 'Betashares Nasdaq 100 ETF', 150, 38.7, '2023-01-17', 'etf'),
+    h('BTC', 'CRYPTO', 'Bitcoin', 0.12, 61000, '2023-03-02', 'crypto'),
+  ];
+  p.goals = {
+    retirementAge: 58, passiveIncome: 130000, targetProperties: 5, risk: 4,
+    events: [{ id: uid(), label: 'Kitchen renovation', year: new Date().getFullYear() + 1, amount: 45000 }],
+  };
+  return p;
+}
+
+export const SAMPLE_CSV = `Trade Date,Code,Market,Buy/Sell,Quantity,Price,Brokerage
+2021-03-02,VAS,ASX,Buy,120,89.10,9.50
+2021-09-15,VAS,ASX,Buy,80,95.40,9.50
+2022-02-08,A200,ASX,Buy,200,121.30,9.50
+2022-06-21,WES,ASX,Buy,45,48.20,9.50
+2023-04-04,NDQ,ASX,Buy,150,30.85,9.50
+2023-11-29,WES,ASX,Sell,15,55.70,9.50
+2024-07-10,MQG,ASX,Buy,12,192.00,9.50
+2025-01-22,AAPL,NASDAQ,Buy,10,358.00,0`;

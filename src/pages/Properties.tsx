@@ -1,0 +1,178 @@
+import { useState } from 'react';
+import { useApp } from '../lib/store';
+import { propertyStats } from '../lib/calc';
+import { money, monthYear, pct } from '../lib/format';
+import { emptyProperty, uid } from '../lib/defaults';
+import type { Property, ValuationEntry } from '../lib/types';
+import { LotPlan } from '../components/LotPlan';
+import { PropertyEditor } from '../components/PropertyEditor';
+import { Icon, MoneyInput, Select, Segmented } from '../components/ui';
+
+const reaUrl = (p: Property) =>
+  `https://www.realestate.com.au/property/${[p.address, p.suburb, p.state, p.postcode].join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+
+export function Properties() {
+  const p = useApp((s) => s.profile)!;
+  const update = useApp((s) => s.update);
+  const [view, setView] = useState<'cards' | 'list'>('cards');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Property | null>(null);
+  const lvr = p.assumptions.lvr;
+  const sel = p.properties.find((x) => x.id === selected);
+
+  const totals = p.properties.reduce((a, pr) => { const s = propertyStats(pr, lvr); return { v: a.v + s.val.value, d: a.d + s.debt, u: a.u + s.usable, c: a.c + (pr.use === 'investment' ? s.cashflow : 0) }; }, { v: 0, d: 0, u: 0, c: 0 });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Properties</h1><p className="text-muted">{p.properties.length} properties · {money(totals.v, { compact: true })} value · {money(totals.v - totals.d, { compact: true })} equity</p></div>
+        <div className="flex gap-2">
+          <Segmented size="sm" label="Layout" value={view} onChange={setView} options={[{ value: 'cards', label: 'Cards' }, { value: 'list', label: 'List' }]} />
+          <button className="btn-primary" onClick={() => setEditing(emptyProperty())}><Icon name="plus" className="h-4 w-4" />Add property</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4">
+        {[['Portfolio value', money(totals.v)], ['Owing', money(totals.d)], [`Usable equity (${lvr}% LVR)`, money(totals.u)], ['Investment cash flow', `${money(totals.c, { sign: true })} / yr`]].map(([l, v]) => (
+          <div key={l} className="bg-surface p-4"><p className="text-xs text-muted">{l}</p><p className="font-display text-xl font-semibold">{v}</p></div>
+        ))}
+      </div>
+
+      {p.properties.length === 0 && (
+        <div className="panel p-10 text-center"><p className="font-medium">No properties yet</p><p className="text-sm text-muted mt-1">Add your home or an investment to see its value, equity and cash flow.</p></div>
+      )}
+
+      {view === 'cards' ? (
+        <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+          {p.properties.map((pr) => {
+            const s = propertyStats(pr, lvr);
+            return (
+              <button key={pr.id} onClick={() => setSelected(pr.id)} className="panel overflow-hidden text-left transition-colors hover:border-brass/60">
+                <LotPlan property={pr} className="h-36 w-full" />
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="font-semibold">{pr.address}</p><p className="text-sm text-muted">{pr.suburb} {pr.state} {pr.postcode}</p></div>
+                    <span className={`chip ${pr.use === 'home' ? 'bg-sky/15 text-sky' : 'bg-gum/15 text-gum'}`}>{pr.use === 'home' ? 'Home' : 'Investment'}</span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-y-3 text-sm">
+                    <div><p className="text-xs text-muted">Value</p><p className="font-display text-lg font-semibold">{money(s.val.value)}</p>{s.growthSincePurchase != null && <p className="text-xs text-gum">{pct(s.growthSincePurchase, 0, true)} since purchase</p>}</div>
+                    <div><p className="text-xs text-muted">{pr.use === 'investment' ? 'Cash flow' : 'Yearly cost'}</p><p className={`font-display text-lg font-semibold ${s.cashflow >= 0 ? 'text-gum' : 'text-clay'}`}>{money(s.cashflow, { sign: true })}</p><p className="text-xs text-muted">a year after repayments</p></div>
+                    <div><p className="text-xs text-muted">Equity</p><p>{money(s.equity)}</p></div>
+                    <div><p className="text-xs text-muted">Usable equity</p><p>{money(s.usable)}</p></div>
+                    {pr.use === 'investment' && <div><p className="text-xs text-muted">Gross yield</p><p>{pct(s.grossYield)}</p></div>}
+                    <div><p className="text-xs text-muted">LVR</p><p>{pct(s.lvrNow, 0)}</p></div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="panel overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted"><tr className="border-b border-line">{['Property', 'Value', 'Owing', 'Equity', 'Usable', 'Yield', 'Cash flow / yr'].map((h, i) => <th key={h} className={`px-4 py-3 font-medium ${i ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
+            <tbody>
+              {p.properties.map((pr) => { const s = propertyStats(pr, lvr); return (
+                <tr key={pr.id} className="border-b border-line last:border-0 hover:bg-raised cursor-pointer" onClick={() => setSelected(pr.id)}>
+                  <td className="px-4 py-3"><p className="font-medium">{pr.address}</p><p className="text-xs text-muted">{pr.suburb} {pr.state}</p></td>
+                  <td className="px-4 py-3 text-right">{money(s.val.value)}</td><td className="px-4 py-3 text-right">{money(s.debt)}</td><td className="px-4 py-3 text-right">{money(s.equity)}</td>
+                  <td className="px-4 py-3 text-right">{money(s.usable)}</td><td className="px-4 py-3 text-right">{pr.use === 'investment' ? pct(s.grossYield) : '—'}</td>
+                  <td className={`px-4 py-3 text-right ${s.cashflow >= 0 ? 'text-gum' : 'text-clay'}`}>{money(s.cashflow, { sign: true })}</td>
+                </tr>); })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {sel && <PropertyDetail property={sel} onClose={() => setSelected(null)} onEdit={() => { setEditing(structuredClone(sel)); setSelected(null); }} />}
+      {editing && (
+        <Sheet title={p.properties.some((x) => x.id === editing.id) ? `Edit ${editing.address}` : 'Add a property'} onClose={() => setEditing(null)}>
+          <PropertyEditor value={editing} onChange={setEditing} thorough />
+          <div className="mt-6 flex justify-between">
+            {p.properties.some((x) => x.id === editing.id) ? <button className="btn-ghost text-clay" onClick={() => { update((d) => { d.properties = d.properties.filter((x) => x.id !== editing.id); }); setEditing(null); }}>Remove property</button> : <span />}
+            <button className="btn-primary" disabled={!editing.address} onClick={() => { update((d) => { const i = d.properties.findIndex((x) => x.id === editing.id); if (i >= 0) d.properties[i] = editing; else d.properties.push(editing); }); setEditing(null); }}>Save property</button>
+          </div>
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
+      <div className="rise h-full w-full max-w-2xl overflow-y-auto bg-ground p-6 shadow-2xl sm:border-l sm:border-line" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-6 flex items-center justify-between gap-4"><h2 className="font-display text-2xl font-semibold">{title}</h2><button className="btn-ghost p-2" aria-label="Close" onClick={onClose}><Icon name="x" /></button></div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PropertyDetail({ property: pr, onClose, onEdit }: { property: Property; onClose: () => void; onEdit: () => void }) {
+  const p = useApp((s) => s.profile)!;
+  const update = useApp((s) => s.update);
+  const s = propertyStats(pr, p.assumptions.lvr);
+  const [src, setSrc] = useState<ValuationEntry['source']>('realestate.com.au');
+  const [val, setVal] = useState<number | null>(null);
+  const addVal = () => { if (!val) return; update((d) => { d.properties.find((x) => x.id === pr.id)!.valuations.push({ id: uid(), source: src, value: val, date: new Date().toISOString().slice(0, 10) }); }); setVal(null); };
+  const latest = [...new Map([...pr.valuations].sort((a, b) => a.date.localeCompare(b.date)).map((v) => [v.source, v])).values()];
+  const rows: [string, number][] = pr.use === 'investment'
+    ? [['Rent after vacancy', s.rentGross], ['Management', -s.mgmt], ['Rates, insurance, upkeep', -(pr.annualCosts ?? 0)], ['Loan repayments', -s.repayments]]
+    : [['Loan repayments', -s.repayments], ['Rates, insurance, upkeep', -(pr.annualCosts ?? 0)]];
+
+  return (
+    <Sheet title={pr.address} onClose={onClose}>
+      <LotPlan property={pr} className="h-44 w-full rounded-xl border border-line" />
+      <p className="mt-3 text-sm text-muted">{pr.suburb} {pr.state} {pr.postcode} · {pr.kind}{pr.bedrooms ? `, ${pr.bedrooms} bed` : ''}{pr.yearBuilt ? ` · built ${pr.yearBuilt}` : ''} · bought {monthYear(pr.purchaseDate)} for {money(pr.purchasePrice)}</p>
+
+      <section className="mt-6 panel p-5">
+        <div className="flex items-end justify-between gap-4">
+          <div><p className="text-sm text-muted">Estimated value</p><p className="font-display text-4xl font-semibold">{money(s.val.value)}</p>
+            <p className="text-sm text-muted">{s.val.basis === 'sources' ? `Average of ${s.val.sources} source${s.val.sources > 1 ? 's' : ''} · range ${money(s.val.low, { compact: true })} to ${money(s.val.high, { compact: true })}` : 'Purchase price grown at your growth assumption. Add an estimate below.'}</p></div>
+          <a className="btn-quiet shrink-0" href={reaUrl(pr)} target="_blank" rel="noreferrer">Open on realestate.com.au</a>
+        </div>
+        <ul className="mt-5 space-y-2">
+          {latest.map((v) => {
+            const w = s.val.high > s.val.low ? ((v.value - s.val.low) / (s.val.high - s.val.low)) * 100 : 50;
+            return (
+              <li key={v.id} className="grid grid-cols-[140px_1fr_100px] items-center gap-3 text-sm">
+                <span className="text-muted">{v.source}</span>
+                <span className="relative h-1.5 rounded-full bg-line"><span className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brass" style={{ left: `${w}%` }} /></span>
+                <span className="text-right">{money(v.value, { compact: true })}</span>
+              </li>
+            );
+          })}
+          <li className="grid grid-cols-[140px_1fr_100px] items-center gap-3 text-sm opacity-60"><span className="text-muted">Microburbs</span><span className="text-xs text-muted">Automatic monthly valuation, connecting soon</span><span /></li>
+        </ul>
+        <div className="mt-5 grid gap-2 border-t border-line pt-4 sm:grid-cols-[1fr_1fr_auto]">
+          <Select value={src} onChange={setSrc} options={(['realestate.com.au', 'Domain', 'RP Data', 'Bank valuation', 'My estimate'] as const).map((x) => ({ value: x, label: x }))} />
+          <MoneyInput value={val} onChange={setVal} placeholder="Estimate" />
+          <button className="btn-primary" onClick={addVal} disabled={!val}>Add estimate</button>
+        </div>
+      </section>
+
+      <section className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line">
+        {[['Equity', money(s.equity)], [`Usable equity at ${p.assumptions.lvr}%`, money(s.usable)], ['Owing', money(s.debt)], ['LVR', pct(s.lvrNow, 0)]].map(([l, v]) => (
+          <div key={l} className="bg-surface p-4"><p className="text-xs text-muted">{l}</p><p className="font-display text-xl font-semibold">{v}</p></div>
+        ))}
+      </section>
+
+      <section className="mt-6 panel p-5">
+        <p className="font-medium">Cash flow per year</p>
+        <dl className="mt-3 space-y-2 text-sm">
+          {rows.map(([l, v]) => <div key={l} className="flex justify-between"><dt className="text-muted">{l}</dt><dd>{money(v, { sign: true })}</dd></div>)}
+          <div className="flex justify-between border-t border-line pt-2 font-semibold"><dt>Before tax</dt><dd className={s.cashflow >= 0 ? 'text-gum' : 'text-clay'}>{money(s.cashflow, { sign: true })}</dd></div>
+        </dl>
+      </section>
+
+      <section className="mt-6 panel p-5">
+        <p className="font-medium">Loans</p>
+        <ul className="mt-3 divide-y divide-line text-sm">
+          {pr.loans.map((l) => <li key={l.id} className="flex justify-between py-2"><span>{l.lender || 'Loan'} · {l.type === 'io' ? 'interest only' : 'P&I'} · {l.rate?.toFixed(2)}%</span><span>{money(l.balance)}</span></li>)}
+        </ul>
+      </section>
+      <div className="mt-6 flex justify-end"><button className="btn-quiet" onClick={onEdit}>Edit property details</button></div>
+    </Sheet>
+  );
+}
