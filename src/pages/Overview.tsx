@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { useApp } from '../lib/store';
+import { useApp, useNavIntent } from '../lib/store';
+import { Icon } from '../components/ui';
 import { project, position } from '../lib/calc';
 import { money } from '../lib/format';
 import type { Quotes } from '../lib/calc';
@@ -23,9 +24,15 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-muted">{greet}, {p.household.you.name || 'there'}</p>
-        <h1 className="font-display text-3xl font-semibold sm:text-4xl">Here’s where you stand</h1>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-muted">{greet}, {p.household.you.name || 'there'}</p>
+          <h1 className="font-display text-3xl font-semibold sm:text-4xl">Here’s where you stand</h1>
+        </div>
+        <button className="group inline-flex items-center gap-2 rounded-xl border border-brass/60 bg-brass/10 px-4 py-2.5 text-sm font-semibold text-brass transition-all hover:bg-brass/20 hover:shadow-[0_4px_16px_-6px_rgb(var(--brass)/0.6)]"
+          onClick={() => { useNavIntent.getState().set({ planTab: 'projections' }); go('plan'); }}>
+          <Icon name="spark" className="h-4 w-4 transition-transform group-hover:rotate-45" />Create your Wise Future
+        </button>
       </div>
 
       <RateWatch />

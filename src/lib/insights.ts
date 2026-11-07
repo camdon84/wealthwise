@@ -40,7 +40,6 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
         ? `Paid from rent, savings, super and, if needed, selling shares and investment properties, your money lasts past ${life} with about ${money(Math.max(0, leftReal), { compact: true })} in today's money to spare.`
         : `After rent, savings, super and selling shares and investment properties, the plan can't keep paying ${money(p.goals.passiveIncome, { compact: true })} a year past ${proj.runsOutAge}. A lower yearly income, a later stop-work age or a bigger share plan would stretch it. Try them in the plan.`,
       figure: onTrack ? `${life}+` : `${proj.runsOutAge}`, figureLabel: onTrack ? 'money lasts past' : 'money runs out at age',
-      action: { label: 'Create your Wise Future', to: 'plan:projections' },
     });
   }
 
