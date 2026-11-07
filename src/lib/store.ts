@@ -4,6 +4,13 @@ import { createAdapter } from './storage';
 import { normalize } from './defaults';
 
 const adapter = createAdapter();
+
+/** Offset money lives on each loan (Properties); the cash total's "in offset" figure is always their sum. */
+export function syncOffsets(p: Profile) {
+  const loans = p.properties.flatMap((pr) => pr.loans);
+  if (loans.length === 0) return;
+  p.finances.cashOffset = loans.reduce((t, l) => t + (l.offset ?? 0), 0) || null;
+}
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 interface State {
@@ -69,6 +76,7 @@ export const useApp = create<State>((set, get) => ({
     if (!cur) return;
     const next: Profile = structuredClone(cur);
     fn(next);
+    syncOffsets(next);
     next.updatedAt = new Date().toISOString();
     set({ profile: next, saving: 'saving' });
     clearTimeout(saveTimer);

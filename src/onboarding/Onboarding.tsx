@@ -311,12 +311,28 @@ export function CashSuper({ withDates }: { thorough: boolean; withDates?: boolea
   const hh = p.household; const f = p.finances;
   const split = (f.cashOffset ?? 0) + (f.cashSavings ?? 0);
   const diff = (f.cash ?? 0) - split;
+  const loans = p.properties.flatMap((pr) => pr.loans.filter((l) => (l.balance ?? 0) > 0).map((l) => ({ pr, l })));
   return (
     <div className="space-y-8">
       <div className="paper rounded-xl border border-line bg-surface p-5">
         <div className="max-w-sm"><Field label="Total cash savings" hint="Everything you have in cash, offset and savings accounts.">{(id) => <MoneyInput id={id} value={f.cash} onChange={(v) => update((d) => { d.finances.cash = v; })} />}</Field></div>
         <div className="mt-5 grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
-          <Field label="Amount in an offset account" hint="Reduces the interest on a home loan.">{(id) => <MoneyInput id={id} value={f.cashOffset ?? null} onChange={(v) => update((d) => { d.finances.cashOffset = v; if (d.finances.cash != null && d.finances.cashSavings == null && v != null) d.finances.cashSavings = Math.max(0, d.finances.cash - v); })} />}</Field>
+          <div>
+            <p className="field-label">Amount in offset accounts</p>
+            {loans.length === 0 ? (
+              <p className="text-sm text-muted">An offset account is linked to a property loan. Add a property with a loan first, then you can put your offset balance against it here.</p>
+            ) : (<>
+              <div className="space-y-2">
+                {loans.map(({ pr, l }) => (
+                  <div key={l.id}>
+                    <p className="mb-1 text-xs text-muted">{pr.address || 'Property'} · {l.lender || 'loan'} {money(l.balance ?? 0, { compact: true })} · {pr.use === 'home' ? 'home' : 'investment'}</p>
+                    <MoneyInput value={l.offset ?? null} onChange={(v) => update((d) => { const x = d.properties.find((y) => y.id === pr.id)?.loans.find((y) => y.id === l.id); if (x) x.offset = v; })} />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-muted">Total {money(f.cashOffset ?? 0)}. Linked to each loan in Properties, so changing it here changes it there.</p>
+            </>)}
+          </div>
           <Field label="Amount in cash and normal savings">{(id) => <MoneyInput id={id} value={f.cashSavings ?? null} onChange={(v) => update((d) => { d.finances.cashSavings = v; })} />}</Field>
         </div>
         {f.cash != null && split > 0 && Math.abs(diff) >= 1 && (

@@ -47,6 +47,10 @@ export function normalize(p: Profile): Profile {
   p.mode = 'thorough';
   p.goals.lifeExpectancy ??= 90;
   p.household.dependantsDetail ??= p.household.dependants.map((age, i) => emptyDependant(i, age));
+  // Offset money now belongs to a loan: move an old unassigned offset amount onto the first loan (home first)
+  { const loans = [...p.properties].sort((a, b) => (a.use === 'home' ? -1 : 0) - (b.use === 'home' ? -1 : 0)).flatMap((pr) => pr.loans);
+    const assigned = loans.reduce((t, l) => t + (l.offset ?? 0), 0);
+    if (loans.length && !assigned && (p.finances.cashOffset ?? 0) > 0) loans[0].offset = p.finances.cashOffset!; }
   p.plannedPurchases ??= [];
   for (const pp of p.plannedPurchases) { pp.ioFirst5 ??= true; pp.payOff ??= false; pp.depositPct ??= 20; pp.costsPct ??= 5; pp.holdingPct ??= 1.2; pp.mgmtPct ??= 7; if (pp.buyBy === undefined) pp.buyBy = null; }
   for (const pr of p.properties) { pr.planIo5 ??= pr.loans.length > 0 && pr.loans.every((l) => l.type === 'io'); pr.planPayOff ??= pr.use === 'home'; }
@@ -107,7 +111,7 @@ export function demoProfile(): Profile {
   p.finances = {
     housing: 'own', rentMonthly: null, mortgageMonthly: null, mortgageSharePct: 100, livingMode: 'breakdown',
     livingBreakdown: { groceries: 1400, energy: 260, water: 90, internet: 120, subscriptions: 85, petrol: 420, transport: 60, carInsurance: 140, carRunning: 110, health: 380, homeInsurance: 210, school: 0, kids: 0, eatingOut: 600, clothing: 250, medical: 120, pets: 90, other: 235 },
-    livingMonthly: 4570, cash: 38000, cashOffset: 30000, cashSavings: 8000, offsetIsCash: true, buffer: 20000,
+    livingMonthly: 4570, cash: 53000, cashOffset: 45000, cashSavings: 8000, offsetIsCash: true, buffer: 20000,
     debts: [
       { id: uid(), kind: 'car', label: 'Car loan', balance: 21000, monthlyRepayment: 640, limit: null, rate: 9.49 },
       { id: uid(), kind: 'credit-card', label: 'Credit card', balance: 6400, monthlyRepayment: null, limit: 12000, rate: 20.99 },
