@@ -205,6 +205,7 @@ async function api(req: Request, env: Env, path: string) {
   }
 
   if (path === '/api/quotes' && method === 'GET') return quotes(req, env);
+  if (path === '/api/history' && method === 'GET') return history(req, env);
   if (path === '/api/briefing' && method === 'GET') return briefingRoute(req, env);
   if (path === '/api/wise' && method === 'POST') return wiseRoute(req, env);
   if (path === '/api/documents/read' && method === 'POST') return readDocument(req, env);
@@ -434,4 +435,32 @@ Reply with JSON only, filling only the section that matches the document and nul
     console.error(`doc read: ${(e as Error).message}`);
     return fail('We read the file but couldn’t pick out the figures. You can enter them by hand instead.', 422);
   }
+}
+
+/* ---------- Price history for charts ---------- */
+const INDEX_SYMBOLS: Record<string, { symbol: string; name: string }> = {
+  'IDX:AXJO': { symbol: '^AXJO', name: 'ASX 200' }, 'IDX:GSPC': { symbol: '^GSPC', name: 'S&P 500' },
+  'IDX:IXIC': { symbol: '^IXIC', name: 'Nasdaq' }, 'IDX:AUDUSD': { symbol: 'AUDUSD=X', name: 'AUD/USD' },
+};
+const RANGES: Record<string, { interval: string; ttl: number }> = { '1mo': { interval: '1d', ttl: 1 }, '6mo': { interval: '1d', ttl: 3 }, '1y': { interval: '1d', ttl: 6 }, '5y': { interval: '1wk', ttl: 24 }, '10y': { interval: '1mo', ttl: 48 }, max: { interval: '1mo', ttl: 48 } };
+
+async function history(req: Request, env: Env) {
+  const u = new URL(req.url);
+  const key = (u.searchParams.get('key') || '').toUpperCase();
+  const range = RANGES[u.searchParams.get('range') || ''] ? u.searchParams.get('range')! : '1y';
+  if (!/^(ASX|NASDAQ|NYSE|CRYPTO|IDX):[A-Z0-9.\-]{1,12}$/.test(key)) return fail('Unknown symbol.');
+  const idx = INDEX_SYMBOLS[key];
+  if (key.startsWith('IDX:') && !idx) return fail('Unknown index.');
+  const symbol = idx?.symbol ?? yahooSymbol(key);
+  const data = await cached(env, `hist:${key}:${range}`, RANGES[range].ttl * 3600e3, async () => {
+    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${RANGES[range].interval}`, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' } });
+    if (!res.ok) throw new Error(`history ${symbol} ${res.status}`);
+    const r = (await res.json() as any)?.chart?.result?.[0];
+    const ts: number[] = r?.timestamp ?? [];
+    const closes: (number | null)[] = r?.indicators?.adjclose?.[0]?.adjclose ?? r?.indicators?.quote?.[0]?.close ?? [];
+    const points = ts.map((t, i) => ({ t: t * 1000, c: closes[i] })).filter((x) => x.c != null);
+    if (!points.length) throw new Error('no history');
+    return { key, name: idx?.name ?? key.split(':')[1], currency: r?.meta?.currency ?? 'AUD', points };
+  });
+  return data ? json(data, 200, { 'cache-control': 'public, max-age=900' }) : fail('Price history unavailable right now.', 503);
 }

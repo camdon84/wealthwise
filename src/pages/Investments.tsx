@@ -8,6 +8,7 @@ import type { Holding } from '../lib/types';
 import { CsvImport } from '../components/CsvImport';
 import { Field, Icon, MoneyInput, NumInput, PriceInput, Segmented, Select, TextInput } from '../components/ui';
 import { Sheet } from './Properties';
+import { HoldingChart, MarketStrip } from '../components/PriceCharts';
 
 const KIND_COLOR: Record<Holding['kind'], string> = { etf: 'rgb(var(--sky))', share: 'rgb(var(--gum))', crypto: 'rgb(var(--brass))', fund: 'rgb(var(--sage))' };
 const KIND_LABEL: Record<Holding['kind'], string> = { etf: 'ETFs', share: 'Shares', crypto: 'Crypto', fund: 'Funds' };
@@ -16,6 +17,7 @@ export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | nul
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const [sheet, setSheet] = useState<'import' | 'trade' | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const st = holdingsStats(p.holdings, quotes);
   const byKind = Object.entries(st.rows.reduce<Record<string, number>>((a, r) => { a[r.h.kind] = (a[r.h.kind] ?? 0) + r.value; return a; }, {})).sort((a, b) => b[1] - a[1]);
 
@@ -32,13 +34,15 @@ export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | nul
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-semibold sm:text-4xl">Shares and crypto</h1>
-          <p className="text-muted">{priceMode === 'demo' ? 'Demo prices' : 'Prices delayed 15–20 minutes'}{asOf ? ` · updated ${asOf.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}` : ''}</p>
+          <p className="text-muted">{priceMode === 'demo' ? 'Demo prices' : 'Prices delayed 15–20 minutes'} · select a holding to see its chart{asOf ? ` · updated ${asOf.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}` : ''}</p>
         </div>
         <div className="flex gap-2">
           <button className="btn-quiet" onClick={() => setSheet('import')}><Icon name="upload" className="h-4 w-4" />Import a file</button>
           <button className="btn-primary" onClick={() => setSheet('trade')}><Icon name="plus" className="h-4 w-4" />Log a trade</button>
         </div>
       </div>
+
+      <MarketStrip />
 
       <section className="panel p-5 sm:p-6">
         <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
@@ -63,7 +67,7 @@ export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | nul
             <thead className="text-xs text-muted"><tr className="border-b border-line">{['Holding', 'Units', 'Avg cost', 'Price', 'Today', 'Value', 'Gain', ''].map((h, i) => <th key={i} className={`px-4 py-3 font-medium ${i ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
             <tbody>
               {[...st.rows].sort((a, b) => b.value - a.value).map((r) => (
-                <tr key={r.h.id} className="border-b border-line last:border-0">
+                <tr key={r.h.id} className="cursor-pointer border-b border-line last:border-0 hover:bg-raised" onClick={() => setOpen(r.h.id)} title={`See ${r.h.code}'s price history`}>
                   <td className="px-4 py-3"><p className="font-semibold">{r.h.code} <span className="text-xs font-normal text-muted">{r.h.exchange}</span></p><p className="text-xs text-muted">{r.h.name !== r.h.code ? r.h.name : KIND_LABEL[r.h.kind].replace(/s$/, '')}</p></td>
                   <td className="px-4 py-3 text-right">{num(r.h.units, 4)}</td>
                   <td className="px-4 py-3 text-right">{fmtPrice(r.h.avgCost, r.h.currency)}</td>
@@ -71,7 +75,7 @@ export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | nul
                   <td className={`px-4 py-3 text-right ${r.dayChange >= 0 ? 'text-gum' : 'text-clay'}`}>{pct(r.dayChange, 2, true)}</td>
                   <td className="px-4 py-3 text-right font-medium">{money(r.value)}</td>
                   <td className={`px-4 py-3 text-right ${r.gain >= 0 ? 'text-gum' : 'text-clay'}`}>{money(r.gain, { sign: true })}<br /><span className="text-xs">{pct(r.gainPct, 1, true)}</span></td>
-                  <td className="px-2 py-3 text-right"><button className="btn-ghost p-2" aria-label={`Remove ${r.h.code}`} onClick={() => update((d) => { d.holdings = d.holdings.filter((x) => x.id !== r.h.id); })}><Icon name="trash" className="h-4 w-4" /></button></td>
+                  <td className="px-2 py-3 text-right"><button className="btn-ghost p-2" aria-label={`Remove ${r.h.code}`} onClick={(e) => { e.stopPropagation(); update((d) => { d.holdings = d.holdings.filter((x) => x.id !== r.h.id); }); }}><Icon name="trash" className="h-4 w-4" /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -79,6 +83,11 @@ export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | nul
         </div>
       )}
 
+      {open && (() => { const r = st.rows.find((x) => x.h.id === open); return r ? (
+        <Sheet title={`${r.h.code}${r.h.name !== r.h.code ? `: ${r.h.name}` : ''}`} onClose={() => setOpen(null)}>
+          <p className="mb-4 text-sm text-muted">{num(r.h.units, 4)} units · average buy {fmtPrice(r.h.avgCost, r.h.currency)}{r.h.firstBought ? ` · first bought ${new Date(r.h.firstBought).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} · worth {money(r.value)} ({money(r.gain, { sign: true })})</p>
+          <div className="panel p-5"><HoldingChart h={r.h} currentPrice={r.price} /></div>
+        </Sheet>) : null; })()}
       {sheet === 'import' && <Sheet title="Import trades" onClose={() => setSheet(null)}><CsvImport onImport={(h) => { merge(h); setSheet(null); }} /></Sheet>}
       {sheet === 'trade' && <Sheet title="Log a trade" onClose={() => setSheet(null)}><TradeForm onDone={() => setSheet(null)} /></Sheet>}
     </div>

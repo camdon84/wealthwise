@@ -7,7 +7,7 @@ import { Overview } from './pages/Overview';
 import { Properties } from './pages/Properties';
 import { Investments } from './pages/Investments';
 import { Plan } from './pages/Plan';
-import { Renovate } from './pages/Misc';
+import { Renovate } from './pages/Renovate';
 import { Dependants, MyDetails } from './pages/MyDetails';
 import { Account } from './pages/Account';
 import { FirstLook } from './pages/FirstLook';
