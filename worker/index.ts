@@ -192,6 +192,7 @@ async function api(req: Request, env: Env, path: string) {
   if (path === '/api/quotes' && method === 'GET') return quotes(req, env);
   if (path === '/api/briefing' && method === 'GET') return briefingRoute(req, env);
   if (path === '/api/wise' && method === 'POST') return wiseRoute(req, env);
+  if (path === '/api/documents/read' && method === 'POST') return readDocument(req, env);
   if (path === '/api/cash-rate' && method === 'GET') {
     const data = await cashRate(env);
     return data ? json(data, 200, { 'cache-control': 'public, max-age=1800' }) : fail('Cash rate unavailable right now.', 503);
@@ -377,4 +378,42 @@ function cashRate(env: Env, force = false) {
     const recent = changes.slice(-6);
     return { current: recent[recent.length - 1].rate, effective: recent[recent.length - 1].date, previous: recent[recent.length - 2] ?? null, changes: recent };
   }, force);
+}
+
+/* ---------- Document reading: convert with Workers AI, then extract the figures ----------
+ * The file is read in memory and discarded; only the extracted figures go back to the app.
+ */
+const DOC_TYPES = ['valuation', 'super', 'loan', 'rental', 'payslip', 'trades', 'other'];
+
+async function readDocument(req: Request, env: Env) {
+  let form: FormData;
+  try { form = await req.formData(); } catch { return fail('Upload a file to read.'); }
+  const file = form.get('file');
+  if (!(file instanceof File)) return fail('Upload a file to read.');
+  if (file.size > 6 * 1024 * 1024) return fail('That file is over 6 MB. Try a smaller PDF or a photo of the page.', 413);
+  const kind = DOC_TYPES.includes(String(form.get('kind'))) ? String(form.get('kind')) : 'other';
+  const context = String(form.get('context') || '{}').slice(0, 4000);
+
+  const converted: any = await (env.AI as any).toMarkdown([{ name: file.name || 'document', blob: new Blob([await file.arrayBuffer()], { type: file.type || 'application/octet-stream' }) }]);
+  const text = String(converted?.[0]?.data || '').replace(/## Metadata[\s\S]*?## Contents/, '').slice(0, 14000);
+  if (!text.trim() || converted?.[0]?.format === 'error') return fail('We couldn’t read any text in that file. Try a PDF, or a clearer photo of the page.', 422);
+
+  const sys = `You read Australian personal-finance documents for a wealth app and pull out figures exactly as written. The user says this is a "${kind}" document; correct that if the text clearly shows otherwise.
+Never guess or calculate: if a value isn't in the text, use null. Money as plain numbers (415000 not "$415,000"). Dates as YYYY-MM-DD.
+The household's properties and people, to help you name the right ones: ${context}
+Reply with JSON only, filling only the section that matches the document and null for the rest:
+{"detectedType":"valuation|super|loan|rental|payslip|trades|other","summary":"one plain sentence describing the document",
+"valuation":{"address":"","value":0,"date":"","weeklyRent":null,"valuer":""},
+"super":{"memberName":"","fund":"","closingBalance":0,"periodEnd":"","returnPercent":null,"contributions":null},
+"loan":{"propertyAddress":"","lender":"","balance":0,"ratePercent":null,"rateType":"variable|fixed|null","offsetBalance":null,"date":""},
+"rental":{"address":"","weeklyRent":null,"periodEnd":""},
+"payslip":{"name":"","annualSalary":null,"payDate":""},
+"trades":[{"code":"","market":"ASX","side":"buy|sell","units":0,"price":0,"date":""}]}`;
+  try {
+    const out = await askAI(env, sys, `Document text:\n${text}`);
+    return json({ fileName: file.name, ...out });
+  } catch (e) {
+    console.error(`doc read: ${(e as Error).message}`);
+    return fail('We read the file but couldn’t pick out the figures. You can enter them by hand instead.', 422);
+  }
 }

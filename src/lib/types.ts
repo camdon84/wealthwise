@@ -8,6 +8,7 @@ export interface Person {
   salary: number | null; // gross annual
   employment: 'payg' | 'self' | 'not-working';
   superBalance: number | null;
+  superReturn?: number | null; // last financial year's net return, %
 }
 
 export interface Household {
@@ -134,7 +135,13 @@ export interface Profile {
   assumptions: Assumptions;
   rateWatch?: { cashRate: number; date: string }; // RBA cash rate the variable loan rates were last confirmed against
   firstLookSeen?: boolean;
+  documents?: DocRecord[];
+  eofy?: { fy: string; done: string[] }; // end-of-financial-year update checklist
+
   updatedAt: string;
 }
 
 export interface Session { userId: string; email: string; name: string; demo?: boolean; sandbox?: boolean }
+
+export type DocKind = 'valuation' | 'super' | 'loan' | 'rental' | 'payslip' | 'trades' | 'other';
+export interface DocRecord { id: string; name: string; kind: DocKind; uploadedAt: string; summary: string; applied: string[] }

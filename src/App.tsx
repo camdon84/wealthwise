@@ -9,6 +9,7 @@ import { Investments } from './pages/Investments';
 import { Plan } from './pages/Plan';
 import { ProfilePage, Renovate } from './pages/Misc';
 import { FirstLook } from './pages/FirstLook';
+import { Documents, eofyItems } from './pages/Documents';
 import { Icon, Logo } from './components/ui';
 
 const NAV = [
@@ -16,6 +17,7 @@ const NAV = [
   { id: 'properties', label: 'Properties', icon: 'property' },
   { id: 'investments', label: 'Shares and crypto', icon: 'shares' },
   { id: 'plan', label: 'Plan', icon: 'plan' },
+  { id: 'documents', label: 'Upload your documents', icon: 'upload' },
   { id: 'renovate', label: 'Renovator', icon: 'renovate' },
   { id: 'profile', label: 'Profile', icon: 'profile' },
 ];
@@ -36,6 +38,7 @@ function Shell() {
   const [menu, setMenu] = useState(false);
   const current = NAV.some((n) => n.id === route) ? route : 'overview';
   const profile = useApp((s) => s.profile)!;
+  const due = eofyItems(profile).outstanding.length;
   if (profile.firstLookSeen === false) return <FirstLook quotes={quotes} />;
 
   const nav = (
@@ -44,6 +47,7 @@ function Shell() {
         <button key={n.id} onClick={() => { go(n.id); setMenu(false); }} aria-current={current === n.id ? 'page' : undefined}
           className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${current === n.id ? 'bg-raised text-ink ring-1 ring-line' : 'text-muted hover:text-ink hover:bg-raised/60'}`}>
           <Icon name={n.icon} className="h-[18px] w-[18px]" />{n.label}
+          {n.id === 'documents' && due > 0 && <span className="ml-auto rounded-full bg-brass px-1.5 text-[11px] font-semibold text-ground" aria-label={`${due} end of year updates due`}>{due}</span>}
         </button>
       ))}
     </nav>
@@ -72,6 +76,7 @@ function Shell() {
           {current === 'properties' && <Properties />}
           {current === 'investments' && <Investments quotes={quotes} asOf={asOf} />}
           {current === 'plan' && <Plan quotes={quotes} />}
+          {current === 'documents' && <Documents />}
           {current === 'renovate' && <Renovate />}
           {current === 'profile' && <ProfilePage />}
         </main>
