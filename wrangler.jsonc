@@ -10,7 +10,7 @@
     "run_worker_first": ["/api/*"]
   },
   "d1_databases": [
-    { "binding": "DB", "database_name": "wealthwise", "database_id": "REPLACE_WITH_D1_DATABASE_ID" }
+    { "binding": "DB", "database_name": "wealthwise", "database_id": "72ad86e1-366d-4940-ab37-64bac244d250" }
   ],
   "observability": { "enabled": true }
 }
