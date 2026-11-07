@@ -80,7 +80,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   const cap = !propsOk(p, r) && r.shareMonthly > 0 ? maxShareMonthly(p, quotes) : null;
   if (cap) problems.push(`Your share plan of ${m(r.shareMonthly)} a month uses savings your property plan needs. Based on your property purchasing goals, the most you can invest in shares is about ${money(cap.monthly)} a month, which grows to about ${m(cap.sharesAtRetireReal)} by ${retireAge}.`);
   if (!propsOk(p, r)) {
-    if (cap) fixes.push(`Invest ${money(cap.monthly)} a month in shares (set “Invest each month” in Shares), or lower your share goal to about ${m(round(cap.sharesAtRetireReal, 50000))}.`);
+    if (cap) fixes.push(`Invest ${money(cap.monthly)} a month in shares (set “Monthly investment” in Shares), or lower your share goal to about ${m(round(cap.sharesAtRetireReal, 50000))}.`);
     // Cheaper properties
     const scale = bisect(0.3, 1, (f) => propsOk(p, run((x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= f; }); })));
     if (scale != null && scale < 0.97) {
@@ -130,7 +130,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   const sharesReal = r.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years); // before any retirement sale money is added
   if ((g.sharesTarget ?? 0) > 0 && sharesReal < (g.sharesTarget ?? 0) * 0.97) {
     problems.push(`Investing ${m(r.shareMonthly)} a month, your shares reach about ${m(sharesReal)} by ${retireAge}, short of your ${m(g.sharesTarget ?? 0)} goal.`);
-    fixes.push(`Invest about ${money(r.requiredShareMonthly)} a month (set “Invest each month” in Shares), or lower your share goal to about ${m(round(sharesReal, 50000))}.`);
+    fixes.push(`Invest about ${money(r.requiredShareMonthly)} a month (set “Monthly investment” in Shares), or lower your share goal to about ${m(round(sharesReal, 50000))}.`);
   }
 
   // What's working

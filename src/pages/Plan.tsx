@@ -292,10 +292,10 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
         <h2 className="font-display text-xl font-semibold">Your share plan</h2>
         <p className="mt-1 text-sm text-muted">Shares only. Crypto is tracked in its own tab but left out of the plan.</p>
         <div className="mt-5"><p className="text-xs text-muted">Shares today</p><p className="font-display text-2xl font-semibold">{money(sharesNow)}</p></div>
-        <p className="mt-5 text-sm">Enter either one. The other is worked out for you.</p>
+        <p className="mt-5 text-sm">Plan your shares one of two ways: set a goal for retirement, or set how much you’ll invest each month. We’ll work out the other.</p>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <Field label="Share portfolio value at retirement" hint="In today’s money. Leave blank if you don’t have a retirement goal.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
-          <Field label="Invest each month" hint={auto ? (p.goals.sharesTarget ? 'Worked out from your target. Type your own amount to change it.' : 'Rises with inflation each year.') : 'Your own amount, rising with inflation each year.'}>{(id) => <MoneyInput id={id} value={auto ? (p.goals.sharesTarget ? Math.round(required) : null) : p.goals.shareMonthly ?? null} onChange={(v) => update((d) => { d.goals.shareMonthly = v ?? 0; })} suffix="/ month" />}</Field>
+          <Field label="Retirement goal" hint="What you’d like your shares to be worth when you stop work, in today’s money. Leave blank if you don’t have one.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
+          <Field label="Monthly investment" hint={auto && p.goals.sharesTarget ? 'Worked out from your goal. Type an amount to set your own instead.' : 'The amount goes up with inflation each year.'}>{(id) => <MoneyInput id={id} value={auto ? (p.goals.sharesTarget ? Math.round(required) : null) : p.goals.shareMonthly ?? null} onChange={(v) => update((d) => { d.goals.shareMonthly = v ?? 0; })} suffix="/ month" />}</Field>
         </div>
         {(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).length > 0 && (
           <div className="mt-4 rounded-xl border border-line p-3">

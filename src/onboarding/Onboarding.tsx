@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useApp } from '../lib/store';
 import { useQuotes } from '../lib/hooks';
-import { hecsAnnual, hecsCompulsory, livingCosts, position, propertyStats } from '../lib/calc';
+import { afterTax, hecsAnnual, hecsCompulsory, livingCosts, position, propertyStats } from '../lib/calc';
 import { defaultCurrency, money, num, price } from '../lib/format';
 import { DEBT_RATE, LIVING_CATEGORIES, emptyDebt, emptyDependant, emptyProperty, uid } from '../lib/defaults';
 import type { Debt, Holding, Profile, Property } from '../lib/types';
@@ -159,6 +159,17 @@ function AboutYou({ thorough }: { thorough: boolean }) {
   );
 }
 
+/** The marginal tax bracket for a salary (2026–27 resident rates) and what's left after tax. */
+function TaxBracket({ salary }: { salary: number }) {
+  const rate = salary > 190000 ? 45 : salary > 135000 ? 37 : salary > 45000 ? 30 : salary > 18200 ? 15 : 0;
+  return (
+    <span className="mt-1 block">
+      <span className="rounded bg-raised px-1.5 py-0.5 font-medium text-ink ring-1 ring-line">{rate}% tax bracket</span>
+      <span className="ml-1.5">plus 2% Medicare levy · about {money(afterTax(salary))} a year after tax ({money(afterTax(salary) / 12)} a month)</span>
+    </span>
+  );
+}
+
 /** Expected promotions: a new salary from a given year, then the yearly pay rise carries on from there. */
 function Promotions({ who }: { who: 'you' | 'partner' }) {
   const p = useApp((s) => s.profile)!;
@@ -198,7 +209,7 @@ export function Income({ thorough, withDates }: { thorough: boolean; withDates?:
           <p className="font-display text-lg font-semibold">{who === 'you' ? hh.you.name || 'You' : hh.partner.name || 'Your partner'}</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field label="Job title">{(id) => <TextInput id={id} value={hh[who].jobTitle ?? ''} onChange={(v) => update((d) => { d.household[who].jobTitle = v; })} placeholder="e.g. Project manager" />}</Field>
-            <Field label="Salary before tax" hint={withDates ? <AsOf date={hh[who].salaryAsOf} onToday={() => update((d) => { d.household[who].salaryAsOf = today(); })} /> : 'Include regular overtime and allowances. Leave super out.'}>{(id) => <MoneyInput id={id} value={hh[who].salary} onChange={(v) => update((d) => { d.household[who].salary = v; if (withDates) d.household[who].salaryAsOf = today(); })} suffix="/ year" />}</Field>
+            <Field label="Salary before tax" hint={<>{withDates ? <AsOf date={hh[who].salaryAsOf} onToday={() => update((d) => { d.household[who].salaryAsOf = today(); })} /> : 'Include regular overtime and allowances. Leave super out.'}{(hh[who].salary ?? 0) > 0 && <TaxBracket salary={hh[who].salary!} />}</>}>{(id) => <MoneyInput id={id} value={hh[who].salary} onChange={(v) => update((d) => { d.household[who].salary = v; if (withDates) d.household[who].salaryAsOf = today(); })} suffix="/ year" />}</Field>
             {thorough && <div><p className="field-label">Work</p><Segmented size="sm" value={hh[who].employment} onChange={(v) => update((d) => { d.household[who].employment = v; })} options={[...emp]} /></div>}
             <Field label="Expected pay rise each year" hint="About 3% keeps pace with wages. Inflation is assumed at 2.75%.">{(id) => <NumInput id={id} value={hh[who].salaryGrowth ?? 3} onChange={(v) => update((d) => { d.household[who].salaryGrowth = v ?? 3; })} step={0.5} suffix="% / yr" />}</Field>
           </div>
