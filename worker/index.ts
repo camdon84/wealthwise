@@ -225,8 +225,13 @@ type Headline = { title: string; source: string; url: string; date: string };
 const decode = (s: string) => s.replace(/<!\[CDATA\[|\]\]>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 
 async function news(query: string): Promise<Headline[]> {
-  const res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-AU&gl=AU&ceid=AU:en`, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' } });
-  if (!res.ok) return [];
+  const ua = { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' };
+  let res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-AU&gl=AU&ceid=AU:en`, { headers: ua }).catch(() => null);
+  if (!res?.ok) {
+    console.log(`google news ${res?.status ?? 'error'} for ${query}, trying bing`);
+    res = await fetch(`https://www.bing.com/news/search?q=${encodeURIComponent(query.replace(/ when:\d+d/, ''))}&format=rss&mkt=en-AU`, { headers: ua }).catch(() => null);
+    if (!res?.ok) return [];
+  }
   const xml = await res.text();
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 12).map(([, it]) => {
     const raw = decode(it.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '');
@@ -282,7 +287,7 @@ async function cached(env: Env, key: string, maxAgeMs: number, make: () => Promi
       .bind(key, JSON.stringify(data), Date.now()).run();
     return data;
   } catch (e) {
-    console.error('ai', key, e);
+    console.error(`ai ${key}: ${(e as Error)?.message ?? e}`);
     return row ? JSON.parse(row.data) : null; // serve the last good copy if the refresh fails
   }
 }
