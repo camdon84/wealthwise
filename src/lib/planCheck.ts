@@ -1,4 +1,4 @@
-import { position, project, type Projection, type Quotes } from './calc';
+import { holdingsStats, incomeTax, position, project, type Projection, type Quotes } from './calc';
 import { money } from './format';
 import type { Profile } from './types';
 
@@ -149,12 +149,12 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   }
   if (cashOk(r) && position(p, quotes).monthlySurplus < 0) problems.push('You’re spending more than you earn each month right now. Check your living costs in My details.');
 
-  const ideas = [...buyIdeas(p, r, run), ...(lastsOk(r) && cashOk(r) && propsOk(p, r) ? retireIdeas(p, run) : [])];
+  const ideas = [...buyIdeas(p, r, run, quotes), ...(lastsOk(r) && cashOk(r) && propsOk(p, r) ? retireIdeas(p, run) : [])];
   return { works: problems.length === 0, problems, fixes: [...new Set(fixes)], good, ideas, proj: r };
 }
 
 /** Tested levers that would bring a property purchase forward. */
-function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) => Projection): string[] {
+function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) => Projection, quotes: Quotes): string[] {
   const owned = p.properties.length;
   const planned = (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - owned));
   if (planned.length === 0) return [];
@@ -170,6 +170,17 @@ function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) =>
   if (withDebt.some((pr) => !pr.planIo5)) levers.push({ text: 'move your current loans to interest-only for 5 years, so repayments are lower while you save', mod: (x) => { x.properties.forEach((pr) => { pr.planIo5 = true; }); } });
   if (planned.some((pp) => pp.ioFirst5 === false)) levers.push({ text: 'use interest-only for the first 5 years on new purchases', mod: (x) => { x.plannedPurchases?.forEach((pp) => { pp.ioFirst5 = true; }); } });
   if (withDebt.some((pr) => pr.planPayOff && pr.use === 'investment') || planned.some((pp) => pp.payOff)) levers.push({ text: 'don’t pay the investment loans off by retirement (it means bigger repayments now)', mod: (x) => { x.properties.forEach((pr) => { if (pr.use === 'investment') pr.planPayOff = false; }); x.plannedPurchases?.forEach((pp) => { pp.payOff = false; }); } });
+  // Selling some crypto or shares to fund the deposit, after capital gains tax
+  for (const kind of ['crypto', 'shares'] as const) {
+    for (const frac of [0.5, 1]) {
+      const sale = saleAfterTax(p, quotes, kind, frac);
+      if (!sale || sale.gross < 10000) continue;
+      levers.push({
+        text: `consider selling ${frac === 1 ? 'your' : 'about half your'} ${kind} (${m(sale.gross)}). After an estimated ${m(sale.tax)} in capital gains tax, that adds about ${m(sale.net)} to your deposit savings. An accountant can help you time the sale${kind === 'shares' && (p.goals.sharesTarget ?? 0) > 0 ? ', and your share goal would need more invested later' : ''}`,
+        mod: (x) => { applySale(x, quotes, kind, frac); x.finances.cash = (x.finances.cash ?? 0) + sale.net; x.finances.cashSavings = (x.finances.cashSavings ?? 0) + sale.net; },
+      });
+    }
+  }
   levers.push({ text: `aim for a property about 10% cheaper (around ${m(round(planned[0].price * 0.9, 5000))} in today’s money)`, mod: (x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= 0.9; }); } });
   levers.push({ text: 'trim your living costs by about 10%', mod: (x) => { const f = x.finances; if (f.livingMonthly) f.livingMonthly *= 0.9; for (const k in f.livingBreakdown ?? {}) if (f.livingBreakdown[k]) f.livingBreakdown[k] = (f.livingBreakdown[k] ?? 0) * 0.9; } });
 
@@ -192,7 +203,16 @@ function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) =>
         : `To buy ${name} sooner (${b.to} instead of ${base[b.k]}), ${lv.text}.` });
     }
   }
-  return out.sort((a, b) => a.k - b.k || b.gain - a.gain).slice(0, 3).map((x) => x.text);
+  // For each asset, keep one sale idea: the smaller sale if it does as well as selling everything
+  const pick = out.filter((x) => {
+    const m2 = x.text.match(/selling (your|about half your) (crypto|shares)/);
+    if (!m2) return true;
+    const twin = out.find((y) => y !== x && y.text.includes(`selling ${m2[1] === 'your' ? 'about half your' : 'your'} ${m2[2]}`));
+    if (!twin) return true;
+    const thisIsHalf = m2[1] !== 'your';
+    return thisIsHalf ? x.k < twin.k || (x.k === twin.k && x.gain >= twin.gain) : twin.k > x.k || (twin.k === x.k && twin.gain < x.gain);
+  });
+  return pick.sort((a, b) => a.k - b.k || b.gain - a.gain).slice(0, 4).map((x) => x.text);
 }
 
 /** When the plan has room to spare: an earlier finish, or a bigger retirement income. */
@@ -208,4 +228,29 @@ function retireIdeas(p: Profile, run: (mod: (x: Profile) => void) => Projection)
   const most = bisect(p.goals.passiveIncome, p.goals.passiveIncome * 4, (v) => lastsOk(run((x) => { x.goals.passiveIncome = v; })), 12);
   if (most != null && most > p.goals.passiveIncome * 1.15) out.push(`Or stop at ${p.goals.retirementAge} as planned and live on up to about ${m(round(most, 5000))} a year in retirement instead of ${m(p.goals.passiveIncome)}.`);
   return out;
+}
+
+const isCryptoHolding = (h: { kind: string; exchange: string }) => h.kind === 'crypto' || h.exchange === 'CRYPTO';
+
+/** Selling part of the crypto or share portfolio today: gross, estimated capital gains tax and what's left. */
+function saleAfterTax(p: Profile, quotes: Quotes, kind: 'crypto' | 'shares', frac: number) {
+  const rows = holdingsStats(p.holdings, quotes).rows.filter((r) => isCryptoHolding(r.h) === (kind === 'crypto'));
+  if (rows.length === 0) return null;
+  const yearAgo = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+  let gross = 0, taxable = 0;
+  for (const r of rows) {
+    gross += r.value * frac;
+    const gain = Math.max(0, r.gain) * frac;
+    const held12 = !r.h.firstBought || r.h.firstBought < yearAgo;
+    taxable += held12 ? gain * 0.5 : gain; // 50% CGT discount after 12 months
+  }
+  const income = (p.household.you.salary ?? 0) + (p.household.otherIncome ?? 0);
+  const tax = Math.max(0, incomeTax(income + taxable) - incomeTax(income));
+  return { gross, tax, net: gross - tax };
+}
+
+function applySale(x: Profile, quotes: Quotes, kind: 'crypto' | 'shares', frac: number) {
+  x.holdings = x.holdings
+    .map((h) => (isCryptoHolding(h) === (kind === 'crypto') ? { ...h, units: h.units * (1 - frac) } : h))
+    .filter((h) => h.units > 1e-9);
 }
