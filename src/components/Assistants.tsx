@@ -81,7 +81,7 @@ export function WisePanel({ profile, quotes, go }: { profile: Profile; quotes: Q
                   <p className="text-sm leading-relaxed text-muted">{ins.body}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     {ins.action && (ins.action.to === 'plan:projections'
-                      ? <button className="group inline-flex items-center gap-2 rounded-xl bg-brass px-4 py-2 text-sm font-semibold text-ground shadow-[0_6px_20px_-6px_rgb(var(--brass)/0.7)] ring-2 ring-brass/40 transition-transform hover:-translate-y-0.5" onClick={() => { useNavIntent.getState().set({ planTab: 'projections' }); go('plan'); }}><Icon name="spark" className="h-4 w-4 transition-transform group-hover:rotate-45" />{ins.action.label}</button>
+                      ? <button className="group inline-flex items-center gap-2 rounded-xl border border-brass/60 bg-brass/10 px-4 py-2.5 text-sm font-semibold text-brass transition-all hover:bg-brass/20 hover:shadow-[0_4px_16px_-6px_rgb(var(--brass)/0.6)]" onClick={() => { useNavIntent.getState().set({ planTab: 'projections' }); go('plan'); }}><Icon name="spark" className="h-4 w-4 transition-transform group-hover:rotate-45" />{ins.action.label}</button>
                       : <button className="btn-quiet py-1.5" onClick={() => go(ins.action!.to)}>{ins.action.label}</button>)}
                     {ins.ask && <span className="text-xs text-muted">{ASK[ins.ask]}</span>}
                   </div>

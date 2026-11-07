@@ -38,12 +38,6 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
                 <p className="text-sm text-muted">{p.household.hasPartner ? 'Your combined net worth' : 'Your current net worth'}</p>
                 <p className="font-display text-5xl font-semibold tracking-tight">{money(pos.netWorth)}</p>
                 <p className="mt-1 text-sm text-muted">{money(pos.assets, { compact: true })} in assets, {money(pos.liabilities, { compact: true })} owing</p>
-                {atRetire && (
-                  <div className="mt-4">
-                    <p className="text-sm text-muted">{p.household.hasPartner ? 'Your combined net worth' : 'Your net worth'} at retirement age ({p.goals.retirementAge})</p>
-                    <p className="font-display text-3xl font-semibold tracking-tight text-gum">{money(atRetire.netWorth / Math.pow(1 + p.assumptions.inflation / 100, atRetire.year - proj.points[0].year), { compact: true })} <span className="text-sm font-normal text-muted">in today’s money · {money(atRetire.netWorth, { compact: true })} in {atRetire.year} dollars</span></p>
-                  </div>
-                )}
               </div>
               <div className="flex flex-col items-end gap-3">
                 <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
@@ -55,9 +49,11 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
             <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} /> Projected from your current position to age {p.goals.lifeExpectancy ?? 90}, using the assumptions in your plan. Markers show when your equity could fund each new purchase.</p>
           </div>
           <div className="grid grid-cols-2 gap-px border-t border-line bg-line lg:grid-cols-1 lg:border-l lg:border-t-0">
-            <Kpi label="Usable equity" value={money(pos.usable, { compact: true })} sub={`at ${p.assumptions.lvr}% LVR`} />
-            <Kpi label="Borrowing capacity" value={money(pos.bc.capacity, { compact: true })} sub="estimate, before a lender checks" />
-            <Kpi label="Left over each month" value={money(pos.monthlySurplus)} sub="after living costs and all repayments" />
+            <Kpi label="Usable equity today" value={money(pos.usable, { compact: true })} sub={`at ${p.assumptions.lvr}% LVR`} />
+            <Kpi label="Borrowing capacity today" value={money(pos.bc.capacity, { compact: true })} sub="estimate, before a lender checks" />
+            <Kpi label="Left over cash each month" value={money(pos.monthlySurplus)} sub="after living costs and all repayments" />
+            <div className="col-span-2 border-t-4 border-line bg-raised px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted lg:col-span-1">At retirement</div>
+            {atRetire && <Kpi label={`${p.household.hasPartner ? 'Your combined net worth' : 'Your net worth'} at retirement age (${p.goals.retirementAge})`} value={money(atRetire.netWorth / Math.pow(1 + p.assumptions.inflation / 100, atRetire.year - proj.points[0].year), { compact: true })} sub={`in today’s money · ${money(atRetire.netWorth, { compact: true })} in ${atRetire.year} dollars`} accent />}
             <div className="bg-surface p-5">
               <p className="text-xs text-muted">Living on {money(p.goals.passiveIncome, { compact: true })} a year from {p.goals.retirementAge}</p>
               <p className={`font-display text-2xl font-semibold mt-0.5 ${proj.runsOutAge == null ? '' : 'text-clay'}`}>{proj.runsOutAge == null ? `Lasts past ${life}` : `Runs out at ${proj.runsOutAge}`}</p>
@@ -75,11 +71,11 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
   );
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string; sub: string }) {
+function Kpi({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: boolean }) {
   return (
     <div className="bg-surface p-5">
       <p className="text-xs text-muted">{label}</p>
-      <p className="font-display text-2xl font-semibold mt-0.5">{value}</p>
+      <p className={`font-display text-2xl font-semibold mt-0.5 ${accent ? 'text-gum' : ''}`}>{value}</p>
       <p className="text-xs text-muted mt-0.5">{sub}</p>
     </div>
   );
