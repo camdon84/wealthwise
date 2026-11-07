@@ -4,7 +4,7 @@ import { project, type Quotes } from '../lib/calc';
 import { money } from '../lib/format';
 import type { Assumptions } from '../lib/types';
 import { MiniLine, chartColors as C, WealthChart, toReal, wealthSeries } from '../components/Charts';
-import { Segmented } from '../components/ui';
+import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
 
 const SLIDERS: { key: keyof Assumptions; label: string; min: number; max: number; step: number; fmt: (v: number) => string }[] = [
   { key: 'lvr', label: 'Borrow against equity up to', min: 60, max: 90, step: 5, fmt: (v) => `${v}% LVR` },
@@ -55,10 +55,11 @@ export function Plan({ quotes }: { quotes: Quotes }) {
         <div className="min-w-0 space-y-6">
           <section className="panel p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-xl font-semibold">Wealth over time</h2>
-              <Segmented size="sm" label="Show values in" value={dollars} onChange={setDollars} options={[{ value: 'real', label: 'Today’s dollars' }, { value: 'nominal', label: 'Future dollars' }]} /></div>
+              <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div></div>
             <div className="mt-3 flex justify-end">
               <ul className="flex flex-wrap gap-x-4 text-xs text-muted">{wealthSeries.map((s) => <li key={s.key} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />{s.label}</li>)}</ul></div>
-            <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={300} /></div>
+            <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} /></p>
+            <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={300} real={dollars === 'real'} /></div>
           </section>
 
           <section className="panel p-5 sm:p-6">

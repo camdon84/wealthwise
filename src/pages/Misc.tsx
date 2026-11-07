@@ -32,6 +32,7 @@ export function ProfilePage() {
           <Field label="Stop working at">{(id) => <NumInput id={id} value={g.retirementAge} onChange={(v) => update((d) => { d.goals.retirementAge = v ?? 60; })} suffix="years" />}</Field>
           <Field label="Income wanted then">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ yr" />}</Field>
           <Field label="Properties to own">{(id) => <NumInput id={id} value={g.targetProperties} onChange={(v) => update((d) => { d.goals.targetProperties = v ?? 0; })} />}</Field>
+          <Field label="Planning to live to">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} suffix="years" />}</Field>
         </div>
       </section>
       <section className="panel flex flex-wrap items-center justify-between gap-4 p-6">

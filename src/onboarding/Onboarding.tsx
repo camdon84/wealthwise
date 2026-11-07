@@ -395,6 +395,7 @@ function Goals({ thorough }: { thorough: boolean }) {
         <Field label="Age you’d like to stop working">{(id) => <NumInput id={id} value={g.retirementAge} onChange={(v) => update((d) => { d.goals.retirementAge = v ?? 60; })} />}</Field>
         <Field label="Yearly income you want then" hint="In today’s dollars, before tax.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
         <Field label="Properties you’d like to own">{(id) => <NumInput id={id} value={g.targetProperties} onChange={(v) => update((d) => { d.goals.targetProperties = v ?? 0; })} />}</Field>
+        <Field label="Age you’re planning to live to" hint="Your plan runs to this age, so you can see if the money lasts.">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} min={60} max={110} />}</Field>
       </div>
       <div className="panel p-5">
         <label htmlFor="risk" className="field-label">How comfortable are you with ups and downs?</label>

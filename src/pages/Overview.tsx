@@ -4,7 +4,7 @@ import { project, position } from '../lib/calc';
 import { money } from '../lib/format';
 import type { Quotes } from '../lib/calc';
 import { WealthChart, toReal, wealthSeries } from '../components/Charts';
-import { Segmented } from '../components/ui';
+import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { NewsPanel, WisePanel } from '../components/Assistants';
 import { RateWatch } from '../components/RateWatch';
 
@@ -37,14 +37,14 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
                 <p className="mt-1 text-sm text-muted">{money(pos.assets, { compact: true })} in assets, {money(pos.liabilities, { compact: true })} owing</p>
               </div>
               <div className="flex flex-col items-end gap-3">
-                <Segmented size="sm" label="Show values in" value={dollars} onChange={setDollars} options={[{ value: 'real', label: 'Today’s dollars' }, { value: 'nominal', label: 'Future dollars' }]} />
+                <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
                 <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
                   {wealthSeries.map((s) => <li key={s.key} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />{s.label}</li>)}
                 </ul>
               </div>
             </div>
-            <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} /></div>
-            <p className="mt-2 text-xs text-muted">Projected in {dollars === 'real' ? 'today’s dollars' : 'future dollars'} from your current position and the assumptions in your plan. Markers show when your equity could fund each new purchase.</p>
+            <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} /></div>
+            <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} /> Projected from your current position to age {p.goals.lifeExpectancy ?? 90}, using the assumptions in your plan. Markers show when your equity could fund each new purchase.</p>
           </div>
           <div className="grid grid-cols-2 gap-px border-t border-line bg-line lg:grid-cols-1 lg:border-l lg:border-t-0">
             <Kpi label="Usable equity" value={money(pos.usable, { compact: true })} sub={`at ${p.assumptions.lvr}% LVR`} />

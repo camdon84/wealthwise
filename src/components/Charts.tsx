@@ -8,12 +8,13 @@ const C = {
 };
 const axis = { stroke: C.muted, fontSize: 11, tickLine: false, axisLine: false } as const;
 
-function Tip({ active, payload, label, rows }: any) {
+function Tip({ active, payload, label, rows, real }: any) {
   if (!active || !payload?.length) return null;
   const d: YearPoint = payload[0].payload;
   return (
     <div className="rounded-xl border border-line bg-surface px-3 py-2.5 text-xs shadow-lg">
       <p className="font-semibold text-ink">{label} · age {d.age}</p>
+      {real != null && <p className="text-[11px] text-muted">{real ? 'in today’s money' : `in ${label} dollars`}</p>}
       {rows.map((r: { key: keyof YearPoint; label: string; color: string }) => (
         <p key={String(r.key)} className="mt-1 flex items-center justify-between gap-6 text-muted">
           <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: r.color }} />{r.label}</span>
@@ -39,7 +40,7 @@ export function toReal(points: YearPoint[], inflation: number): YearPoint[] {
   });
 }
 
-export function WealthChart({ points, retireYear, height = 320 }: { points: YearPoint[]; retireYear: number; height?: number }) {
+export function WealthChart({ points, retireYear, height = 320, real }: { points: YearPoint[]; retireYear: number; height?: number; real?: boolean }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={points} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
@@ -49,7 +50,7 @@ export function WealthChart({ points, retireYear, height = 320 }: { points: Year
         <CartesianGrid vertical={false} stroke={C.grid} strokeDasharray="2 4" />
         <XAxis dataKey="year" {...axis} interval="preserveStartEnd" minTickGap={28} />
         <YAxis {...axis} width={56} tickFormatter={(v) => money(v, { compact: true })} />
-        <Tooltip content={<Tip rows={wealthSeries} />} cursor={{ stroke: C.muted, strokeDasharray: '3 3' }} />
+        <Tooltip content={<Tip rows={wealthSeries} real={real} />} cursor={{ stroke: C.muted, strokeDasharray: '3 3' }} />
         {wealthSeries.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} strokeWidth={1.5} fill={`url(#g-${s.key})`} isAnimationActive={false} />)}
         <ReferenceLine x={retireYear} stroke={C.brass} strokeDasharray="4 4" label={{ value: 'Stop work', position: 'insideTopRight', fill: C.brass, fontSize: 11 }} />
         {points.filter((p) => p.bought).map((p) => (

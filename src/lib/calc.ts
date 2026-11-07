@@ -187,7 +187,7 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
   const pos = position(p, quotes);
   const startAge = n(p.household.you.age) || 35;
   const retireAge = Math.max(startAge + 1, p.goals.retirementAge);
-  const endAge = Math.max(retireAge + 8, startAge + 25);
+  const endAge = Math.max(retireAge + 1, startAge + 5, Math.min(110, p.goals.lifeExpectancy ?? 90));
   const y0 = thisYear();
   const retireYear = y0 + (retireAge - startAge);
 

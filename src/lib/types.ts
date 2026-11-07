@@ -89,6 +89,7 @@ export interface LifeEvent { id: string; label: string; year: number; amount: nu
 
 export interface Goals {
   retirementAge: number;
+  lifeExpectancy?: number; // age the plan runs to
   passiveIncome: number; // today's dollars p.a.
   targetProperties: number;
   risk: number; // 1-5

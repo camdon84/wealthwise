@@ -45,6 +45,7 @@ export function normalize(p: Profile): Profile {
   for (const d of p.finances.debts) if (d.rate === undefined && d.kind !== 'hecs') d.rate = DEBT_RATE[d.kind] ?? null;
   for (const pr of p.properties) for (const l of pr.loans) l.rateType ??= 'variable';
   p.mode = 'thorough';
+  p.goals.lifeExpectancy ??= 90;
   return p;
 }
 
@@ -72,7 +73,7 @@ export function blankProfile(name: string): Profile {
     finances: { ...financeDefaults(), livingMonthly: null, cash: null, offsetIsCash: true, buffer: null, debts: [] },
     properties: [],
     holdings: [],
-    goals: { retirementAge: 60, passiveIncome: 120000, targetProperties: 4, risk: 3, events: [] },
+    goals: { retirementAge: 60, lifeExpectancy: 90, passiveIncome: 120000, targetProperties: 4, risk: 3, events: [] },
     assumptions: { ...defaultAssumptions },
     updatedAt: new Date().toISOString(),
   };
@@ -149,7 +150,7 @@ export function demoProfile(): Profile {
   p.rateWatch = { cashRate: 4.6, date: '2026-09-30' }; // demo: last confirmed before the RBA's November rise
   p.firstLookSeen = true;
   p.goals = {
-    retirementAge: 58, passiveIncome: 130000, targetProperties: 5, risk: 4,
+    retirementAge: 58, lifeExpectancy: 90, passiveIncome: 130000, targetProperties: 5, risk: 4,
     events: [{ id: uid(), label: 'Kitchen renovation', year: new Date().getFullYear() + 1, amount: 45000 }],
   };
   return p;
