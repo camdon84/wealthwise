@@ -317,8 +317,11 @@ function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quot
   const planned = (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - owned));
   const rows = useMemo(() => {
     const top = Math.max(required, current, cap ?? 0, 1000);
-    const steps = [0, 500, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000].filter((v) => v <= top * 1.1);
-    const amounts = [...new Set([...steps, Math.round(current), Math.round(required), ...(cap != null ? [cap] : [])])].sort((x, y) => x - y).slice(0, 10);
+    const special = [0, Math.round(current), Math.round(required), ...(cap != null ? [cap] : [])];
+    const steps = [500, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000].filter((v) => v <= top * 1.1 && !special.includes(v));
+    const room = Math.max(0, 10 - new Set(special).size);
+    const picked = steps.length <= room ? steps : steps.filter((_, j) => j % Math.ceil(steps.length / room) === 0).slice(0, room);
+    const amounts = [...new Set([...special, ...picked])].sort((x, y) => x - y);
     const years = Math.max(1, p.goals.retirementAge - (p.household.you.age ?? 35));
     return amounts.map((v) => {
       const x: typeof p = JSON.parse(JSON.stringify(p)); x.goals.shareMonthly = v;
@@ -346,7 +349,7 @@ function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quot
                 return (
                   <tr key={row.v} className={`border-b border-line last:border-0 ${isCurrent ? 'bg-brass/10' : ''}`}>
                     <td className="py-2.5 pr-3"><span className="font-semibold">{money(row.v)}</span>
-                      <span className="block text-[11px] text-muted">{[isCurrent && 'your plan', Math.abs(row.v - required) < 1 && 'reaches your share goal', cap != null && row.v === cap && 'most before properties slip'].filter(Boolean).join(' · ')}</span></td>
+                      <span className="block text-[11px] text-muted">{[isCurrent && 'your plan', Math.abs(row.v - required) < 1 && 'reaches your share goal', cap != null && row.v === cap && 'most that still fits every property'].filter(Boolean).join(' · ')}</span></td>
                     {row.buys.map((b, k) => <td key={k} className={`px-2 py-2.5 text-right ${!b.year || b.late ? 'font-medium text-clay' : ''}`}>{b.year ?? 'Doesn’t fit'}</td>)}
                     <td className="px-2 py-2.5 text-right">{money(row.shares, { compact: true })}</td>
                     <td className="py-2.5 pl-2 text-right">{!isCurrent && <button className={`text-xs font-medium hover:underline ${broken ? 'text-muted' : 'text-brass'}`} onClick={() => onUse(row.v)}>Use</button>}</td>
@@ -412,7 +415,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
             const c = (v: number) => money(v / d, { compact: true });
             const working = pt.age < p.goals.retirementAge;
             const stats = working
-              ? [`Cash at year end ${c(Math.max(0, pt.cash))}`, pt.shareContribution > 0 ? `${c(pt.shareContribution)} into shares` : 'Nothing into shares', `Shares ${c(pt.shares)}`, `Super ${c(pt.super)}`]
+              ? [`Cash at year end ${c(Math.max(0, pt.cash))}`, pt.sharePlanned > 0 && pt.shareContribution < pt.sharePlanned * 0.98 ? `${c(pt.shareContribution)} into shares (plan ${c(pt.sharePlanned)})` : pt.shareContribution > 0 ? `${c(pt.shareContribution)} into shares` : 'Nothing into shares', `Shares ${c(pt.shares)}`, `Super ${c(pt.super)}`]
               : [pt.superDrawn > 0 ? `${c(pt.superDrawn)} paid from super` : pt.age < 60 ? 'Super not open until 60' : 'Super used up', `Cash at year end ${c(Math.max(0, pt.cash))}`, `Shares ${c(pt.shares)}`, `Super left ${c(pt.super)}`];
             return (
               <li key={pt.year} className={`flex gap-4 py-3 ${pt.age === p.goals.retirementAge ? 'bg-brass/5' : ''}`}>

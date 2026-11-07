@@ -119,7 +119,7 @@ export function demoProfile(): Profile {
   const today = new Date().toISOString().slice(0, 10);
   const props: Property[] = [
     {
-      ...emptyProperty(), address: '14 Kirkland Avenue', suburb: 'Coorparoo', state: 'QLD', postcode: '4151', use: 'home', kind: 'house', structure: 'joint',
+      ...emptyProperty(), address: '14 Kirkland Avenue', suburb: 'Coorparoo', state: 'QLD', postcode: '4151', geo: { lat: -27.4996757, lon: 153.0525236 }, use: 'home', kind: 'house', structure: 'joint',
       purchasePrice: 720000, purchaseDate: '2019-03', growthRate: 6, bedrooms: 4, yearBuilt: 1962, weeklyRent: null, annualCosts: 7200,
       valuations: [
         { id: uid(), source: 'realestate.com.au', value: 1150000, date: today },
@@ -129,7 +129,7 @@ export function demoProfile(): Profile {
       loans: [{ id: uid(), lender: 'CBA', balance: 470000, rate: 6.09, type: 'pi', yearsLeft: 23, offset: 45000 }],
     },
     {
-      ...emptyProperty(), address: '8/22 Esplanade', suburb: 'Bargara', state: 'QLD', postcode: '4670', use: 'investment', kind: 'unit', structure: 'personal',
+      ...emptyProperty(), address: '8/22 Esplanade', suburb: 'Bargara', state: 'QLD', postcode: '4670', geo: { lat: -24.8122745, lon: 152.4624863 }, use: 'investment', kind: 'unit', structure: 'personal',
       purchasePrice: 245000, purchaseDate: '2021-06', growthRate: 5, bedrooms: 2, yearBuilt: 2003, weeklyRent: 480, annualCosts: 6900,
       valuations: [
         { id: uid(), source: 'realestate.com.au', value: 395000, date: today },
@@ -138,7 +138,7 @@ export function demoProfile(): Profile {
       loans: [{ id: uid(), lender: 'Macquarie', balance: 196000, rate: 6.29, type: 'io', yearsLeft: 26, offset: 0 }],
     },
     {
-      ...emptyProperty(), address: '31 Ashgrove Road', suburb: 'Harlaxton', state: 'QLD', postcode: '4350', use: 'investment', kind: 'house', structure: 'personal',
+      ...emptyProperty(), address: '31 Ashgrove Road', suburb: 'Harlaxton', state: 'QLD', postcode: '4350', geo: null, use: 'investment', kind: 'house', structure: 'personal',
       purchasePrice: 510000, purchaseDate: '2023-02', growthRate: 5.5, bedrooms: 3, yearBuilt: 2014, weeklyRent: 560, annualCosts: 5400,
       valuations: [
         { id: uid(), source: 'realestate.com.au', value: 630000, date: today },
