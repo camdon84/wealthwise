@@ -424,7 +424,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
               <p className={`text-sm font-medium ${proj.runsOutAge != null ? 'text-clay' : 'text-gum'}`}>{proj.runsOutAge != null ? `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money runs out at ${proj.runsOutAge}.` : `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money lasts to ${p.goals.lifeExpectancy ?? 90}.`}</p></div>
             <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
           </div>
-          <div className="mt-3 flex justify-end"><SeriesToggles hidden={hidden} onChange={setHidden} /></div>
+          <div className="mt-3 flex justify-end"><SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} /></div>
           <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} />{proj.cryptoExcluded > 0 && ` Crypto (${money(proj.cryptoExcluded, { compact: true })} today) is left out because its future value can’t be estimated.`}</p>
           <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={320} real={dollars === 'real'} hidden={hidden} runsOutYear={runsOutYear} /></div>
           <MarkerKey points={pts} />

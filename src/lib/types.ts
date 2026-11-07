@@ -166,7 +166,8 @@ export interface Profile {
   documents?: DocRecord[];
   eofy?: { fy: string; done: string[] }; // end-of-financial-year update checklist
   renovations?: Renovation[];
-  cryptoGrowth?: number | null; // the user's own guess, only used on the Crypto page
+  cryptoGrowth?: number | null;
+  cryptoInPlan?: boolean; // opted in: crypto grows at cryptoGrowth in the plan // the user's own guess, only used on the Crypto page
 
   updatedAt: string;
 }

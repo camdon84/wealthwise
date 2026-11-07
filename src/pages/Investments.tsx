@@ -41,7 +41,7 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
           <p className="text-muted">{priceMode === 'demo' ? 'Demo prices' : 'Prices delayed 15–20 minutes'} · select a holding to see its chart{asOf ? ` · updated ${asOf.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}` : ''}</p>
         </div>
         <div className="flex gap-2">
-          {!crypto && <button className="btn-quiet" onClick={() => setSheet('import')}><Icon name="upload" className="h-4 w-4" />Import a file</button>}
+          <button className="btn-quiet" onClick={() => setSheet('import')}><Icon name="upload" className="h-4 w-4" />Import a file</button>
           <button className="btn-primary" onClick={() => setSheet('trade')}><Icon name="plus" className="h-4 w-4" />Log a trade</button>
         </div>
       </div>
@@ -49,7 +49,9 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
       {crypto ? (
         <div className="flex gap-3 rounded-xl border border-brass/40 bg-brass/10 p-4 text-sm">
           <Icon name="coin" className="mt-0.5 h-5 w-5 shrink-0 text-brass" />
-          <p>As cryptocurrency is a volatile asset, we cannot measure its future performance. Your crypto counts towards your net worth today, but it’s left out of your plan, projections and Your Wise Future.</p>
+          <p>{p.cryptoInPlan && p.cryptoGrowth != null
+            ? `Your crypto is included in your plan as a simple figure: today’s value growing at your own estimate of ${p.cryptoGrowth}% a year. Cryptocurrency is volatile, so treat that part of the plan as a rough guide.`
+            : 'As cryptocurrency is a volatile asset, we cannot measure its future performance. Your crypto counts towards your net worth today, but it’s left out of your plan, projections and Your Wise Future unless you choose to include it below.'}</p>
         </div>
       ) : <MarketStrip />}
 
@@ -70,7 +72,7 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
       </section>
 
       {mine.length === 0 ? (
-        <div className="panel p-10 text-center"><p className="font-medium">{crypto ? 'No crypto yet' : 'No shares yet'}</p><p className="mt-1 text-sm text-muted">{crypto ? 'Log a trade to track a coin at live prices.' : 'Import your broker’s trade history or log a trade to start tracking.'}</p></div>
+        <div className="panel p-10 text-center"><p className="font-medium">{crypto ? 'No crypto yet' : 'No shares yet'}</p><p className="mt-1 text-sm text-muted">{crypto ? 'Import your exchange’s trade history or log a trade to track a coin at live prices.' : 'Import your broker’s trade history or log a trade to start tracking.'}</p></div>
       ) : (
         <div className="panel overflow-x-auto">
           <table className="w-full text-sm">
@@ -98,7 +100,7 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
           <p className="mb-4 text-sm text-muted">{num(r.h.units, 4)} units · average buy {fmtPrice(r.h.avgCost, r.h.currency)}{r.h.firstBought ? ` · first bought ${new Date(r.h.firstBought).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} · worth {money(r.value)} ({money(r.gain, { sign: true })})</p>
           <div className="panel p-5"><HoldingChart h={r.h} currentPrice={r.price} /></div>
         </Sheet>) : null; })()}
-      {sheet === 'import' && <Sheet title="Import trades" onClose={() => setSheet(null)}><CsvImport onImport={(h) => { merge(h); setSheet(null); }} /></Sheet>}
+      {sheet === 'import' && <Sheet title="Import trades" onClose={() => setSheet(null)}><CsvImport crypto={crypto} onImport={(h) => { merge(h); setSheet(null); }} /></Sheet>}
       {sheet === 'trade' && <Sheet title="Log a trade" onClose={() => setSheet(null)}><TradeForm onDone={() => setSheet(null)} crypto={crypto} /></Sheet>}
     </div>
   );
@@ -150,18 +152,42 @@ function TradeForm({ onDone, crypto }: { onDone: () => void; crypto?: boolean })
 function CryptoGuess({ value }: { value: number }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
+  const [asking, setAsking] = useState(false);
   const g = p.cryptoGrowth ?? null;
+  const inPlan = !!p.cryptoInPlan;
   const age = p.household.you.age ?? 35;
   const years = Math.max(0, p.goals.retirementAge - age);
   const future = g != null ? value * Math.pow(1 + g / 100, years) : null;
   const real = future != null ? future / Math.pow(1 + p.assumptions.inflation / 100, years) : null;
+  const missing = inPlan && g == null;
   return (
-    <div className="mt-6 flex flex-wrap items-end gap-x-8 gap-y-3 rounded-xl bg-raised p-4 ring-1 ring-line">
-      <div className="w-44"><Field label="My expected growth">{(id) => <NumInput id={id} value={g} onChange={(v) => update((d) => { d.cryptoGrowth = v; })} step={1} suffix="% / yr" placeholder="e.g. 15" />}</Field></div>
-      {future != null ? (
-        <div><p className="text-xs text-muted">Expected value at {p.goals.retirementAge}</p><p className="font-display text-2xl font-semibold">{money(future, { compact: true })}</p><p className="text-xs text-muted">about {money(real!, { compact: true })} in today’s money</p></div>
-      ) : <p className="pb-2 text-sm text-muted">Enter a growth rate to see what your crypto could be worth at {p.goals.retirementAge}.</p>}
-      <p className="basis-full text-[11px] text-muted">Your own estimate, shown here only. It isn’t used in your plan, projections or Your Wise Future.</p>
+    <div className="mt-6 space-y-4 rounded-xl bg-raised p-4 ring-1 ring-line">
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        <div className="w-44"><Field label="My expected growth">{(id) => <NumInput id={id} value={g} onChange={(v) => update((d) => { d.cryptoGrowth = v; })} step={1} suffix="% / yr" placeholder="e.g. 15" />}</Field></div>
+        {future != null ? (
+          <div><p className="text-xs text-muted">Expected value at {p.goals.retirementAge}</p><p className="font-display text-2xl font-semibold">{money(future, { compact: true })}</p><p className="text-xs text-muted">about {money(real!, { compact: true })} in today’s money</p></div>
+        ) : <p className="pb-2 text-sm text-muted">Enter a growth rate to see what your crypto could be worth at {p.goals.retirementAge}.</p>}
+      </div>
+      <label className="flex cursor-pointer items-start gap-3 border-t border-line pt-4">
+        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={inPlan} onChange={(e) => { if (e.target.checked) setAsking(true); else update((d) => { d.cryptoInPlan = false; }); }} />
+        <span className="text-sm font-medium">I want to include my crypto in my full financial plan
+          <span className="block text-xs font-normal text-muted">{inPlan ? 'Included: it grows at your expected rate in your projections and Your Wise Future, and can be sold in retirement after your shares.' : 'Off: your crypto only counts in today’s net worth.'}</span>
+        </span>
+      </label>
+      {missing && <p role="alert" className="rounded-lg bg-clay/10 px-3 py-2 text-sm text-clay">Enter your expected growth above to include crypto in your plan, or untick the box. Until then it’s left out.</p>}
+      {asking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="crypto-warn" onClick={() => setAsking(false)}>
+          <div className="paper w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-clay/15 text-clay"><Icon name="coin" className="h-5 w-5" /></span><h2 id="crypto-warn" className="font-display text-xl font-semibold">Cryptocurrency</h2></div>
+            <p className="mt-4 leading-relaxed">Cryptocurrency is a volatile asset. We can include it in your plan, but it will only be a simple metric of your current portfolio value in today’s money and the expected growth that is set by you.</p>
+            {g == null && <p className="mt-3 text-sm text-clay">You’ll need to enter your expected growth for it to be included.</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <button className="btn-quiet" onClick={() => setAsking(false)}>Cancel</button>
+              <button className="btn-primary" onClick={() => { update((d) => { d.cryptoInPlan = true; }); setAsking(false); }}>Include my crypto</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

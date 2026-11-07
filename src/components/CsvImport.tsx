@@ -7,29 +7,34 @@ import { Icon } from './ui';
 
 type FieldKey = 'code' | 'units' | 'price' | 'date' | 'side' | 'market' | 'fees';
 const FIELDS: { key: FieldKey; label: string; required?: boolean; guess: RegExp }[] = [
-  { key: 'code', label: 'Ticker or code', required: true, guess: /^(code|ticker|symbol|security|stock|asx code|instrument)/i },
-  { key: 'units', label: 'Units', required: true, guess: /(qty|quantity|units|shares|volume)/i },
-  { key: 'price', label: 'Price per unit', required: true, guess: /(^price|unit price|avg|average|cost per|trade price|execution price)/i },
+  { key: 'code', label: 'Ticker or code', required: true, guess: /^(code|ticker|symbol|security|stock|asx code|instrument|coin|asset|pair|market)/i },
+  { key: 'units', label: 'Units', required: true, guess: /(qty|quantity|units|shares|volume|^amount)/i },
+  { key: 'price', label: 'Price per unit', required: true, guess: /(^price|unit price|avg|average|cost per|trade price|execution price|^rate)/i },
   { key: 'date', label: 'Trade date', guess: /date/i },
   { key: 'side', label: 'Buy or sell', guess: /(buy\/sell|side|type|action|transaction)/i },
   { key: 'market', label: 'Market', guess: /(market|exchange)/i },
-  { key: 'fees', label: 'Brokerage', guess: /(brokerage|fee|commission)/i },
+  { key: 'fees', label: 'Brokerage', guess: /(brokerage|^fee|fee aud|fees|commission)/i },
 ];
 
 const CRYPTO = new Set(['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE']);
+const SAMPLE_CRYPTO_CSV = `Date,Type,Market,Amount,Rate Inc. Fee,Fee AUD
+2024-03-12,Buy,BTC/AUD,0.05,98500,25
+2024-11-20,Buy,ETH/AUD,0.8,4950,12
+2025-06-03,Buy,BTC/AUD,0.03,162000,20
+2025-09-14,Sell,ETH/AUD,0.2,6800,6`;
 const toNum = (s: string | undefined) => { const v = Number(String(s ?? '').replace(/[^0-9.\-]/g, '')); return isFinite(v) ? v : 0; };
 
-function aggregate(rows: Record<string, string>[], map: Partial<Record<FieldKey, string>>): Holding[] {
+function aggregate(rows: Record<string, string>[], map: Partial<Record<FieldKey, string>>, forceCrypto = false): Holding[] {
   const by = new Map<string, Holding & { cost: number }>();
   for (const r of rows) {
     const rawCode = String(r[map.code!] ?? '').trim().toUpperCase();
     if (!rawCode) continue;
-    const code = rawCode.replace(/\.(AX|ASX)$/, '');
+    const code = rawCode.replace(/\.(AX|ASX)$/, '').replace(/[-/](AUD|USD|USDT)$/, '');
     const units = Math.abs(toNum(r[map.units!]));
     const price = toNum(r[map.price!]);
     if (!units || !price) continue;
     const mk = String(map.market ? r[map.market] : '').toUpperCase();
-    const exchange: Holding['exchange'] = CRYPTO.has(code) ? 'CRYPTO' : /NASDAQ/.test(mk) ? 'NASDAQ' : /NYSE|US/.test(mk) ? 'NYSE' : 'ASX';
+    const exchange: Holding['exchange'] = forceCrypto || CRYPTO.has(code) ? 'CRYPTO' : /NASDAQ/.test(mk) ? 'NASDAQ' : /NYSE|US/.test(mk) ? 'NYSE' : 'ASX';
     const sell = map.side ? /^(s|sell|sold)/i.test(String(r[map.side] ?? '').trim()) : false;
     const fees = map.fees ? toNum(r[map.fees]) : 0;
     const date = map.date ? String(r[map.date] ?? '') : '';
@@ -49,7 +54,7 @@ function aggregate(rows: Record<string, string>[], map: Partial<Record<FieldKey,
   return [...by.values()].filter((h) => h.units > 0).map(({ cost, ...h }) => ({ ...h, avgCost: cost / h.units, currency: defaultCurrency(h.exchange) }));
 }
 
-export function CsvImport({ onImport, compact }: { onImport: (h: Holding[]) => void; compact?: boolean }) {
+export function CsvImport({ onImport, compact, crypto }: { onImport: (h: Holding[]) => void; compact?: boolean; crypto?: boolean }) {
   const [rows, setRows] = useState<Record<string, string>[] | null>(null);
   const [cols, setCols] = useState<string[]>([]);
   const [map, setMap] = useState<Partial<Record<FieldKey, string>>>({});
@@ -69,7 +74,7 @@ export function CsvImport({ onImport, compact }: { onImport: (h: Holding[]) => v
   const readFile = (f: File) => { const fr = new FileReader(); fr.onload = () => load(String(fr.result), f.name); fr.readAsText(f); };
 
   const ready = FIELDS.filter((f) => f.required).every((f) => map[f.key]);
-  const preview = useMemo(() => (rows && ready ? aggregate(rows, map) : []), [rows, map, ready]);
+  const preview = useMemo(() => (rows && ready ? aggregate(rows, map, crypto) : []), [rows, map, ready, crypto]);
 
   if (!rows) {
     return (
@@ -79,11 +84,11 @@ export function CsvImport({ onImport, compact }: { onImport: (h: Holding[]) => v
           onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) readFile(f); }}
           className={`rounded-2xl border-2 border-dashed ${drag ? 'border-brass bg-brass/5' : 'border-line'} ${compact ? 'p-6' : 'p-10'} text-center transition-colors`}>
           <Icon name="upload" className="mx-auto h-7 w-7 text-brass" />
-          <p className="mt-3 font-medium">Drop your broker’s trade history here</p>
-          <p className="mt-1 text-sm text-muted">CSV from CommSec, Stake, SelfWealth, Pearler, Sharesight or a spreadsheet. You’ll match the columns next.</p>
+          <p className="mt-3 font-medium">{crypto ? 'Drop your exchange’s trade history here' : 'Drop your broker’s trade history here'}</p>
+          <p className="mt-1 text-sm text-muted">{crypto ? 'CSV from CoinSpot, Swyftx, Independent Reserve, Binance or a spreadsheet. You’ll match the columns next.' : 'CSV from CommSec, Stake, SelfWealth, Pearler, Sharesight or a spreadsheet. You’ll match the columns next.'}</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <button type="button" className="btn-primary" onClick={() => input.current?.click()}>Choose a file</button>
-            <button type="button" className="btn-quiet" onClick={() => load(SAMPLE_CSV, 'sample-trades.csv')}>Use a sample file</button>
+            <button type="button" className="btn-quiet" onClick={() => load(crypto ? SAMPLE_CRYPTO_CSV : SAMPLE_CSV, crypto ? 'sample-crypto.csv' : 'sample-trades.csv')}>Use a sample file</button>
           </div>
           <input ref={input} type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) readFile(f); e.target.value = ''; }} />
         </div>

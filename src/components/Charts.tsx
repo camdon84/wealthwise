@@ -34,21 +34,23 @@ export const wealthSeries = [
   { key: 'propertyEquity' as const, label: 'Property equity', color: C.equity },
   { key: 'shares' as const, label: 'Shares', color: C.shares },
   { key: 'super' as const, label: 'Super', color: C.super },
+  { key: 'crypto' as const, label: 'Crypto', color: '#8b6fb3' },
 ];
 
 export function toReal(points: YearPoint[], inflation: number): YearPoint[] {
   return points.map((p, i) => {
     const d = Math.pow(1 + inflation / 100, i);
-    return { ...p, propertyEquity: p.propertyEquity / d, shares: p.shares / d, super: p.super / d, cash: p.cash / d, netWorth: p.netWorth / d, bought: p.bought ? p.bought / d : undefined };
+    return { ...p, propertyEquity: p.propertyEquity / d, shares: p.shares / d, super: p.super / d, cash: p.cash / d, crypto: p.crypto / d, netWorth: p.netWorth / d, bought: p.bought ? p.bought / d : undefined };
   });
 }
 
-export function SeriesToggles({ hidden, onChange }: { hidden: string[]; onChange: (h: string[]) => void }) {
+export function SeriesToggles({ hidden, onChange, crypto }: { hidden: string[]; onChange: (h: string[]) => void; crypto?: boolean }) {
+  const list = wealthSeries.filter((s) => crypto || s.key !== 'crypto');
   return (
     <ul className="flex flex-wrap gap-x-2 gap-y-1" aria-label="Show or hide each part of the chart">
-      {wealthSeries.map((s) => {
+      {list.map((s) => {
         const on = !hidden.includes(s.key);
-        const onlyOne = on && wealthSeries.length - hidden.length === 1;
+        const onlyOne = on && list.filter((x) => !hidden.includes(x.key)).length === 1;
         return (
           <li key={s.key}>
             <label className={`flex cursor-pointer select-none items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-raised ${on ? 'text-ink' : 'text-muted line-through decoration-muted/60'}`} title={onlyOne ? 'At least one needs to stay on' : undefined}>
@@ -66,7 +68,8 @@ export function SeriesToggles({ hidden, onChange }: { hidden: string[]; onChange
 }
 
 export function WealthChart({ points, retireYear, height = 320, real, hidden = [], runsOutYear }: { points: YearPoint[]; retireYear: number; height?: number; real?: boolean; hidden?: string[]; runsOutYear?: number | null }) {
-  const shown = wealthSeries.filter((s) => !hidden.includes(s.key));
+  const hasCrypto = points.some((p) => p.crypto > 0);
+  const shown = wealthSeries.filter((s) => !hidden.includes(s.key) && (hasCrypto || s.key !== 'crypto'));
   points = points.map((p) => ({ ...p, cash: Math.max(0, p.cash), netWorth: p.netWorth - Math.min(0, p.cash) })); // a shortfall shows as the money running out, not negative cash
   return (
     <ResponsiveContainer width="100%" height={height}>

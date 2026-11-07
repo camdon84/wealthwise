@@ -48,7 +48,7 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
               </div>
               <div className="flex flex-col items-end gap-3">
                 <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
-                <SeriesToggles hidden={hidden} onChange={setHidden} />
+                <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} />
               </div>
             </div>
             <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} hidden={hidden} runsOutYear={proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null} /></div>

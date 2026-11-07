@@ -191,7 +191,7 @@ export function position(p: Profile, quotes: Quotes) {
 
 /* ---------- Projection ---------- */
 export interface YearPoint {
-  year: number; age: number; propertyValue: number; propertyDebt: number; propertyEquity: number; shares: number; super: number; cash: number;
+  year: number; age: number; propertyValue: number; propertyDebt: number; propertyEquity: number; shares: number; super: number; cash: number; crypto: number;
   netWorth: number; passiveIncome: number; passiveIncomeReal: number; properties: number; borrowing: number; monthlySavings: number;
   repayUp2: number; repayBase: number; repayDown2: number; bought?: number;
   spendGoalReal: number; spendFundedReal: number; shareContribution: number; sharePlanned: number; rentIncome: number; superDrawn: number; paidOff?: string[]; sold?: string[];
@@ -253,9 +253,15 @@ export function project(p: Profile, quotes: Quotes): Projection {
   const renos = (p.renovations ?? []).filter((r) => !r.done && valueNow.has(r.propertyId));
 
   // Crypto is too volatile to project: it counts in today's net worth but not in the plan.
-  const cryptoExcluded = pos.shares.rows.filter((r) => r.h.kind === 'crypto').reduce((t, r) => t + r.value, 0);
-  let shares = pos.shares.value - cryptoExcluded;
-  let shareCost = pos.shares.rows.filter((r) => r.h.kind !== 'crypto').reduce((t, r) => t + r.cost, 0);
+  // Unless the person opts in with their own growth rate: then it's a simple pot growing at that rate.
+  const isCryptoRow = (r: { h: { kind: string; exchange: string } }) => r.h.kind === 'crypto' || r.h.exchange === 'CRYPTO';
+  const cryptoNow = pos.shares.rows.filter(isCryptoRow).reduce((t, r) => t + r.value, 0);
+  const cryptoIn = !!p.cryptoInPlan && p.cryptoGrowth != null;
+  const cryptoExcluded = cryptoIn ? 0 : cryptoNow;
+  let cryptoBal = cryptoIn ? cryptoNow : 0;
+  let cryptoCost = cryptoIn ? pos.shares.rows.filter(isCryptoRow).reduce((t, r) => t + r.cost, 0) : 0;
+  let shares = pos.shares.value - cryptoNow;
+  let shareCost = pos.shares.rows.filter((r) => !isCryptoRow(r)).reduce((t, r) => t + r.cost, 0);
   const reqMonthly = requiredShareMonthly(p, shares);
   const shareMonthly = p.goals.shareMonthly == null ? reqMonthly : n(p.goals.shareMonthly);
   let sup = pos.superBal;
@@ -302,6 +308,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   otherDebt = debtSims.reduce((t, d) => t + d.bal, 0);
 
   if (shareMonthly > 0 && !n(p.goals.shareStartAfter)) say(y0, 'shares', p.goals.shareMonthly == null ? `Invest about ${fmt(shareMonthly)} a month in shares${p.goals.sharesTarget ? ` to reach your ${fmt(n(p.goals.sharesTarget))} goal by ${retireAge}` : ''}, rising with inflation.` : `Invest ${fmt(shareMonthly)} a month in shares (your own amount), rising with inflation.`);
+  if (cryptoIn && cryptoNow > 0) say(y0, 'goal', `Your ${fmt(cryptoNow)} in crypto is included in the plan, growing at your own estimate of ${n(p.cryptoGrowth)}% a year. It’s a volatile asset, so treat this part of the plan as a rough guide.`);
   if (cryptoExcluded > 0) say(y0, 'goal', `Your ${fmt(cryptoExcluded)} in crypto stays in today’s net worth but isn’t projected forward, because its future value can’t be reasonably estimated.`);
 
   for (let i = 0; i <= endAge - startAge; i++) {
@@ -366,6 +373,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       const ccCap = CC_CAP * infl(i);
       sup = sup * (1 + a.superReturn / 100) + (Math.min(youSal * SG_RATE, ccCap) + Math.min(partSal * SG_RATE, ccCap)) * 0.85;
       shares *= 1 + a.shareReturn / 100;
+      cryptoBal *= 1 + n(p.cryptoGrowth) / 100;
 
       let debtRepay = 0;
       for (const d of debtSims) if (d.bal > 0) {
@@ -412,7 +420,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
           // Stopping work: investments that still carry a loan (and weren't set to be paid off) are sold
           const at = events.length;
           for (let k = sims.length - 1; k >= 0; k--) if (sims[k].invest && !sims[k].payOff && sims[k].debt > 1000) sellProperty(k, ' at retirement, as it still has a loan and isn’t set to be paid off');
-          const snap = `After that you’d have about ${fmt(sup / infl(i))} in super, ${fmt(shares / infl(i))} in shares, ${fmt(Math.max(0, cash) / infl(i))} in cash and ${sims.length} ${sims.length === 1 ? 'property' : 'properties'} (today’s money).`;
+          const snap = `After that you’d have about ${fmt(sup / infl(i))} in super, ${fmt(shares / infl(i))} in shares, ${cryptoBal > 1000 ? `${fmt(cryptoBal / infl(i))} in crypto, ` : ''}${fmt(Math.max(0, cash) / infl(i))} in cash and ${sims.length} ${sims.length === 1 ? 'property' : 'properties'} (today’s money).`;
           const sold = events.length - at;
           say(year, 'retire', `Stop working at ${retireAge}.${sold ? ` ${sold === 1 ? 'One property is' : `${sold} properties are`} sold (below). ${snap}` : ` ${snap.replace('After that you’d', 'You’d')}`} From here you live on ${fmt(p.goals.passiveIncome)} a year in today’s money.`);
           events.splice(at, 0, events.pop()!);
@@ -436,6 +444,13 @@ export function project(p: Profile, quotes: Quotes): Projection {
         cash += propNet + offsetSaving + superDraw - spendGoal - debtRepay - renoCost;
         const floor = buffer * infl(i);
         if (cash < floor - 1) sellShares(floor - cash);
+        if (cash < floor - 1 && cryptoBal > 0) {
+          const need = floor - cash;
+          const gainShare = Math.max(0, 1 - cryptoCost / cryptoBal);
+          const gross = Math.min(cryptoBal, need / (1 - gainShare * CGT_RATE));
+          if (gross >= cryptoBal * 0.999 && cryptoBal > 1000) say(year, 'sell', 'Your crypto is fully sold down by now.');
+          cryptoCost *= 1 - gross / cryptoBal; cryptoBal -= gross; cash += gross * (1 - gainShare * CGT_RATE);
+        }
         while (cash < floor - 1) {
           const idx = sims.map((s, k) => ({ s, k })).filter((x) => x.s.invest).map((x) => x.k).pop(); // newest investment first
           if (idx == null) break;
@@ -503,7 +518,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       : (rentNet - spendGoal) / 12;
     points.push({
       year, age, propertyValue, propertyDebt, propertyEquity: propertyValue - propertyDebt, shares, super: sup, cash,
-      netWorth: propertyValue - propertyDebt + shares + sup + cash - Math.max(0, otherDebt) - Math.max(0, hecsBal),
+      crypto: cryptoBal, netWorth: propertyValue - propertyDebt + shares + sup + cash + cryptoBal - Math.max(0, otherDebt) - Math.max(0, hecsBal),
       passiveIncome, passiveIncomeReal: passiveIncome / infl(i), properties: sims.length,
       borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, false))) : 0,
       monthlySavings: monthlyNet, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
