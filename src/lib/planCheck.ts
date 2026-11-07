@@ -161,8 +161,8 @@ function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) =>
   const base = planned.map((_, k) => r.purchases[k]?.year ?? null);
   const levers: { text: string; mod: (x: Profile) => void }[] = [];
   if (r.shareMonthly > 0) {
-    levers.push({ text: 'don’t invest in shares until then', mod: (x) => { x.goals.shareMonthly = 0; } });
-    if (!p.goals.shareStartAfter) levers.push({ text: `keep your ${m(r.shareMonthly)} a month share plan but start it once your planned properties are bought (tick the box in Shares)`, mod: (x) => { x.goals.shareMonthly = Math.round(r.shareMonthly); x.goals.shareStartAfter = planned.length; } });
+    if (!p.goals.shareStartAfter) levers.push({ text: `hold off on your ${m(r.shareMonthly)} a month share plan until it’s bought (tick the box in Shares)`, mod: (x) => { x.goals.shareMonthly = Math.round(r.shareMonthly); x.goals.shareStartAfter = 1; } });
+    else levers.push({ text: 'pause the share plan until then', mod: (x) => { x.goals.shareMonthly = 0; } });
     levers.push({ text: `halve your share plan to about ${money(Math.round(r.shareMonthly / 2 / 50) * 50)} a month`, mod: (x) => { x.goals.shareMonthly = Math.round(r.shareMonthly / 2); } });
   }
   const withDebt = p.properties.filter((pr) => pr.loans.some((l) => (l.balance ?? 0) > 0));
