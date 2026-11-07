@@ -29,7 +29,7 @@ export function Auth() {
         <Logo />
         <div className="max-w-lg">
           <h1 className="font-display text-5xl font-semibold leading-[1.05]">See every property, share and dollar on one plan.</h1>
-          <p className="mt-5 text-lg text-muted">WealthWise values your portfolio, tracks your shares, and shows when your equity could fund the next purchase, all the way to the year you stop working.</p>
+          <p className="mt-5 text-lg text-muted">WealthWise values your portfolio, tracks your shares and maps each purchase up to the year you stop working. Then it shows whether your money will last through retirement, for as long as you plan to live.</p>
         </div>
         <HeroTimeline />
       </section>
