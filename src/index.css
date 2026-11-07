@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --ground: 238 241 236;
-  --surface: 255 255 255;
-  --raised: 246 248 244;
-  --line: 214 222 213;
+  --ground: 233 237 230;
+  --surface: 251 248 241;
+  --raised: 243 239 229;
+  --line: 222 216 200;
   --ink: 20 33 28;
   --muted: 92 108 100;
   --brass: 156 114 42;
@@ -40,6 +40,22 @@ h1, h2, h3, .font-display { font-family: 'Bricolage Grotesque', system-ui, sans-
 
 :focus-visible { outline: 2px solid rgb(var(--brass)); outline-offset: 2px; border-radius: 6px; }
 
+/* Cards are cream in both themes: dark chrome around light, easy-to-read content. */
+.dark .panel, .dark .paper {
+  --surface: 250 247 239;
+  --raised: 242 238 228;
+  --line: 224 217 201;
+  --ink: 24 36 31;
+  --muted: 96 106 98;
+  --brass: 150 108 38;
+  --gum: 44 106 84;
+  --sky: 58 100 140;
+  --clay: 176 70 48;
+  --sage: 112 132 78;
+  color: rgb(var(--ink));
+  color-scheme: light;
+}
+
 @layer components {
   .field-label { @apply block text-sm font-medium text-ink mb-1.5; }
   .field-hint { @apply text-xs text-muted mt-1; }
@@ -54,7 +70,7 @@ h1, h2, h3, .font-display { font-family: 'Bricolage Grotesque', system-ui, sans-
   .btn-primary { @apply btn bg-brass text-ground hover:bg-brass/90; }
   .btn-quiet { @apply btn border border-line text-ink hover:bg-raised; }
   .btn-ghost { @apply btn text-muted hover:text-ink hover:bg-raised; }
-  .panel { @apply bg-surface border border-line rounded-2xl; }
+  .panel { @apply bg-surface border border-line rounded-2xl shadow-[0_1px_2px_rgb(0_0_0/0.06),0_8px_24px_-12px_rgb(0_0_0/0.25)]; }
   .chip { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
 }
 

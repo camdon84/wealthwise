@@ -68,7 +68,7 @@ export function Onboarding() {
           <p className="text-sm text-muted lg:hidden">Step {step + 1} of {STEPS.length}</p>
           <h1 className="font-display text-3xl font-semibold sm:text-4xl">{STEPS[step].title}</h1>
           <p className="mt-1 text-muted">{STEPS[step].blurb}</p>
-          <div key={step} className="rise mt-8">{body[step]}</div>
+          <div key={step} className="rise panel mt-8 p-5 sm:p-7">{body[step]}</div>
           {step < 7 && (
             <div className="mt-10 flex items-center justify-between border-t border-line pt-6">
               <button className="btn-ghost" onClick={() => go(step - 1)} disabled={step === 0}><Icon name="back" className="h-4 w-4" />Back</button>
@@ -378,7 +378,7 @@ function Review({ go }: { go: (n: number) => void }) {
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {sections.map((s) => (
-          <div key={s.title} className="rounded-xl border border-line bg-surface p-4">
+          <div key={s.title} className="paper rounded-xl border border-line bg-surface p-4">
             <div className="flex items-center justify-between"><p className="font-medium">{s.title}</p><button className="text-sm text-brass hover:underline" onClick={() => go(s.step)}>Edit</button></div>
             {s.lines.map((l, i) => <p key={i} className="mt-1 text-sm text-muted">{l}</p>)}
           </div>

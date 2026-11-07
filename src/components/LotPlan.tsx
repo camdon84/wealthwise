@@ -10,9 +10,9 @@ function rand(seed: string) {
 export function LotPlan({ property, className = '' }: { property: Property; className?: string }) {
   const r = rand(property.id + property.address);
   const unit = property.kind === 'unit';
-  const W = 320, H = 150;
-  const x0 = 70 + r() * 20, y0 = 18 + r() * 8;
+  const W = 520, H = 150;
   const w = unit ? 170 : 150 + r() * 40, h = H - 40 - r() * 10;
+  const x0 = W / 2 - w / 2 + (r() - 0.5) * 20, y0 = 18 + r() * 8;
   const skew = (r() - 0.5) * 26;
   const lot = [[x0, y0], [x0 + w, y0 + skew * 0.3], [x0 + w + skew * 0.4, y0 + h], [x0 - skew * 0.2, y0 + h - skew * 0.2]];
   const hx = x0 + 22 + r() * 18, hy = y0 + 22 + r() * 10, hw = unit ? w - 50 : 60 + r() * 30, hh = unit ? h - 46 : 40 + r() * 18;
@@ -38,8 +38,8 @@ export function LotPlan({ property, className = '' }: { property: Property; clas
       <text x={x0 + w / 2} y={y0 + h - 8} textAnchor="middle" fontSize="9" fill="rgb(var(--muted))" fontFamily="Figtree">Lot {lotNo} on {plan}</text>
       <line x1={x0} y1={y0 - 7} x2={x0 + w} y2={y0 - 7 + skew * 0.3} stroke="rgb(var(--muted))" strokeWidth="0.6" />
       <text x={x0 + w / 2} y={y0 - 10} textAnchor="middle" fontSize="8" fill="rgb(var(--muted))" fontFamily="Figtree">{(w / 8.5).toFixed(2)} m</text>
-      <path d={`M${W - 22} 16 l0 20 M${W - 26} 22 l4 -6 4 6`} stroke="rgb(var(--muted))" strokeWidth="1" fill="none" />
-      <text x={W - 22} y={46} textAnchor="middle" fontSize="8" fill="rgb(var(--muted))" fontFamily="Figtree">N</text>
+      <path d={`M${x0 + w + 40} 16 l0 20 M${x0 + w + 36} 22 l4 -6 4 6`} stroke="rgb(var(--muted))" strokeWidth="1" fill="none" />
+      <text x={x0 + w + 40} y={46} textAnchor="middle" fontSize="8" fill="rgb(var(--muted))" fontFamily="Figtree">N</text>
     </svg>
   );
 }

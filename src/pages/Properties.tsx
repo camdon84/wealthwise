@@ -32,7 +32,7 @@ export function Properties() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4">
+      <div className="paper grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4">
         {[['Portfolio value', money(totals.v)], ['Owing', money(totals.d)], [`Usable equity (${lvr}% LVR)`, money(totals.u)], ['Investment cash flow', `${money(totals.c, { sign: true })} / yr`]].map(([l, v]) => (
           <div key={l} className="bg-surface p-4"><p className="text-xs text-muted">{l}</p><p className="font-display text-xl font-semibold">{v}</p></div>
         ))}
@@ -152,7 +152,7 @@ function PropertyDetail({ property: pr, onClose, onEdit }: { property: Property;
         </div>
       </section>
 
-      <section className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line">
+      <section className="paper mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line">
         {[['Equity', money(s.equity)], [`Usable equity at ${p.assumptions.lvr}%`, money(s.usable)], ['Owing', money(s.debt)], ['LVR', pct(s.lvrNow, 0)]].map(([l, v]) => (
           <div key={l} className="bg-surface p-4"><p className="text-xs text-muted">{l}</p><p className="font-display text-xl font-semibold">{v}</p></div>
         ))}
