@@ -58,7 +58,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
 
   // 1. Savings running out while still working (usually repayments to pay loans off fast)
   if (!cashOk(r)) {
-    problems.push(`Your savings run out in ${r.shortfallYear}, while you’re still working: loan repayments and living costs would be more than you earn.`);
+    problems.push(`Your savings run out in ${r.shortfallYear}, while you’re still working: loan repayments and living expenses would be more than you earn.`);
     const sellInstead = run((x) => { x.plannedPurchases?.forEach((pp) => { pp.payOff = false; }); x.properties.forEach((pr) => { if (pr.use === 'investment') pr.planPayOff = false; }); });
     if (cashOk(sellInstead)) fixes.push('Don’t pay the investment properties off by retirement. Paying them off that quickly needs bigger repayments than your income covers; selling them when you stop work avoids that.');
     const io = run((x) => { x.plannedPurchases?.forEach((pp) => { pp.ioFirst5 = true; }); });
@@ -147,7 +147,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
       if (extra && extra.year <= r.retireYear - 3 && lastsOk(more) && cashOk(more)) good.push(`There’s room for one more: property ${g.targetProperties + 1} would fit around ${extra.year}. Raise “Properties owned by retirement” to add it.`);
     }
   }
-  if (cashOk(r) && position(p, quotes).monthlySurplus < 0) problems.push('You’re spending more than you earn each month right now. Check your living costs in My details.');
+  if (cashOk(r) && position(p, quotes).monthlySurplus < 0) problems.push('You’re spending more than you earn each month right now. Check your living expenses in My details.');
 
   const ideas = [...buyIdeas(p, r, run, quotes), ...(lastsOk(r) && cashOk(r) && propsOk(p, r) ? retireIdeas(p, run) : [])];
   return { works: problems.length === 0, problems, fixes: [...new Set(fixes)], good, ideas, proj: r };
@@ -182,7 +182,7 @@ function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) =>
     }
   }
   levers.push({ text: `aim for a property about 10% cheaper (around ${m(round(planned[0].price * 0.9, 5000))} in today’s money)`, mod: (x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= 0.9; }); } });
-  levers.push({ text: 'trim your living costs by about 10%', mod: (x) => { const f = x.finances; if (f.livingMonthly) f.livingMonthly *= 0.9; for (const k in f.livingBreakdown ?? {}) if (f.livingBreakdown[k]) f.livingBreakdown[k] = (f.livingBreakdown[k] ?? 0) * 0.9; } });
+  levers.push({ text: 'reduce your living expenses by about 10%', mod: (x) => { const f = x.finances; if (f.livingMonthly) f.livingMonthly *= 0.9; for (const k in f.livingBreakdown ?? {}) if (f.livingBreakdown[k]) f.livingBreakdown[k] = (f.livingBreakdown[k] ?? 0) * 0.9; } });
 
   const out: { k: number; gain: number; text: string }[] = [];
   for (const lv of levers) {
