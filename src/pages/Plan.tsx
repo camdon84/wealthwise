@@ -56,7 +56,7 @@ function Goals({ quotes }: { quotes: Quotes }) {
           <Field label="Stop working at age">{(id) => <NumInput id={id} value={g.retirementAge} onChange={(v) => update((d) => { d.goals.retirementAge = v ?? 60; })} />}</Field>
           <Field label="Planning to live to">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} />}</Field>
           <Field label="Properties owned by retirement" hint={`You own ${p.properties.length} now. Set prices in Property portfolio.`}>{(id) => <NumInput id={id} value={g.targetProperties} onChange={(v) => update((d) => { d.goals.targetProperties = v ?? 0; })} min={0} max={15} />}</Field>
-          <Field label="Share portfolio by retirement" hint="In today’s money. Leave blank if you don’t have a target. Set the monthly amount in the Shares tab.">{(id) => <MoneyInput id={id} value={g.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; })} />}</Field>
+          <Field label="Share portfolio value at retirement" hint="In today’s money. Leave blank if you don’t have a retirement goal. Or set a monthly amount in Shares.">{(id) => <MoneyInput id={id} value={g.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
           <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working, in today’s money. The plan sells shares and properties if it needs to." className="sm:col-span-2">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
         </div>
       </section>
@@ -279,19 +279,25 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">Your share plan</h2>
         <p className="mt-1 text-sm text-muted">Shares only. Crypto is tracked in its own tab but left out of the plan.</p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div><p className="text-xs text-muted">Shares today</p><p className="font-display text-2xl font-semibold">{money(sharesNow)}</p></div>
-          <Field label="Share portfolio by retirement" hint="In today’s money. Also set in Goals.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; })} />}</Field>
+        <div className="mt-5"><p className="text-xs text-muted">Shares today</p><p className="font-display text-2xl font-semibold">{money(sharesNow)}</p></div>
+        <p className="mt-5 text-sm">Enter either one. The other is worked out for you.</p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <Field label="Share portfolio value at retirement" hint="In today’s money. Leave blank if you don’t have a retirement goal.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
+          <Field label="Invest each month" hint={auto ? (p.goals.sharesTarget ? 'Worked out from your target. Type your own amount to change it.' : 'Rises with inflation each year.') : 'Your own amount, rising with inflation each year.'}>{(id) => <MoneyInput id={id} value={auto ? (p.goals.sharesTarget ? Math.round(required) : null) : p.goals.shareMonthly ?? null} onChange={(v) => update((d) => { d.goals.shareMonthly = v ?? 0; })} suffix="/ month" />}</Field>
         </div>
-        <div className="mt-6 rounded-xl bg-raised p-4 ring-1 ring-line">
-          <p className="text-sm text-muted">To reach {money(p.goals.sharesTarget ?? 0, { compact: true })} by {p.goals.retirementAge} at {p.assumptions.shareReturn}% a year, you’d invest about</p>
-          <p className="font-display text-3xl font-semibold">{money(required)} <span className="text-base font-normal text-muted">a month</span></p>
-          <p className="text-xs text-muted">{money(required * 12)} a year in today’s money, rising with inflation, for {years} years.</p>
-        </div>
-        <div className="mt-6">
-          <p className="field-label">How much will you invest?</p>
-          <Segmented value={auto ? 'auto' : 'custom'} onChange={(v) => update((d) => { d.goals.shareMonthly = v === 'auto' ? null : Math.round(required); })} options={[{ value: 'auto', label: 'What’s needed for my goal' }, { value: 'custom', label: 'My own amount' }]} />
-          {!auto && <div className="mt-3 max-w-xs"><MoneyInput value={p.goals.shareMonthly ?? null} onChange={(v) => update((d) => { d.goals.shareMonthly = v ?? 0; })} suffix="/ month" /></div>}
+        <div className="mt-5 rounded-xl bg-raised p-4 ring-1 ring-line">
+          {auto && p.goals.sharesTarget ? (<>
+            <p className="text-sm text-muted">To reach {money(p.goals.sharesTarget, { compact: true })} by {p.goals.retirementAge} at {p.assumptions.shareReturn}% a year, you’d invest about</p>
+            <p className="font-display text-3xl font-semibold">{money(required)} <span className="text-base font-normal text-muted">a month</span></p>
+            <p className="text-xs text-muted">{money(required * 12)} a year in today’s money, rising with inflation, for {years} years.</p>
+          </>) : !auto && proj.shareMonthly > 0 ? (<>
+            <p className="text-sm text-muted">By investing {money(proj.shareMonthly)} a month, you’d have about</p>
+            <p className="font-display text-3xl font-semibold">{money(realAtRetire, { compact: true })} <span className="text-base font-normal text-muted">by {p.goals.retirementAge}</span></p>
+            <p className="text-xs text-muted">In today’s money, at {p.assumptions.shareReturn}% a year.{p.goals.sharesTarget ? (realAtRetire >= p.goals.sharesTarget * 0.98 ? ` That meets your ${money(p.goals.sharesTarget, { compact: true })} target.` : ` That’s short of your ${money(p.goals.sharesTarget, { compact: true })} target.`) : ''}{proj.points.some((x) => x.sharePlanned > 0 && x.shareContribution < x.sharePlanned * 0.98) ? ' Some years your savings can’t cover the full amount, so less goes in.' : ''}</p>
+            {p.goals.sharesTarget ? <button className="btn-quiet mt-3 text-sm" onClick={() => update((d) => { d.goals.shareMonthly = null; })}>Invest what’s needed for my target instead ({money(required)} a month)</button> : null}
+          </>) : (
+            <p className="text-sm text-muted">Enter a share portfolio value for retirement, or how much you’d invest each month, to see where it gets you by {p.goals.retirementAge}.</p>
+          )}
         </div>
         {over && cap && (
           <div role="alert" className="mt-5 flex gap-3 rounded-xl border border-clay/50 bg-clay/10 p-4">
@@ -304,9 +310,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
           </div>
         )}
         {!over && cap && <p className="mt-5 text-sm text-gum">Your property plan still works. You could invest up to {money(cap.monthly)} a month before it starts delaying a purchase.</p>}
-        <p className={`mt-4 text-sm ${realAtRetire >= (p.goals.sharesTarget ?? 0) ? 'text-gum' : 'text-clay'}`}>
-          At {money(proj.shareMonthly)} a month, your shares reach about {money(realAtRetire, { compact: true })} in today’s money by {p.goals.retirementAge}{p.goals.sharesTarget ? (realAtRetire >= p.goals.sharesTarget ? ', on target.' : `, short of your ${money(p.goals.sharesTarget, { compact: true })} goal.`) : '.'}
-        </p>
+
       </section>
       <ShareTradeOff quotes={quotes} current={proj.shareMonthly} required={required} cap={cap?.monthly ?? null} onUse={useAmount} />
     </div>
@@ -334,7 +338,7 @@ function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quot
   }, [p, quotes, current, required, cap]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section className="panel p-5 sm:p-6">
-      <h3 className="font-display text-lg font-semibold">What your share plan does to your properties</h3>
+      <h3 className="font-display text-lg font-semibold">What your share plan does to your property portfolio</h3>
       <p className="mt-1 text-sm text-muted">Every dollar into shares comes out of the savings that fund your deposits. Here’s when each property lands at different monthly amounts.</p>
       {planned.length === 0 ? <p className="mt-6 text-sm text-muted">You haven’t planned any more properties. Raise “Properties owned by retirement” in Goals to see the trade-off.</p> : (
         <div className="mt-5 overflow-x-auto">
@@ -352,7 +356,7 @@ function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quot
                 return (
                   <tr key={row.v} className={`border-b border-line last:border-0 ${isCurrent ? 'bg-brass/10' : ''}`}>
                     <td className="py-2.5 pr-3"><span className="font-semibold">{money(row.v)}</span>
-                      <span className="block text-[11px] text-muted">{[isCurrent && 'your plan', Math.abs(row.v - required) < 1 && 'reaches your share goal', cap != null && row.v === cap && 'most that still fits every property'].filter(Boolean).join(' · ')}</span></td>
+                      <span className="block text-[11px] text-muted">{[isCurrent && 'your plan', (p.goals.sharesTarget ?? 0) > 0 && Math.abs(row.v - required) < 1 && 'reaches your share target', cap != null && row.v === cap && 'most that still fits every property'].filter(Boolean).join(' · ')}</span></td>
                     {row.buys.map((b, k) => <td key={k} className={`px-2 py-2.5 text-right ${!b.year || b.late ? 'font-medium text-clay' : ''}`}>{b.year ?? 'Doesn’t fit'}</td>)}
                     <td className="px-2 py-2.5 text-right">{money(row.shares, { compact: true })}</td>
                     <td className="py-2.5 pl-2 text-right">{!isCurrent && <button className={`text-xs font-medium hover:underline ${broken ? 'text-muted' : 'text-brass'}`} onClick={() => onUse(row.v)}>Use</button>}</td>
