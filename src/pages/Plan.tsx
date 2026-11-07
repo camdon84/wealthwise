@@ -223,6 +223,7 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
   block: ReturnType<typeof project>['block']; startYear: number; startAge: number; retireAge: number;
 }) {
   const update = useApp((s) => s.update);
+  const assumedRate = useApp((s) => s.profile!.assumptions.newLoanRate);
   const set = (patch: Partial<PlannedPurchase>) => update((d) => { Object.assign(d.plannedPurchases![k], patch); });
   const late = plan.buyBy && bought && bought.year >= plan.buyBy;
   const io5 = plan.ioFirst5 !== false;
@@ -242,7 +243,7 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
         <Field label="Price in today’s money">{(id) => <MoneyInput id={id} value={plan.price} onChange={(v) => set({ price: v ?? 0 })} />}</Field>
         <Field label="When">{(id) => <Select id={id} value={String(plan.buyBy ?? '')} onChange={(v) => set({ buyBy: v ? Number(v) : null })}
           options={[{ value: '', label: 'As soon as possible' }, ...Array.from({ length: Math.max(1, retireAge - startAge) }, (_, j) => startYear + 1 + j).map((y) => ({ value: String(y), label: `Before ${y}` }))]} />}</Field>
-        <Field label="Interest rate">{(id) => <NumInput id={id} value={plan.rate} onChange={(v) => set({ rate: v ?? 0 })} step={0.05} suffix="%" />}</Field>
+        <Field label="Interest rate" hint={plan.rate === assumedRate ? 'Same as your assumptions' : <button type="button" className="font-medium text-brass hover:underline" onClick={() => set({ rate: assumedRate })}>Use interest rate from assumptions ({assumedRate}%)</button>}>{(id) => <NumInput id={id} value={plan.rate} onChange={(v) => set({ rate: v ?? 0 })} step={0.05} suffix="%" />}</Field>
         <Field label="Rental yield" hint={`About ${money(weeklyRent)} a week`}>{(id) => <NumInput id={id} value={plan.yieldPct} onChange={(v) => set({ yieldPct: v ?? 0 })} step={0.1} suffix="%" />}</Field>
         <Field label="Price growth">{(id) => <NumInput id={id} value={plan.growth} onChange={(v) => set({ growth: v ?? 0 })} step={0.5} suffix="% / yr" />}</Field>
         <Field label="Deposit" hint="20% avoids mortgage insurance">{(id) => <NumInput id={id} value={plan.depositPct ?? 20} onChange={(v) => set({ depositPct: v ?? 20 })} step={1} suffix="%" />}</Field>
