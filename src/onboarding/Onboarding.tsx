@@ -2,10 +2,10 @@ import { useState, type ReactNode } from 'react';
 import { useApp } from '../lib/store';
 import { useQuotes } from '../lib/hooks';
 import { hecsAnnual, hecsCompulsory, livingCosts, position, propertyStats } from '../lib/calc';
-import { money, num } from '../lib/format';
+import { defaultCurrency, money, num, price } from '../lib/format';
 import { DEBT_RATE, LIVING_CATEGORIES, emptyDebt, emptyProperty, uid } from '../lib/defaults';
 import type { Debt, Holding, Profile, Property } from '../lib/types';
-import { Field, Icon, Logo, MoneyInput, NumInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
+import { Field, Icon, Logo, MoneyInput, NumInput, PriceInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
 import { PropertyEditor } from '../components/PropertyEditor';
 import { CsvImport } from '../components/CsvImport';
 import { LotPlan } from '../components/LotPlan';
@@ -110,7 +110,7 @@ function LivePosition({ profile }: { profile: Profile }) {
             <div className="mt-1 h-1.5 rounded-full bg-line/60"><div className="h-1.5 rounded-full bg-brass transition-all duration-500" style={{ width: `${(r.v / max) * 100}%` }} /></div>
           </div>
         ))}
-        <div className="flex justify-between border-t border-line pt-3 text-sm"><span className="text-muted">Debts</span><span className="text-clay">−{money(pos.liabilities, { compact: true })}</span></div>
+        <div className="flex justify-between border-t border-line pt-3 text-sm"><span className="text-muted">Debts</span><span className={pos.liabilities > 0 ? 'text-clay' : ''}>{pos.liabilities > 0 ? '−' : ''}{money(pos.liabilities, { compact: true })}</span></div>
         {pos.takeHome > 0 && <div className="flex justify-between text-sm"><span className="text-muted">Monthly take-home</span><span>{money(pos.takeHome)}</span></div>}
       </div>
       <p className="mt-5 text-xs text-muted">Your answers save as you go. You can leave and pick up here later.</p>
@@ -346,7 +346,7 @@ function Properties({ thorough }: { thorough: boolean }) {
 function Shares() {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
-  const [manual, setManual] = useState<Holding>({ id: uid(), code: '', exchange: 'ASX', name: '', units: 0, avgCost: 0, firstBought: '', kind: 'share' });
+  const [manual, setManual] = useState<Holding>({ id: uid(), code: '', exchange: 'ASX', name: '', units: 0, avgCost: 0, firstBought: '', kind: 'share', currency: 'AUD' });
   const merge = (list: Holding[]) => update((d) => {
     for (const h of list) {
       const cur = d.holdings.find((x) => x.code === h.code && x.exchange === h.exchange);
@@ -359,11 +359,11 @@ function Shares() {
       <CsvImport onImport={merge} />
       <details className="panel p-5">
         <summary className="cursor-pointer font-medium">Or add a holding by hand</summary>
-        <div className="mt-4 grid gap-3 sm:grid-cols-5">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3 sm:items-end">
           <Field label="Code">{(id) => <TextInput id={id} value={manual.code} onChange={(v) => setManual({ ...manual, code: v.toUpperCase(), name: v.toUpperCase() })} placeholder="VAS" />}</Field>
-          <Field label="Market">{(id) => <Select id={id} value={manual.exchange} onChange={(v) => setManual({ ...manual, exchange: v, kind: v === 'CRYPTO' ? 'crypto' : manual.kind })} options={[{ value: 'ASX', label: 'ASX' }, { value: 'NASDAQ', label: 'NASDAQ' }, { value: 'NYSE', label: 'NYSE' }, { value: 'CRYPTO', label: 'Crypto' }]} />}</Field>
+          <Field label="Market">{(id) => <Select id={id} value={manual.exchange} onChange={(v) => setManual({ ...manual, exchange: v, kind: v === 'CRYPTO' ? 'crypto' : manual.kind, currency: defaultCurrency(v) })} options={[{ value: 'ASX', label: 'ASX' }, { value: 'NASDAQ', label: 'NASDAQ' }, { value: 'NYSE', label: 'NYSE' }, { value: 'CRYPTO', label: 'Crypto' }]} />}</Field>
           <Field label="Units">{(id) => <NumInput id={id} value={manual.units || null} onChange={(v) => setManual({ ...manual, units: v ?? 0 })} step={0.0001} />}</Field>
-          <Field label="Average buy price">{(id) => <MoneyInput id={id} value={manual.avgCost || null} onChange={(v) => setManual({ ...manual, avgCost: v ?? 0 })} />}</Field>
+          <Field label="Average buy price" className="sm:col-span-2">{(id) => <PriceInput id={id} value={manual.avgCost || null} onChange={(v) => setManual({ ...manual, avgCost: v ?? 0 })} currency={manual.currency ?? 'AUD'} onCurrency={(c) => setManual({ ...manual, currency: c })} />}</Field>
           <div className="flex items-end"><button className="btn-primary w-full" disabled={!manual.code || !manual.units || !manual.avgCost} onClick={() => { merge([manual]); setManual({ ...manual, id: uid(), code: '', name: '', units: 0, avgCost: 0 }); }}>Add</button></div>
         </div>
       </details>
@@ -373,7 +373,7 @@ function Shares() {
           <div className="flex flex-wrap gap-2">
             {p.holdings.map((h) => (
               <span key={h.id} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-3 pr-1 text-sm">
-                <span className="font-semibold">{h.code}</span><span className="text-muted">{num(h.units, 4)} @ {money(h.avgCost, { cents: true })}</span>
+                <span className="font-semibold">{h.code}</span><span className="text-muted">{num(h.units, 4)} @ {price(h.avgCost, h.currency)}</span>
                 <button aria-label={`Remove ${h.code}`} className="rounded-full p-1 text-muted hover:bg-raised hover:text-clay" onClick={() => update((d) => { d.holdings = d.holdings.filter((x) => x.id !== h.id); })}><Icon name="x" className="h-3.5 w-3.5" /></button>
               </span>
             ))}

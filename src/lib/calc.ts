@@ -111,9 +111,11 @@ export const holdingKey = (h: Pick<Holding, 'code' | 'exchange'>) => `${h.exchan
 export function holdingsStats(holdings: Holding[], quotes: Quotes) {
   const rows = holdings.map((h) => {
     const q = quotes[holdingKey(h)];
-    const price = q?.price ?? h.avgCost;
+    const price = q?.price ?? (h.currency && h.currency !== 'AUD' ? h.avgCost * (quotes[`FX:${h.currency}`]?.price ?? 1) : h.avgCost);
     const value = price * h.units;
-    const cost = h.avgCost * h.units;
+    const cur = h.currency ?? 'AUD';
+    const fx = cur === 'AUD' ? 1 : quotes[`FX:${cur}`]?.price ?? NaN; // AUD per 1 unit of the currency
+    const cost = h.avgCost * h.units * (isNaN(fx) ? 1 : fx);
     return { h, price, value, cost, gain: value - cost, gainPct: cost ? ((value - cost) / cost) * 100 : 0, dayChange: q ? q.change : 0 };
   });
   const value = rows.reduce((a, r) => a + r.value, 0);

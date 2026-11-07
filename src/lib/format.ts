@@ -32,3 +32,17 @@ export const monthYear = (ym: string) => {
   const [y, m] = ym.split('-').map(Number);
   return new Date(y, (m || 1) - 1, 1).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' });
 };
+
+export const CURRENCIES = [
+  { code: 'AUD', label: 'AUD, Australian dollar' }, { code: 'USD', label: 'USD, US dollar' }, { code: 'EUR', label: 'EUR, Euro' },
+  { code: 'GBP', label: 'GBP, British pound' }, { code: 'JPY', label: 'JPY, Japanese yen' }, { code: 'CNY', label: 'CNY, Chinese yuan' },
+  { code: 'HKD', label: 'HKD, Hong Kong dollar' }, { code: 'CAD', label: 'CAD, Canadian dollar' }, { code: 'INR', label: 'INR, Indian rupee' },
+  { code: 'CHF', label: 'CHF, Swiss franc' }, { code: 'SGD', label: 'SGD, Singapore dollar' }, { code: 'NZD', label: 'NZD, New Zealand dollar' },
+];
+/** A price in its own currency: "$104.20" for AUD, "US$358.00" style otherwise. */
+export function price(n: number, currency = 'AUD') {
+  if (currency === 'AUD') return money(n, { cents: true });
+  try { return new Intl.NumberFormat('en-AU', { style: 'currency', currency, maximumFractionDigits: currency === 'JPY' ? 0 : 2 }).format(n); }
+  catch { return `${currency} ${n.toFixed(2)}`; }
+}
+export const defaultCurrency = (exchange: string) => (exchange === 'NASDAQ' || exchange === 'NYSE' ? 'USD' : 'AUD');

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useApp } from '../lib/store';
 import { holdingsStats, type Quotes } from '../lib/calc';
-import { money, num, pct } from '../lib/format';
+import { defaultCurrency, money, num, pct, price as fmtPrice } from '../lib/format';
 import { priceMode } from '../lib/prices';
 import { uid } from '../lib/defaults';
 import type { Holding } from '../lib/types';
 import { CsvImport } from '../components/CsvImport';
-import { Field, Icon, MoneyInput, NumInput, Segmented, Select, TextInput } from '../components/ui';
+import { Field, Icon, MoneyInput, NumInput, PriceInput, Segmented, Select, TextInput } from '../components/ui';
 import { Sheet } from './Properties';
 
 const KIND_COLOR: Record<Holding['kind'], string> = { etf: 'rgb(var(--sky))', share: 'rgb(var(--gum))', crypto: 'rgb(var(--brass))', fund: 'rgb(var(--sage))' };
@@ -66,7 +66,7 @@ export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | nul
                 <tr key={r.h.id} className="border-b border-line last:border-0">
                   <td className="px-4 py-3"><p className="font-semibold">{r.h.code} <span className="text-xs font-normal text-muted">{r.h.exchange}</span></p><p className="text-xs text-muted">{r.h.name !== r.h.code ? r.h.name : KIND_LABEL[r.h.kind].replace(/s$/, '')}</p></td>
                   <td className="px-4 py-3 text-right">{num(r.h.units, 4)}</td>
-                  <td className="px-4 py-3 text-right">{money(r.h.avgCost, { cents: true })}</td>
+                  <td className="px-4 py-3 text-right">{fmtPrice(r.h.avgCost, r.h.currency)}</td>
                   <td className="px-4 py-3 text-right">{money(r.price, { cents: true })}</td>
                   <td className={`px-4 py-3 text-right ${r.dayChange >= 0 ? 'text-gum' : 'text-clay'}`}>{pct(r.dayChange, 2, true)}</td>
                   <td className="px-4 py-3 text-right font-medium">{money(r.value)}</td>
@@ -93,6 +93,7 @@ function TradeForm({ onDone }: { onDone: () => void }) {
   const [units, setUnits] = useState<number | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [fees, setFees] = useState<number | null>(9.5);
+  const [currency, setCurrency] = useState('AUD');
   const [error, setError] = useState('');
   const save = () => {
     if (!code || !units || !price) return setError('Enter a code, units and price.');
@@ -101,7 +102,7 @@ function TradeForm({ onDone }: { onDone: () => void }) {
       const cur = d.holdings.find((h) => h.code === code && h.exchange === exchange);
       if (side === 'buy') {
         if (cur) { const cost = cur.units * cur.avgCost + units * price + (fees ?? 0); cur.units += units; cur.avgCost = cost / cur.units; }
-        else d.holdings.push({ id: uid(), code, exchange, name: code, units, avgCost: (units * price + (fees ?? 0)) / units, firstBought: new Date().toISOString().slice(0, 10), kind: exchange === 'CRYPTO' ? 'crypto' : 'share' });
+        else d.holdings.push({ id: uid(), code, exchange, name: code, units, avgCost: (units * price + (fees ?? 0)) / units, currency, firstBought: new Date().toISOString().slice(0, 10), kind: exchange === 'CRYPTO' ? 'crypto' : 'share' });
       } else {
         if (!cur || cur.units < units) { failed = `You hold ${cur ? cur.units : 0} ${code}. You can’t sell more than that.`; return; }
         cur.units -= units;
@@ -115,9 +116,9 @@ function TradeForm({ onDone }: { onDone: () => void }) {
       <Segmented value={side} onChange={setSide} options={[{ value: 'buy', label: 'Bought' }, { value: 'sell', label: 'Sold' }]} />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Code">{(id) => <TextInput id={id} value={code} onChange={(v) => setCode(v.toUpperCase().trim())} placeholder="VAS" />}</Field>
-        <Field label="Market">{(id) => <Select id={id} value={exchange} onChange={setExchange} options={[{ value: 'ASX', label: 'ASX' }, { value: 'NASDAQ', label: 'NASDAQ' }, { value: 'NYSE', label: 'NYSE' }, { value: 'CRYPTO', label: 'Crypto' }]} />}</Field>
+        <Field label="Market">{(id) => <Select id={id} value={exchange} onChange={(v) => { setExchange(v); setCurrency(defaultCurrency(v)); }} options={[{ value: 'ASX', label: 'ASX' }, { value: 'NASDAQ', label: 'NASDAQ' }, { value: 'NYSE', label: 'NYSE' }, { value: 'CRYPTO', label: 'Crypto' }]} />}</Field>
         <Field label="Units">{(id) => <NumInput id={id} value={units} onChange={setUnits} step={0.0001} />}</Field>
-        <Field label="Price per unit">{(id) => <MoneyInput id={id} value={price} onChange={setPrice} />}</Field>
+        <Field label="Price per unit" className="sm:col-span-2">{(id) => <PriceInput id={id} value={price} onChange={setPrice} currency={currency} onCurrency={setCurrency} />}</Field>
         <Field label="Brokerage">{(id) => <MoneyInput id={id} value={fees} onChange={setFees} />}</Field>
       </div>
       {error && <p role="alert" className="text-sm text-clay">{error}</p>}

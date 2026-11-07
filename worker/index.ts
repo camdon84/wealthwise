@@ -76,6 +76,7 @@ function yahooSymbol(key: string) {
   const [ex, code] = key.split(':');
   if (ex === 'ASX') return `${code}.AX`;
   if (ex === 'CRYPTO') return `${code}-AUD`;
+  if (ex === 'FX') return `${code}AUD=X`;
   return code; // NASDAQ / NYSE, priced in USD and converted below
 }
 const marketOpenNow = () => {
@@ -97,7 +98,7 @@ async function fetchYahoo(symbol: string) {
 }
 
 async function quotes(req: Request, env: Env) {
-  const keys = [...new Set((new URL(req.url).searchParams.get('codes') || '').split(',').map((s) => s.trim().toUpperCase()).filter((s) => /^(ASX|NASDAQ|NYSE|CRYPTO):[A-Z0-9.\-]{1,12}$/.test(s)))].slice(0, 40);
+  const keys = [...new Set((new URL(req.url).searchParams.get('codes') || '').split(',').map((s) => s.trim().toUpperCase()).filter((s) => /^(ASX|NASDAQ|NYSE|CRYPTO|FX):[A-Z0-9.\-]{1,12}$/.test(s)))].slice(0, 40);
   const maxAge = (marketOpenNow() ? 15 : 360) * 60000;
   const out: Record<string, { price: number; change: number; asOf: string }> = {};
   const stale: string[] = [];

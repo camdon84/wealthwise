@@ -6,6 +6,7 @@ import { holdingKey, type Quotes } from './calc';
  * that drifts slightly through the day. The hosted build calls /api/quotes on the Cloudflare
  * Worker, which fetches 15–20 minute delayed prices and caches them so free API limits hold.
  */
+const FX_SEED: Record<string, number> = { USD: 1.52, EUR: 1.65, GBP: 1.94, JPY: 0.0101, CNY: 0.21, HKD: 0.195, CAD: 1.1, INR: 0.018, CHF: 1.73, SGD: 1.15, NZD: 0.9 };
 const SEED: Record<string, number> = {
   'ASX:VAS': 104.6, 'ASX:VGS': 141.9, 'ASX:CBA': 168.2, 'ASX:BHP': 40.35, 'ASX:CSL': 184.1, 'ASX:NDQ': 54.2,
   'ASX:A200': 146.8, 'ASX:WES': 79.4, 'ASX:MQG': 214.5, 'NASDAQ:AAPL': 392.0, 'CRYPTO:BTC': 158000,
@@ -17,7 +18,8 @@ export const priceMode: 'demo' | 'live' = (import.meta as any).env?.VITE_STORAGE
 
 export async function fetchQuotes(holdings: Holding[]): Promise<Quotes> {
   if (priceMode === 'live') {
-    const codes = [...new Set(holdings.map(holdingKey))].join(',');
+    const fxKeys = [...new Set(holdings.map((h) => h.currency).filter((c): c is string => !!c && c !== 'AUD'))].map((c) => `FX:${c}`);
+    const codes = [...new Set([...holdings.map(holdingKey), ...fxKeys])].join(',');
     if (!codes) return {};
     const res = await fetch(`/api/quotes?codes=${encodeURIComponent(codes)}`, { credentials: 'include' }).catch(() => null);
     return res?.ok ? res.json() : {};
@@ -25,6 +27,7 @@ export async function fetchQuotes(holdings: Holding[]): Promise<Quotes> {
   const now = new Date();
   const slot = Math.floor(now.getTime() / 300000); // moves every 5 minutes
   const out: Quotes = {};
+  for (const c of new Set(holdings.map((h) => h.currency).filter(Boolean))) if (c !== 'AUD' && FX_SEED[c!]) out[`FX:${c}`] = { price: FX_SEED[c!], change: 0, asOf: now.toISOString() };
   for (const h of holdings) {
     const key = holdingKey(h);
     const base = SEED[key] ?? h.avgCost * (0.9 + hashStr(key) * 0.55);

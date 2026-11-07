@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { parseMoney } from '../lib/format';
+import { CURRENCIES, parseMoney } from '../lib/format';
 
 export function Field({ label, hint, children, className = '' }: { label: string; hint?: ReactNode; children: (id: string) => ReactNode; className?: string }) {
   const id = useId();
@@ -129,5 +129,23 @@ export function Logo({ size = 28 }: { size?: number }) {
       </svg>
       <span className="font-display text-lg font-semibold tracking-tight">WealthWise</span>
     </span>
+  );
+}
+
+/** Wide price box with its currency, for share and crypto buy prices. */
+export function PriceInput({ id, value, onChange, currency, onCurrency }: { id?: string; value: number | null; onChange: (v: number | null) => void; currency: string; onCurrency: (c: string) => void }) {
+  const fmt = (v: number | null) => (v == null ? '' : v.toLocaleString('en-AU', { maximumFractionDigits: 6 }));
+  const [text, setText] = useState(fmt(value));
+  const [focus, setFocus] = useState(false);
+  useEffect(() => { if (!focus) setText(fmt(value)); }, [value, focus]);
+  return (
+    <div className="flex rounded-lg border border-line bg-raised focus-within:border-brass focus-within:ring-2 focus-within:ring-brass/25">
+      <input id={id} inputMode="decimal" className="min-w-0 flex-1 rounded-l-lg bg-transparent px-3 py-2.5 text-[15px] text-ink placeholder:text-muted/70 focus:outline-none" placeholder="0.00" value={text}
+        onFocus={() => setFocus(true)} onBlur={() => { setFocus(false); setText(fmt(value)); }}
+        onChange={(e) => { setText(e.target.value); onChange(parseMoney(e.target.value)); }} />
+      <select aria-label="Currency" className="rounded-r-lg border-l border-line bg-transparent px-2 text-sm font-medium text-ink focus:outline-none" value={currency} onChange={(e) => onCurrency(e.target.value)}>
+        {CURRENCIES.map((c) => <option key={c.code} value={c.code} title={c.label}>{c.code}</option>)}
+      </select>
+    </div>
   );
 }

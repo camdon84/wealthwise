@@ -79,7 +79,8 @@ export interface Holding {
   exchange: 'ASX' | 'NASDAQ' | 'NYSE' | 'CRYPTO';
   name: string;
   units: number;
-  avgCost: number; // per unit
+  avgCost: number; // per unit, in `currency`
+  currency?: string; // what the buy price was paid in; AUD if missing
   firstBought: string;
   kind: 'share' | 'etf' | 'crypto' | 'fund';
 }

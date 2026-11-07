@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import Papa from 'papaparse';
 import type { Holding } from '../lib/types';
 import { SAMPLE_CSV, uid } from '../lib/defaults';
-import { money, num } from '../lib/format';
+import { defaultCurrency, num, price } from '../lib/format';
 import { Icon } from './ui';
 
 type FieldKey = 'code' | 'units' | 'price' | 'date' | 'side' | 'market' | 'fees';
@@ -46,7 +46,7 @@ function aggregate(rows: Record<string, string>[], map: Partial<Record<FieldKey,
     }
     by.set(key, cur);
   }
-  return [...by.values()].filter((h) => h.units > 0).map(({ cost, ...h }) => ({ ...h, avgCost: cost / h.units }));
+  return [...by.values()].filter((h) => h.units > 0).map(({ cost, ...h }) => ({ ...h, avgCost: cost / h.units, currency: defaultCurrency(h.exchange) }));
 }
 
 export function CsvImport({ onImport, compact }: { onImport: (h: Holding[]) => void; compact?: boolean }) {
@@ -122,8 +122,8 @@ export function CsvImport({ onImport, compact }: { onImport: (h: Holding[]) => v
                 {preview.map((h) => (
                   <tr key={h.code + h.exchange} className="border-t border-line">
                     <td className="px-3 py-2 font-semibold">{h.code}</td><td className="px-3 py-2 text-muted">{h.exchange}</td>
-                    <td className="px-3 py-2 text-right">{num(h.units, 4)}</td><td className="px-3 py-2 text-right">{money(h.avgCost, { cents: true })}</td>
-                    <td className="px-3 py-2 text-right">{money(h.avgCost * h.units)}</td>
+                    <td className="px-3 py-2 text-right">{num(h.units, 4)}</td><td className="px-3 py-2 text-right">{price(h.avgCost, h.currency)}</td>
+                    <td className="px-3 py-2 text-right">{price(h.avgCost * h.units, h.currency)}</td>
                   </tr>
                 ))}
               </tbody>
