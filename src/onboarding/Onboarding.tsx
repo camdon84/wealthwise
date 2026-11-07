@@ -3,7 +3,7 @@ import { useApp } from '../lib/store';
 import { useQuotes } from '../lib/hooks';
 import { hecsAnnual, hecsCompulsory, livingCosts, position, propertyStats } from '../lib/calc';
 import { defaultCurrency, money, num, price } from '../lib/format';
-import { DEBT_RATE, LIVING_CATEGORIES, emptyDebt, emptyProperty, uid } from '../lib/defaults';
+import { DEBT_RATE, LIVING_CATEGORIES, emptyDebt, emptyDependant, emptyProperty, uid } from '../lib/defaults';
 import type { Debt, Holding, Profile, Property } from '../lib/types';
 import { Field, Icon, Logo, MoneyInput, NumInput, PriceInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
 import { PropertyEditor } from '../components/PropertyEditor';
@@ -142,15 +142,15 @@ function AboutYou({ thorough }: { thorough: boolean }) {
       <div>
         <p className="field-label">Children or other dependants</p>
         <div className="flex items-center gap-3">
-          <button type="button" className="btn-quiet h-10 w-10 p-0" aria-label="Remove a dependant" onClick={() => update((d) => { d.household.dependants.pop(); })}>−</button>
+          <button type="button" className="btn-quiet h-10 w-10 p-0" aria-label="Remove a dependant" onClick={() => update((d) => { d.household.dependants.pop(); d.household.dependantsDetail?.pop(); })}>−</button>
           <span className="w-8 text-center font-display text-xl">{hh.dependants.length}</span>
-          <button type="button" className="btn-quiet h-10 w-10 p-0" aria-label="Add a dependant" onClick={() => update((d) => { d.household.dependants.push(5); })}>+</button>
+          <button type="button" className="btn-quiet h-10 w-10 p-0" aria-label="Add a dependant" onClick={() => update((d) => { d.household.dependants.push(5); (d.household.dependantsDetail ??= []).push(emptyDependant(d.household.dependantsDetail.length, 5)); })}>+</button>
         </div>
         {thorough && hh.dependants.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-3">
             {hh.dependants.map((age, i) => (
               <label key={i} className="w-28"><span className="text-xs text-muted">Age of child {i + 1}</span>
-                <input type="number" className="input mt-1" value={age} onChange={(e) => update((d) => { d.household.dependants[i] = Number(e.target.value); })} /></label>
+                <input type="number" className="input mt-1" value={age} onChange={(e) => update((d) => { d.household.dependants[i] = Number(e.target.value); const dd = d.household.dependantsDetail?.[i]; if (dd) dd.age = Number(e.target.value); })} /></label>
             ))}
           </div>
         )}
@@ -159,7 +159,7 @@ function AboutYou({ thorough }: { thorough: boolean }) {
   );
 }
 
-function Income({ thorough }: { thorough: boolean }) {
+export function Income({ thorough, withDates }: { thorough: boolean; withDates?: boolean }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const hh = p.household;
@@ -170,7 +170,8 @@ function Income({ thorough }: { thorough: boolean }) {
         <div key={who} className="panel p-5">
           <p className="font-display text-lg font-semibold">{who === 'you' ? hh.you.name || 'You' : hh.partner.name || 'Your partner'}</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Field label="Salary before tax" hint="Include regular overtime and allowances. Leave super out.">{(id) => <MoneyInput id={id} value={hh[who].salary} onChange={(v) => update((d) => { d.household[who].salary = v; })} suffix="/ year" />}</Field>
+            <Field label="Job title">{(id) => <TextInput id={id} value={hh[who].jobTitle ?? ''} onChange={(v) => update((d) => { d.household[who].jobTitle = v; })} placeholder="e.g. Project manager" />}</Field>
+            <Field label="Salary before tax" hint={withDates ? <AsOf date={hh[who].salaryAsOf} onToday={() => update((d) => { d.household[who].salaryAsOf = today(); })} /> : 'Include regular overtime and allowances. Leave super out.'}>{(id) => <MoneyInput id={id} value={hh[who].salary} onChange={(v) => update((d) => { d.household[who].salary = v; if (withDates) d.household[who].salaryAsOf = today(); })} suffix="/ year" />}</Field>
             {thorough && <div><p className="field-label">Work</p><Segmented size="sm" value={hh[who].employment} onChange={(v) => update((d) => { d.household[who].employment = v; })} options={[...emp]} /></div>}
           </div>
         </div>
@@ -180,7 +181,7 @@ function Income({ thorough }: { thorough: boolean }) {
   );
 }
 
-function Spending(_: { thorough: boolean }) {
+export function Spending(_: { thorough: boolean }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const f = p.finances;
@@ -275,7 +276,7 @@ function Spending(_: { thorough: boolean }) {
   );
 }
 
-function CashSuper(_: { thorough: boolean }) {
+export function CashSuper({ withDates }: { thorough: boolean; withDates?: boolean }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const hh = p.household; const f = p.finances;
@@ -295,8 +296,11 @@ function CashSuper(_: { thorough: boolean }) {
       </div>
       <div className="max-w-sm"><Field label="Emergency buffer you want to keep" hint="We won’t count this toward deposits or debt payoff ideas.">{(id) => <MoneyInput id={id} value={f.buffer} onChange={(v) => update((d) => { d.finances.buffer = v; })} />}</Field></div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={`${hh.you.name || 'Your'}${hh.you.name ? '’s' : ''} super balance`}>{(id) => <MoneyInput id={id} value={hh.you.superBalance} onChange={(v) => update((d) => { d.household.you.superBalance = v; })} />}</Field>
-        {hh.hasPartner && <Field label={`${hh.partner.name || 'Partner'}${hh.partner.name ? '’s' : ''} super balance`}>{(id) => <MoneyInput id={id} value={hh.partner.superBalance} onChange={(v) => update((d) => { d.household.partner.superBalance = v; })} />}</Field>}
+        {(['you', 'partner'] as const).filter((w) => w === 'you' || hh.hasPartner).map((who) => (
+          <Field key={who} label={`${hh[who].name || (who === 'you' ? 'Your' : 'Partner')}${hh[who].name ? '’s' : ''} super balance`} hint={withDates ? <AsOf date={hh[who].superAsOf} onToday={() => update((d) => { d.household[who].superAsOf = today(); })} /> : undefined}>
+            {(id) => <MoneyInput id={id} value={hh[who].superBalance} onChange={(v) => update((d) => { d.household[who].superBalance = v; if (withDates) d.household[who].superAsOf = today(); })} />}
+          </Field>
+        ))}
       </div>
     </div>
   );
@@ -465,5 +469,15 @@ function Review({ go }: { go: (n: number) => void }) {
         <button className="btn-primary px-6 py-3 text-base" onClick={() => update((d) => { d.onboarded = true; d.firstLookSeen = false; })}>Build my plan<Icon name="arrow" className="h-4 w-4" /></button>
       </div>
     </div>
+  );
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+function AsOf({ date, onToday }: { date?: string; onToday: () => void }) {
+  return (
+    <span className="flex flex-wrap items-center gap-x-2">
+      <span>{date ? `As of ${new Date(`${date}T00:00:00`).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Not dated yet'}</span>
+      <button type="button" className="font-medium text-brass hover:underline" onClick={onToday}>Update as of today</button>
+    </span>
   );
 }

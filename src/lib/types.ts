@@ -9,6 +9,20 @@ export interface Person {
   employment: 'payg' | 'self' | 'not-working';
   superBalance: number | null;
   superReturn?: number | null; // last financial year's net return, %
+  jobTitle?: string;
+  salaryAsOf?: string; // yyyy-mm-dd the salary was last confirmed
+  superAsOf?: string; // yyyy-mm-dd the super balance was last confirmed
+}
+
+export interface Dependant {
+  id: string;
+  name: string;
+  age: number | null;
+  monthlyCosts: number | null; // food, clothing, phone etc.
+  childcareMonthly: number | null;
+  activitiesMonthly: number | null;
+  schoolFeesYearly: number | null;
+  supportUntil: number; // age costs stop
 }
 
 export interface Household {
@@ -16,7 +30,8 @@ export interface Household {
   hasPartner: boolean;
   you: Person;
   partner: Person;
-  dependants: number[]; // ages
+  dependants: number[]; // ages (kept in step with dependantsDetail)
+  dependantsDetail?: Dependant[];
   otherIncome: number | null; // annual, gross
 }
 
@@ -90,6 +105,7 @@ export interface LifeEvent { id: string; label: string; year: number; amount: nu
 export interface Goals {
   retirementAge: number;
   lifeExpectancy?: number; // age the plan runs to
+  sharesTarget?: number | null; // share portfolio wanted at retirement, today's money
   passiveIncome: number; // today's dollars p.a.
   targetProperties: number;
   risk: number; // 1-5
@@ -135,6 +151,7 @@ export interface Profile {
   holdings: Holding[];
   goals: Goals;
   assumptions: Assumptions;
+  plannedPurchases?: PlannedPurchase[];
   rateWatch?: { cashRate: number; date: string }; // RBA cash rate the variable loan rates were last confirmed against
   firstLookSeen?: boolean;
   documents?: DocRecord[];
@@ -147,3 +164,5 @@ export interface Session { userId: string; email: string; name: string; demo?: b
 
 export type DocKind = 'valuation' | 'super' | 'loan' | 'rental' | 'payslip' | 'trades' | 'other';
 export interface DocRecord { id: string; name: string; kind: DocKind; uploadedAt: string; summary: string; applied: string[] }
+
+export interface PlannedPurchase { id: string; label: string; price: number; yieldPct: number; rate: number; growth: number; notBefore?: number | null }

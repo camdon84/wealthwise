@@ -1,0 +1,69 @@
+import { useState } from 'react';
+import { useApp } from '../lib/store';
+import { dependantsMonthly } from '../lib/calc';
+import { money } from '../lib/format';
+import { emptyDependant } from '../lib/defaults';
+import type { Dependant } from '../lib/types';
+import { CashSuper, Income, Spending } from '../onboarding/Onboarding';
+import { Field, Icon, MoneyInput, NumInput, Segmented, TextInput } from '../components/ui';
+
+type Tab = 'income' | 'home' | 'cash';
+
+export function MyDetails() {
+  const [tab, setTab] = useState<Tab>('income');
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">My details</h1><p className="text-muted">Keep these up to date and your plan updates with them.</p></div>
+        <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: 'income', label: 'Work and income' }, { value: 'home', label: 'Home and living costs' }, { value: 'cash', label: 'Cash, super and debts' }]} />
+      </div>
+      <section className="panel p-5 sm:p-7">
+        {tab === 'income' && <Income thorough withDates />}
+        {tab === 'home' && <Spending thorough />}
+        {tab === 'cash' && <CashSuper thorough withDates />}
+      </section>
+    </div>
+  );
+}
+
+export function Dependants() {
+  const p = useApp((s) => s.profile)!;
+  const update = useApp((s) => s.update);
+  const list = p.household.dependantsDetail ?? [];
+  const sync = (d: typeof p) => { d.household.dependants = (d.household.dependantsDetail ?? []).map((x) => x.age ?? 0); };
+  const set = (id: string, patch: Partial<Dependant>) => update((d) => { Object.assign(d.household.dependantsDetail!.find((x) => x.id === id)!, patch); sync(d); });
+  const total = dependantsMonthly(p);
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Dependants</h1><p className="text-muted">Children or anyone else you support. Their costs stop in your plan once they reach the age you set.</p></div>
+        <button className="btn-primary" onClick={() => update((d) => { (d.household.dependantsDetail ??= []).push(emptyDependant(d.household.dependantsDetail.length)); sync(d); })}><Icon name="plus" className="h-4 w-4" />Add a dependant</button>
+      </div>
+      {list.length > 0 && <p className="text-sm text-muted">Together they cost about <span className="font-semibold text-ink">{money(total)} a month</span> right now. That’s counted on top of your own living costs, so leave school fees and kids’ costs out of those.</p>}
+      {list.length === 0 && <div className="panel p-10 text-center"><p className="font-medium">No dependants added</p><p className="mt-1 text-sm text-muted">Add a child or anyone else you support to include their costs in your plan.</p></div>}
+      <div className="grid gap-5 lg:grid-cols-2">
+        {list.map((dep, i) => {
+          const monthly = (dep.monthlyCosts ?? 0) + (dep.childcareMonthly ?? 0) + (dep.activitiesMonthly ?? 0) + (dep.schoolFeesYearly ?? 0) / 12;
+          return (
+            <section key={dep.id} className="panel p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div><p className="text-xs text-muted">Dependant {i + 1}</p><p className="font-display text-xl font-semibold">{dep.name || `Dependant ${i + 1}`}</p></div>
+                <button className="btn-ghost p-2" aria-label={`Remove ${dep.name}`} onClick={() => update((d) => { d.household.dependantsDetail = d.household.dependantsDetail!.filter((x) => x.id !== dep.id); sync(d); })}><Icon name="trash" className="h-4 w-4" /></button>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <Field label="Name">{(id) => <TextInput id={id} value={dep.name} onChange={(v) => set(dep.id, { name: v })} />}</Field>
+                <Field label="Age">{(id) => <NumInput id={id} value={dep.age} onChange={(v) => set(dep.id, { age: v })} />}</Field>
+                <Field label="Support until age">{(id) => <NumInput id={id} value={dep.supportUntil} onChange={(v) => set(dep.id, { supportUntil: v ?? 18 })} />}</Field>
+                <Field label="Everyday costs" hint="Food, clothes, phone, pocket money">{(id) => <MoneyInput id={id} value={dep.monthlyCosts} onChange={(v) => set(dep.id, { monthlyCosts: v })} suffix="/ mo" />}</Field>
+                <Field label="Childcare">{(id) => <MoneyInput id={id} value={dep.childcareMonthly} onChange={(v) => set(dep.id, { childcareMonthly: v })} suffix="/ mo" />}</Field>
+                <Field label="Sport and activities">{(id) => <MoneyInput id={id} value={dep.activitiesMonthly} onChange={(v) => set(dep.id, { activitiesMonthly: v })} suffix="/ mo" />}</Field>
+                <Field label="School fees" className="sm:col-span-2">{(id) => <MoneyInput id={id} value={dep.schoolFeesYearly} onChange={(v) => set(dep.id, { schoolFeesYearly: v })} suffix="/ year" />}</Field>
+              </div>
+              <p className="mt-4 border-t border-line pt-3 text-sm">About <span className="font-semibold">{money(monthly)} a month</span>{dep.age != null && <span className="text-muted">, for another {Math.max(0, dep.supportUntil - dep.age)} years</span>}</p>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

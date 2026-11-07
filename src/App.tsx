@@ -7,7 +7,9 @@ import { Overview } from './pages/Overview';
 import { Properties } from './pages/Properties';
 import { Investments } from './pages/Investments';
 import { Plan } from './pages/Plan';
-import { ProfilePage, Renovate } from './pages/Misc';
+import { Renovate } from './pages/Misc';
+import { Dependants, MyDetails } from './pages/MyDetails';
+import { Account } from './pages/Account';
 import { FirstLook } from './pages/FirstLook';
 import { Documents, eofyItems } from './pages/Documents';
 import { Icon, Logo } from './components/ui';
@@ -19,7 +21,9 @@ const NAV = [
   { id: 'plan', label: 'Plan', icon: 'plan' },
   { id: 'documents', label: 'Upload your documents', icon: 'upload' },
   { id: 'renovate', label: 'Renovator', icon: 'renovate' },
-  { id: 'profile', label: 'Profile', icon: 'profile' },
+  { id: 'details', label: 'My details', icon: 'details' },
+  { id: 'dependants', label: 'Dependants', icon: 'family' },
+  { id: 'account', label: 'Account', icon: 'profile' },
 ];
 
 export default function App() {
@@ -78,7 +82,9 @@ function Shell() {
           {current === 'plan' && <Plan quotes={quotes} />}
           {current === 'documents' && <Documents />}
           {current === 'renovate' && <Renovate />}
-          {current === 'profile' && <ProfilePage />}
+          {current === 'details' && <MyDetails />}
+          {current === 'dependants' && <Dependants />}
+          {current === 'account' && <Account />}
         </main>
       </div>
     </div>

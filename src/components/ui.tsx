@@ -112,6 +112,8 @@ export function Icon({ name, className = 'h-5 w-5' }: { name: string; className?
     news: <path d="M4 5h13v14H6a2 2 0 01-2-2zM17 9h3v8a2 2 0 01-2 2M8 9h5M8 13h5" />,
     trash: <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />,
     menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+    details: <path d="M5 4h14v16H5zM9 8h6M9 12h6M9 16h4" />,
+    family: <path d="M8 11a3 3 0 100-6 3 3 0 000 6zM17 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM2 20c.6-3.4 3-5 6-5s5.4 1.6 6 5M14 20c.3-2.3 1.6-3.8 3.5-3.8S21 17.7 21.5 20" />,
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">

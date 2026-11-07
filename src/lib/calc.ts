@@ -39,6 +39,14 @@ export function hecsCompulsory(income: number) {
   return (t2 - t1) * 0.15 + (income - t2) * 0.17;
 }
 
+/** Monthly cost of dependants this year, or `yearsAhead` from now (costs stop at each one's support age). */
+export function dependantsMonthly(p: Profile, yearsAhead = 0) {
+  return (p.household.dependantsDetail ?? []).reduce((a, d) => {
+    if (d.age != null && d.age + yearsAhead >= d.supportUntil) return a;
+    return a + n(d.monthlyCosts) + n(d.childcareMonthly) + n(d.activitiesMonthly) + n(d.schoolFeesYearly) / 12;
+  }, 0);
+}
+
 export function livingCosts(p: Profile) {
   const f = p.finances;
   return f.livingMode === 'breakdown' ? Object.values(f.livingBreakdown ?? {}).reduce((a: number, v) => a + n(v), 0) : n(f.livingMonthly);
@@ -137,7 +145,7 @@ export function borrowingCapacity(p: Profile, overrides: { cardLimitCut?: number
   const youGross = n(hh.you.salary) + n(hh.otherIncome) * 0.8 + rent;
   const partnerGross = hh.hasPartner ? n(hh.partner.salary) : 0;
   const netMonthly = (afterTax(youGross) + (partnerGross ? afterTax(partnerGross) : 0)) / 12;
-  const living = Math.max(livingCosts(p), livingFloor(p)) + housingMonthly(p);
+  const living = Math.max(livingCosts(p) + dependantsMonthly(p), livingFloor(p)) + housingMonthly(p);
   const cardLimits = p.finances.debts.filter((d) => d.kind === 'credit-card').reduce((s, d) => s + n(d.limit), 0) - n(overrides.cardLimitCut);
   const commitments = p.finances.debts.filter((d) => d.kind !== 'credit-card' && d.kind !== 'hecs').reduce((s, d) => s + n(d.monthlyRepayment), 0) + Math.max(0, cardLimits) * 0.038
     + hecsAnnual(p).compulsory / 12;
@@ -169,7 +177,7 @@ export function position(p: Profile, quotes: Quotes) {
     ? n(f.mortgageMonthly) * 12
     : props.reduce((a, x) => a + (x.pr.use === 'home' ? x.s.repayments : 0), 0);
   const homeCosts = homeLoanRepay * mortgageShare(p) + props.reduce((a, x) => a + (x.pr.use === 'home' ? n(x.pr.annualCosts) : 0), 0);
-  const living = Math.max(livingCosts(p), livingFloor(p));
+  const living = Math.max(livingCosts(p) + dependantsMonthly(p), livingFloor(p));
   const monthlySurplus = takeHome + (propCashflow - homeCosts) / 12 - living - housingMonthly(p)
     - f.debts.filter((d) => d.kind !== 'hecs').reduce((a, d) => a + n(d.monthlyRepayment), 0) - hecs.voluntary / 12;
   return { takeHome, monthlySurplus, hecs, living, homeCosts, props, propValue, propDebt, usable, shares, superBal, cash, otherDebt, assets, liabilities, netWorth: assets - liabilities, bc, propCashflow };
@@ -182,7 +190,9 @@ export interface YearPoint {
   repayUp2: number; repayBase: number; repayDown2: number; bought?: number;
 }
 
-export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purchases: { year: number; price: number }[]; retireYear: number } {
+export interface PurchaseBlock { year: number; reason: 'deposit' | 'servicing' | 'date'; price: number; deposit: number; available: number; monthlyShort: number }
+
+export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purchases: { year: number; price: number }[]; retireYear: number; block: PurchaseBlock | null } {
   const a = p.assumptions;
   const pos = position(p, quotes);
   const startAge = n(p.household.you.age) || 35;
@@ -204,9 +214,9 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
   let otherDebt = pos.otherDebt - hecsAnnual(p).balance;
   let youSal = n(p.household.you.salary);
   let partSal = p.household.hasPartner ? n(p.household.partner.salary) : 0;
-  let living = (Math.max(livingCosts(p), livingFloor(p)) + housingMonthly(p)) * 12;
+  const baseLiving = Math.max(livingCosts(p), livingFloor(p) - dependantsMonthly(p)) + housingMonthly(p); // household costs before dependants
+  let living = (baseLiving + dependantsMonthly(p)) * 12;
   let hecsBal = hecsAnnual(p).balance;
-  let newPrice = a.newPurchasePrice;
   const buffer = n(p.finances.buffer) || living / 4;
   const otherRepay = p.finances.debts.filter((d) => d.kind !== 'hecs').reduce((s, d) => s + n(d.monthlyRepayment), 0) * 12;
   const cardLoad = p.finances.debts.filter((d) => d.kind === 'credit-card').reduce((s, d) => s + n(d.limit), 0) * 0.038;
@@ -218,6 +228,7 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
   };
   const points: YearPoint[] = [];
   const purchases: { year: number; price: number }[] = [];
+  let block: PurchaseBlock | null = null;
 
   for (let i = 0; i <= endAge - startAge; i++) {
     const year = y0 + i;
@@ -243,7 +254,7 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
       }
       youSal = working ? youSal * 1.03 : 0;
       partSal = working ? partSal * 1.03 : 0;
-      living *= 1 + a.inflation / 100;
+      living = (baseLiving + dependantsMonthly(p, i)) * 12 * Math.pow(1 + a.inflation / 100, i);
       const sg = (youSal + partSal) * 0.12;
       sup = sup * (1 + a.superReturn / 100) + sg * 0.85;
       shares *= 1 + a.shareReturn / 100;
@@ -256,25 +267,39 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
       shares -= drawdown;
       cash += net + propNet + drawdown - living - debtRepay;
       for (const ev of p.goals.events) if (ev.year === year) cash -= ev.amount;
-      // surplus beyond 2x buffer gets invested, as a disciplined investor would
-      if (working && cash > buffer * 2) { shares += cash - buffer * 2; cash = buffer * 2; }
-      newPrice *= 1.05;
+      // While more properties are still planned, savings build up as the deposit fund.
+      // Once the property goal is met, surplus above twice the buffer is invested in shares.
+      // Keep enough for the next deposit (plus the buffer); anything beyond that is invested rather than sitting idle.
+      const nextPlan = p.plannedPurchases?.[purchases.length];
+      const nextDeposit = sims.length < p.goals.targetProperties ? (nextPlan?.price ?? a.newPurchasePrice) * Math.pow(1 + (nextPlan?.growth ?? 5) / 100, i) * 0.25 : 0;
+      const keep = Math.max(buffer * 2, buffer + nextDeposit);
+      if (working && cash > keep) { shares += cash - keep; cash = keep; }
 
-      // acquisition engine: buy when equity + cash covers deposit and servicing allows
+      // acquisition engine: buy when equity + spare cash covers the deposit and servicing allows
       if (working && sims.length < p.goals.targetProperties) {
+        const k = purchases.length;
+        const plan = p.plannedPurchases?.[k];
+        const growth = (plan?.growth ?? 5) / 100;
+        const price = (plan?.price ?? a.newPurchasePrice) * Math.pow(1 + growth, i);
+        const yieldPct = plan?.yieldPct ?? a.newPurchaseYield;
+        const rate = plan?.rate ?? a.newLoanRate;
         const usable = sims.reduce((t, s) => t + Math.max(0, s.value * (a.lvr / 100) - s.debt), 0);
-        const deposit = newPrice * 0.25; // 20% deposit + ~5% stamp duty & costs
-        const newLoan = newPrice * 1.05 - Math.min(Math.max(0, cash - buffer), deposit);
-        const services = serviceSurplus(sims, youSal, partSal, living, otherDebt > 0 ? otherRepay : 0) - pmt(a.newLoanRate + a.serviceBuffer, 30, newLoan) > 0;
-        if (usable + Math.max(0, cash - buffer) >= deposit && services) {
-          const fromCash = Math.min(Math.max(0, cash - buffer), deposit);
+        const deposit = price * 0.25; // 20% deposit + ~5% stamp duty & costs
+        const spare = Math.max(0, cash - buffer);
+        const fromCash = Math.min(spare, deposit);
+        const newLoan = price * 1.05 - fromCash;
+        const serviceGap = serviceSurplus(sims, youSal, partSal, living, otherDebt > 0 ? otherRepay : 0) - pmt(rate + a.serviceBuffer, 30, newLoan);
+        const services = serviceGap > 0;
+        const dateOk = !plan?.notBefore || year >= plan.notBefore;
+        if (!dateOk || usable + spare < deposit || !services) {
+          block = { year, reason: !dateOk ? 'date' : usable + spare < deposit ? 'deposit' : 'servicing', price, deposit, available: usable + spare, monthlyShort: Math.max(0, -serviceGap) };
+        }
+        if (dateOk && usable + spare >= deposit && services) {
+          block = null;
           cash -= fromCash;
-          sims.push({
-            value: newPrice, debt: newPrice * 1.05 - fromCash, rate: a.newLoanRate, io: true, years: 30,
-            rent: newPrice * (a.newPurchaseYield / 100) * (50 / 52), costs: newPrice * 0.012, mgmt: 0.07, g: 0.05, invest: true,
-          });
-          purchases.push({ year, price: newPrice });
-          bought = newPrice;
+          sims.push({ value: price, debt: newLoan, rate, io: true, years: 30, rent: price * (yieldPct / 100) * (50 / 52), costs: price * 0.012, mgmt: 0.07, g: growth, invest: true });
+          purchases.push({ year, price });
+          bought = price;
         }
       }
     }
@@ -296,5 +321,5 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
       monthlySavings: monthlyNet, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
     });
   }
-  return { points, purchases, retireYear };
+  return { points, purchases, retireYear, block: purchases.length + p.properties.length >= p.goals.targetProperties ? null : block };
 }

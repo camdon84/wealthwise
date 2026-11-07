@@ -16,7 +16,7 @@ export const ASK = { broker: 'Ask your mortgage broker', adviser: 'Ask a license
 const liveMode = (import.meta as any).env?.VITE_STORAGE === 'api';
 const wiseMemo = new Map<string, Promise<{ summary: string; ideas: { title: string; body: string }[] } | null>>();
 
-export function useWiseTake(profile: Profile, quotes: Quotes, insights: Insight[], mode?: 'first-look') {
+export function useWiseTake(profile: Profile, quotes: Quotes, insights: Insight[], mode?: 'first-look' | 'goals') {
   const ready = profile.holdings.length === 0 || Object.keys(quotes).length > 0;
   const body = useMemo(() => (ready ? JSON.stringify(wiseFacts(profile, quotes, insights)) : ''), [profile, quotes, insights, ready]);
   const [take, setTake] = useState<{ summary: string; ideas: { title: string; body: string }[] } | null | 'loading'>(liveMode ? 'loading' : null);

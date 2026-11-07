@@ -208,7 +208,7 @@ export function wiseFacts(p: Profile, quotes: Quotes, insights: Insight[]) {
   const atRetire = proj.points.find((x) => x.year === proj.retireYear) ?? proj.points[proj.points.length - 1];
   return {
     household: { age: p.household.you.age, partner: p.household.hasPartner, dependants: p.household.dependants.length, state: p.household.state },
-    goal: { stopWorkAge: p.goals.retirementAge, incomeWantedTodayDollars: p.goals.passiveIncome, propertiesWanted: p.goals.targetProperties },
+    goal: { stopWorkAge: p.goals.retirementAge, incomeWantedTodayDollars: p.goals.passiveIncome, propertiesWanted: p.goals.targetProperties, sharePortfolioWantedTodayDollars: p.goals.sharesTarget ?? null },
     today: {
       netWorth: r(pos.netWorth, 5000), usableEquity: r(pos.usable, 5000), borrowingCapacity: r(pos.bc.capacity, 10000), leftOverEachMonth: r(pos.monthlySurplus, 100),
       cash: r(pos.cash), super: r(pos.superBal, 5000), sharesValue: r(pos.shares.value, 5000),
@@ -219,5 +219,42 @@ export function wiseFacts(p: Profile, quotes: Quotes, insights: Insight[]) {
     cashAboveBuffer: r(Math.max(0, (p.finances.cash ?? 0) - (p.finances.buffer ?? 0)), 500),
     projection: { incomeAtStopWorkTodayDollars: r(atRetire?.passiveIncomeReal ?? 0), gapToGoal: r((atRetire?.passiveIncomeReal ?? 0) - p.goals.passiveIncome), nextPurchaseYear: proj.purchases[0]?.year ?? null },
     observations: insights.map((i) => i.title),
+    goalChecks: goalAnalysisLines(p, quotes),
   };
+}
+const goalAnalysisLines = (p: Profile, quotes: Quotes) => { try { return goalAnalysis(p, quotes).lines.map((l) => l.text); } catch { return []; } };
+
+/* ---------- Goals: do the targets fit together? ---------- */
+export function goalAnalysis(p: Profile, quotes: Quotes) {
+  const a = p.assumptions;
+  const pos = position(p, quotes);
+  const proj = project(p, quotes);
+  const startAge = p.household.you.age ?? 35;
+  const years = Math.max(1, p.goals.retirementAge - startAge);
+  const atRetire = proj.points.find((x) => x.year === proj.retireYear) ?? proj.points[proj.points.length - 1];
+  const deflate = Math.pow(1 + a.inflation / 100, years);
+  const owned = p.properties.length;
+  const projectedProps = owned + proj.purchases.filter((x) => x.year <= proj.retireYear).length;
+  const sharesNow = pos.shares.value;
+  const sharesAtRetireReal = (atRetire?.shares ?? 0) / deflate;
+  const target = p.goals.sharesTarget ?? 0;
+  const real = (a.shareReturn - a.inflation) / 100; // return above inflation, so everything stays in today's money
+  const grown = sharesNow * Math.pow(1 + real, years);
+  const requiredYearly = target > grown ? ((target - grown) * real) / (Math.pow(1 + real, years) - 1) : 0;
+  const spareYearly = Math.max(0, pos.monthlySurplus * 12);
+  const lines: { tone: 'good' | 'warn'; text: string }[] = [];
+  if (p.goals.targetProperties > owned) {
+    if (projectedProps >= p.goals.targetProperties) lines.push({ tone: 'good', text: `You’re on track to own ${p.goals.targetProperties} properties by ${p.goals.retirementAge}. The last purchase lands around ${proj.purchases[p.goals.targetProperties - owned - 1]?.year}.` });
+    else if (proj.block?.reason === 'servicing') lines.push({ tone: 'warn', text: `You’d reach ${projectedProps} of your ${p.goals.targetProperties} properties by ${p.goals.retirementAge}. The next one is held back by borrowing power: lenders would want to see about ${money(proj.block.monthlyShort, { compact: true })} a month more income than you’d have, or a cheaper property.` });
+    else if (proj.block?.reason === 'deposit') lines.push({ tone: 'warn', text: `You’d reach ${projectedProps} of your ${p.goals.targetProperties} properties by ${p.goals.retirementAge}. The next one needs about ${money(proj.block.deposit, { compact: true })} for a deposit, and you’d have ${money(proj.block.available, { compact: true })} in equity and savings.` });
+  }
+  if (target > 0) {
+    if (sharesAtRetireReal >= target) lines.push({ tone: 'good', text: `Your share portfolio is on track to reach about ${money(sharesAtRetireReal, { compact: true })} in today’s money by ${p.goals.retirementAge}, above your ${money(target, { compact: true })} goal.` });
+    else lines.push({ tone: 'warn', text: `To grow your shares to ${money(target, { compact: true })} by ${p.goals.retirementAge}, you’d need to invest about ${money(requiredYearly, { compact: true })} a year (in today’s money) at ${a.shareReturn}% a year. Your plan gets you to about ${money(sharesAtRetireReal, { compact: true })}.${projectedProps < p.goals.targetProperties || requiredYearly > spareYearly ? ` With your property goal also competing for savings, a share goal nearer ${money(Math.max(sharesAtRetireReal, 0), { compact: true })} fits better, or stop work a few years later.` : ''}` });
+  }
+  const incomeReal = atRetire?.passiveIncomeReal ?? 0;
+  lines.push(incomeReal >= p.goals.passiveIncome
+    ? { tone: 'good', text: `Your projected income without working is about ${money(incomeReal, { compact: true })} a year in today’s money, above your ${money(p.goals.passiveIncome, { compact: true })} goal.` }
+    : { tone: 'warn', text: `Your projected income without working is about ${money(incomeReal, { compact: true })} a year in today’s money, short of your ${money(p.goals.passiveIncome, { compact: true })} goal.` });
+  return { owned, projectedProps, sharesAtRetireReal, requiredYearly, spareYearly, incomeReal, lines, proj };
 }

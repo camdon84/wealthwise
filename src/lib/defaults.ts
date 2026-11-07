@@ -4,13 +4,13 @@ export const uid = () => Math.random().toString(36).slice(2, 10);
 
 export const defaultAssumptions: Assumptions = {
   lvr: 80,
-  shareReturn: 7,
+  shareReturn: 8,
   superReturn: 7,
-  inflation: 2.5,
+  inflation: 2.75,
   rentGrowth: 3,
   newPurchasePrice: 650000,
   newPurchaseYield: 5,
-  newLoanRate: 6.2,
+  newLoanRate: 6.85,
   serviceBuffer: 3,
 };
 
@@ -46,8 +46,16 @@ export function normalize(p: Profile): Profile {
   for (const pr of p.properties) for (const l of pr.loans) l.rateType ??= 'variable';
   p.mode = 'thorough';
   p.goals.lifeExpectancy ??= 90;
+  p.household.dependantsDetail ??= p.household.dependants.map((age, i) => emptyDependant(i, age));
+  p.plannedPurchases ??= [];
   return p;
 }
+
+export const emptyDependant = (i: number, age: number | null = null): import('./types').Dependant =>
+  ({ id: uid(), name: `Dependant ${i + 1}`, age, monthlyCosts: null, childcareMonthly: null, activitiesMonthly: null, schoolFeesYearly: null, supportUntil: 18 });
+
+export const plannedPurchase = (n: number, a: Assumptions) =>
+  ({ id: uid(), label: `Property ${n}`, price: a.newPurchasePrice, yieldPct: a.newPurchaseYield, rate: a.newLoanRate, growth: 5, notBefore: null });
 
 export const emptyLoan = (): Loan => ({ id: uid(), lender: '', balance: null, rate: null, type: 'pi', rateType: 'variable', yearsLeft: 25, offset: null });
 export const DEBT_RATE: Record<string, number> = { car: 9.5, personal: 12.5, 'credit-card': 20.99, other: 10 };
@@ -96,8 +104,8 @@ export function demoProfile(): Profile {
   };
   p.finances = {
     housing: 'own', rentMonthly: null, mortgageMonthly: null, mortgageSharePct: 100, livingMode: 'breakdown',
-    livingBreakdown: { groceries: 1400, energy: 260, water: 90, internet: 120, subscriptions: 85, petrol: 420, transport: 60, carInsurance: 140, carRunning: 110, health: 380, homeInsurance: 210, school: 650, kids: 180, eatingOut: 600, clothing: 250, medical: 120, pets: 90, other: 235 },
-    livingMonthly: 5400, cash: 38000, cashOffset: 30000, cashSavings: 8000, offsetIsCash: true, buffer: 20000,
+    livingBreakdown: { groceries: 1400, energy: 260, water: 90, internet: 120, subscriptions: 85, petrol: 420, transport: 60, carInsurance: 140, carRunning: 110, health: 380, homeInsurance: 210, school: 0, kids: 0, eatingOut: 600, clothing: 250, medical: 120, pets: 90, other: 235 },
+    livingMonthly: 4570, cash: 38000, cashOffset: 30000, cashSavings: 8000, offsetIsCash: true, buffer: 20000,
     debts: [
       { id: uid(), kind: 'car', label: 'Car loan', balance: 21000, monthlyRepayment: 640, limit: null, rate: 9.49 },
       { id: uid(), kind: 'credit-card', label: 'Credit card', balance: 6400, monthlyRepayment: null, limit: 12000, rate: 20.99 },
@@ -147,10 +155,22 @@ export function demoProfile(): Profile {
     h('NDQ', 'ASX', 'Betashares Nasdaq 100 ETF', 150, 38.7, '2023-01-17', 'etf'),
     h('BTC', 'CRYPTO', 'Bitcoin', 0.12, 61000, '2023-03-02', 'crypto'),
   ];
+  p.household.dependantsDetail = [
+    { id: uid(), name: 'Mia', age: 7, monthlyCosts: 450, childcareMonthly: 0, activitiesMonthly: 180, schoolFeesYearly: 4200, supportUntil: 18 },
+    { id: uid(), name: 'Leo', age: 4, monthlyCosts: 400, childcareMonthly: 1100, activitiesMonthly: 90, schoolFeesYearly: 0, supportUntil: 18 },
+  ];
+  p.household.you.jobTitle = 'Operations manager';
+  p.household.partner.jobTitle = 'Physiotherapist';
+  p.household.you.salaryAsOf = p.household.partner.salaryAsOf = '2026-07-01';
+  p.household.you.superAsOf = p.household.partner.superAsOf = '2026-06-30';
+  p.plannedPurchases = [
+    { id: uid(), label: 'Property 4', price: 620000, yieldPct: 5.2, rate: 6.6, growth: 5, notBefore: null },
+    { id: uid(), label: 'Property 5', price: 700000, yieldPct: 4.8, rate: 6.6, growth: 5, notBefore: null },
+  ];
   p.rateWatch = { cashRate: 4.6, date: '2026-09-30' }; // demo: last confirmed before the RBA's November rise
   p.firstLookSeen = true;
   p.goals = {
-    retirementAge: 58, lifeExpectancy: 90, passiveIncome: 130000, targetProperties: 5, risk: 4,
+    retirementAge: 58, lifeExpectancy: 90, sharesTarget: 1500000, passiveIncome: 130000, targetProperties: 5, risk: 4,
     events: [{ id: uid(), label: 'Kitchen renovation', year: new Date().getFullYear() + 1, amount: 45000 }],
   };
   return p;

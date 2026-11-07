@@ -171,6 +171,20 @@ async function api(req: Request, env: Env, path: string) {
     return json({ ok: true }, 200, { 'set-cookie': sessionCookie('', 0) });
   }
 
+  if (path === '/api/password' && method === 'POST') {
+    const u = await currentUser(req, env);
+    if (!u) return fail('Sign in again to continue.', 401);
+    const b = await body<{ current?: string; next?: string }>(req);
+    if (!b?.next || b.next.length < 8 || b.next.length > 200) return fail('Use a new password of at least 8 characters.');
+    const row = await env.DB.prepare('SELECT pw_hash, pw_salt FROM users WHERE id = ?').bind(u.id).first<any>();
+    if (!row || !safeEqual(await hashPassword(b.current || '', row.pw_salt), row.pw_hash)) return fail('Your current password isn’t right.', 403);
+    const salt = randomHex(16);
+    await env.DB.prepare('UPDATE users SET pw_hash = ?, pw_salt = ? WHERE id = ?').bind(await hashPassword(b.next, salt), salt, u.id).run();
+    const token = readCookie(req);
+    await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(u.id, token ? await sha256(token) : '').run(); // sign out other devices
+    return json({ ok: true });
+  }
+
   if (path === '/api/profile') {
     const u = await currentUser(req, env);
     if (!u) return fail('Sign in again to continue.', 401);
@@ -348,11 +362,14 @@ async function wiseRoute(req: Request, env: Env) {
   if (text.length > 8000) return fail('Too much data.', 413);
   let facts: any;
   try { facts = JSON.parse(text); } catch { return fail('Could not read that.'); }
-  const firstLook = new URL(req.url).searchParams.get('mode') === 'first-look';
-  const key = `wise:${firstLook ? 'fl:' : ''}${await sha256(text)}`;
+  const mode = new URL(req.url).searchParams.get('mode');
+  const firstLook = mode === 'first-look';
+  const key = `wise:${mode ?? ''}:${await sha256(text)}`;
   const data = await cached(env, key, 7 * 864e5, async () => {
     const lead = firstLook
       ? `This is the household's first look straight after finishing setup. Lead with their quickest wins, especially debts: compare each debt's interest rate with their savings, offset and home loan rate, and point out where paying down or restructuring high-interest debt would save money (the app's observations include the exact savings). Then one line on how they track against their goal.\n`
+      : mode === 'goals'
+      ? `The household is reviewing whether their goals fit together: properties wanted by retirement, a share portfolio target and income in retirement. The app's goal analysis gives exact figures, including the yearly share investment needed. Say plainly which goals compete for the same savings or borrowing power and suggest a sensible trade-off to explore (for example a lower share target to make room for the properties, a cheaper next property, or retiring a little later), using only the figures given.\n`
       : '';
     const sys = lead + `You are Wise, the assistant inside WealthWise, an Australian property and wealth planning app. You get a household's figures, already calculated exactly by the app, plus the app's rule-based observations.
 Write a short, warm, plain-English overview of where they stand against their goal, then up to 2 ideas or scenarios worth exploring in the app (for example a renovation, timing the next purchase, building a buffer, testing a later retirement age).
