@@ -235,9 +235,11 @@ async function news(query: string): Promise<Headline[]> {
   const xml = await res.text();
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 12).map(([, it]) => {
     const raw = decode(it.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '');
-    const source = decode(it.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1] ?? '');
+    const source = decode(it.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1] ?? it.match(/<News:Source>([\s\S]*?)<\/News:Source>/)?.[1] ?? '').replace(/ on MSN$/, '');
     const title = source && raw.endsWith(` - ${source}`) ? raw.slice(0, -(source.length + 3)) : raw;
-    return { title, source, url: decode(it.match(/<link>([\s\S]*?)<\/link>/)?.[1] ?? ''), date: new Date(it.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] ?? Date.now()).toISOString() };
+    let url = decode(it.match(/<link>([\s\S]*?)<\/link>/)?.[1] ?? '');
+    try { const real = new URL(url).searchParams.get('url'); if (url.includes('bing.com/news/apiclick') && real) url = real; } catch { /* keep the feed link */ }
+    return { title, source, url, date: new Date(it.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] ?? Date.now()).toISOString() };
   });
 }
 

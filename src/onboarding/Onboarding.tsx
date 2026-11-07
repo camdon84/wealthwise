@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { useApp } from '../lib/store';
 import { useQuotes } from '../lib/hooks';
-import { position, propertyStats } from '../lib/calc';
+import { hecsAnnual, hecsCompulsory, livingCosts, position, propertyStats } from '../lib/calc';
 import { money, num } from '../lib/format';
-import { emptyDebt, emptyProperty, uid } from '../lib/defaults';
+import { LIVING_CATEGORIES, emptyDebt, emptyProperty, uid } from '../lib/defaults';
 import type { Debt, Holding, Profile, Property } from '../lib/types';
 import { Field, Icon, Logo, MoneyInput, NumInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
 import { PropertyEditor } from '../components/PropertyEditor';
@@ -13,7 +13,7 @@ import { LotPlan } from '../components/LotPlan';
 const STEPS = [
   { title: 'About you', blurb: 'Who the plan is for.' },
   { title: 'Income', blurb: 'What comes in each year.' },
-  { title: 'Spending and debts', blurb: 'What goes out, and what you owe.' },
+  { title: 'Spending and debts', blurb: 'Where you live, what goes out each month, and what you owe.' },
   { title: 'Cash and super', blurb: 'Money you already have set aside.' },
   { title: 'Properties', blurb: 'Your home and any investments.' },
   { title: 'Shares and crypto', blurb: 'Upload a file or add them by hand.' },
@@ -28,7 +28,7 @@ export function Onboarding() {
   const session = useApp((s) => s.session);
   const restart = useApp((s) => s.signInSandbox);
   const step = profile.onboardingStep;
-  const thorough = profile.mode === 'thorough';
+  const thorough = true;
   const go = (n: number) => { update((p) => { p.onboardingStep = Math.max(0, Math.min(STEPS.length - 1, n)); }); window.scrollTo({ top: 0 }); };
 
   const body: Record<number, ReactNode> = {
@@ -42,7 +42,6 @@ export function Onboarding() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3">
           <Logo />
           <div className="flex items-center gap-3">
-            <Segmented size="sm" label="Setup detail" value={profile.mode} onChange={(v) => update((p) => { p.mode = v; })} options={[{ value: 'simple', label: 'Simple' }, { value: 'thorough', label: 'Thorough' }]} />
             {session?.sandbox
               ? <><button className="btn-ghost hidden sm:inline-flex" onClick={() => restart()}>Start again</button><button className="btn-ghost hidden sm:inline-flex" onClick={signOut}>Leave test mode</button></>
               : <button className="btn-ghost hidden sm:inline-flex" onClick={signOut}>Save and exit</button>}
@@ -181,35 +180,96 @@ function Income({ thorough }: { thorough: boolean }) {
   );
 }
 
-function Spending({ thorough }: { thorough: boolean }) {
+function Spending(_: { thorough: boolean }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const f = p.finances;
+  const hh = p.household;
   const setDebt = (id: string, patch: Partial<Debt>) => update((d) => { d.finances.debts = d.finances.debts.map((x) => (x.id === id ? { ...x, ...patch } : x)); });
+  const total = livingCosts(p);
+  const helped = (f.mortgageSharePct ?? 100) < 100;
+  const who = hh.hasPartner ? 'you and your partner' : 'you';
   return (
-    <div className="space-y-8">
-      <Field label="Monthly living costs" hint="Everything except loan repayments: groceries, bills, transport, school, insurance, fun. A rough figure is fine.">{(id) => <MoneyInput id={id} value={f.livingMonthly} onChange={(v) => update((d) => { d.finances.livingMonthly = v; })} suffix="/ month" />}</Field>
-      <div>
-        <p className="field-label">Other debts</p>
-        <p className="text-sm text-muted mb-3">Car loans, personal loans, HECS and credit cards. Lenders count a card’s full limit, even if you pay it off each month.</p>
-        <div className="space-y-3">
-          {f.debts.map((d) => (
-            <div key={d.id} className="rounded-xl border border-line bg-surface p-4">
-              <div className="grid gap-3 sm:grid-cols-4">
-                <Field label="Type">{(id) => <Select id={id} value={d.kind} onChange={(v) => setDebt(d.id, { kind: v })} options={[{ value: 'car', label: 'Car loan' }, { value: 'personal', label: 'Personal loan' }, { value: 'hecs', label: 'HECS / HELP' }, { value: 'credit-card', label: 'Credit card' }, { value: 'other', label: 'Other' }]} />}</Field>
-                <Field label="Amount owing">{(id) => <MoneyInput id={id} value={d.balance} onChange={(v) => setDebt(d.id, { balance: v })} />}</Field>
-                {d.kind === 'credit-card'
-                  ? <Field label="Card limit">{(id) => <MoneyInput id={id} value={d.limit} onChange={(v) => setDebt(d.id, { limit: v })} />}</Field>
-                  : <Field label="Repayment">{(id) => <MoneyInput id={id} value={d.monthlyRepayment} onChange={(v) => setDebt(d.id, { monthlyRepayment: v })} suffix="/ mo" />}</Field>}
-                <div className="flex items-end"><button type="button" className="btn-ghost" onClick={() => update((x) => { x.finances.debts = x.finances.debts.filter((y) => y.id !== d.id); })}><Icon name="trash" className="h-4 w-4" />Remove</button></div>
-              </div>
+    <div className="space-y-10">
+      <section>
+        <p className="field-label">Do you own where you live, or rent?</p>
+        <Segmented value={f.housing} onChange={(v) => update((d) => { d.finances.housing = v; })} options={[{ value: 'own', label: 'I own it' }, { value: 'rent', label: 'I rent' }, { value: 'other', label: 'Neither (e.g. living with family)' }]} />
+        {f.housing === 'rent' && (
+          <div className="mt-4 max-w-sm"><Field label="Rent you personally pay" hint="Your share only, if you split rent with housemates.">{(id) => <MoneyInput id={id} value={f.rentMonthly} onChange={(v) => update((d) => { d.finances.rentMonthly = v; })} suffix="/ month" />}</Field></div>
+        )}
+        {f.housing === 'own' && (
+          <div className="mt-4 space-y-4">
+            <div className="max-w-sm"><Field label="Mortgage repayments" hint="The full monthly repayment on your home loan. Leave blank if it’s paid off, or to work it out from the loan you add in the Properties step.">{(id) => <MoneyInput id={id} value={f.mortgageMonthly} onChange={(v) => update((d) => { d.finances.mortgageMonthly = v; })} suffix="/ month" />}</Field></div>
+            <Toggle checked={helped} onChange={(v) => update((d) => { d.finances.mortgageSharePct = v ? 50 : 100; })} label="Someone else helps pay the mortgage" description={`For example a family member or someone outside this plan. We’ll only count the share ${who} pay.`} />
+            {helped && (
+              <div className="max-w-xs pl-14"><Field label={`Share ${who} pay`}>{(id) => <NumInput id={id} value={f.mortgageSharePct} onChange={(v) => update((d) => { d.finances.mortgageSharePct = Math.min(100, Math.max(0, v ?? 0)); })} suffix="%" min={0} max={100} />}</Field></div>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="field-label mb-0">Monthly living costs</p>
+            <p className="mt-1 max-w-xl text-sm text-muted">Groceries, bills, petrol, transport, subscriptions, insurance, school and everything else you spend each month. Leave out rent, mortgage and loan repayments: they’re counted separately.</p>
+          </div>
+          <Segmented size="sm" label="How to enter living costs" value={f.livingMode} onChange={(v) => update((d) => { d.finances.livingMode = v; })} options={[{ value: 'total', label: 'Enter a total' }, { value: 'breakdown', label: 'Break it down' }]} />
+        </div>
+        {f.livingMode === 'total' ? (
+          <div className="mt-4 max-w-sm"><Field label="Living costs per month">{(id) => <MoneyInput id={id} value={f.livingMonthly} onChange={(v) => update((d) => { d.finances.livingMonthly = v; })} suffix="/ month" placeholder="e.g. 4,500" />}</Field></div>
+        ) : (
+          <div className="mt-4 rounded-xl border border-line bg-raised/50 p-4">
+            <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+              {LIVING_CATEGORIES.map((c) => (
+                <Field key={c.key} label={c.label}>{(id) => <MoneyInput id={id} value={f.livingBreakdown[c.key] ?? null} onChange={(v) => update((d) => { d.finances.livingBreakdown[c.key] = v; })} suffix="/ mo" />}</Field>
+              ))}
             </div>
-          ))}
-          <button type="button" className="btn-quiet" onClick={() => update((d) => { d.finances.debts.push(emptyDebt()); })}><Icon name="plus" className="h-4 w-4" />Add a debt</button>
+            <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+              <p className="text-xs text-muted">Car loans and other repayments go in the debts section below.</p>
+              <p className="text-sm">Total <span className="font-display text-lg font-semibold">{money(total)}</span> <span className="text-muted">/ month</span></p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <p className="field-label">Other debts</p>
+        <p className="mb-3 text-sm text-muted">Car loans, personal loans, HECS and credit cards. Lenders count a card’s full limit, even if you pay it off each month.</p>
+        <div className="space-y-3">
+          {f.debts.map((d) => {
+            const isHecs = d.kind === 'hecs';
+            const owner = d.owner ?? 'you';
+            const person = owner === 'partner' && hh.hasPartner ? hh.partner : hh.you;
+            const income = (person.salary ?? 0) + (owner === 'you' ? hh.otherIncome ?? 0 : 0);
+            const compulsory = hecsCompulsory(income);
+            return (
+              <div key={d.id} className="paper rounded-xl border border-line bg-surface p-4">
+                <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr_auto]">
+                  <Field label="Type">{(id) => <Select id={id} value={d.kind} onChange={(v) => setDebt(d.id, { kind: v, owner: d.owner ?? 'you' })} options={[{ value: 'car', label: 'Car loan' }, { value: 'personal', label: 'Personal loan' }, { value: 'hecs', label: 'HECS / HELP' }, { value: 'credit-card', label: 'Credit card' }, { value: 'other', label: 'Other' }]} />}</Field>
+                  <Field label="Amount owing">{(id) => <MoneyInput id={id} value={d.balance} onChange={(v) => setDebt(d.id, { balance: v })} />}</Field>
+                  {d.kind === 'credit-card' && <Field label="Card limit">{(id) => <MoneyInput id={id} value={d.limit} onChange={(v) => setDebt(d.id, { limit: v })} />}</Field>}
+                  {!isHecs && d.kind !== 'credit-card' && <Field label="Repayment">{(id) => <MoneyInput id={id} value={d.monthlyRepayment} onChange={(v) => setDebt(d.id, { monthlyRepayment: v })} suffix="/ mo" />}</Field>}
+                  {isHecs && hh.hasPartner && <Field label="Whose HECS">{(id) => <Select id={id} value={owner} onChange={(v) => setDebt(d.id, { owner: v })} options={[{ value: 'you', label: hh.you.name || 'Mine' }, { value: 'partner', label: hh.partner.name || 'My partner’s' }]} />}</Field>}
+                  {isHecs && <Field label="Extra repayments">{(id) => <MoneyInput id={id} value={d.voluntaryMonthly ?? null} onChange={(v) => setDebt(d.id, { voluntaryMonthly: v })} suffix="/ mo" />}</Field>}
+                  <div className="flex items-end"><button type="button" className="btn-ghost" onClick={() => update((x) => { x.finances.debts = x.finances.debts.filter((y) => y.id !== d.id); })}><Icon name="trash" className="h-4 w-4" />Remove</button></div>
+                </div>
+                {isHecs && (d.balance ?? 0) > 0 && (
+                  <p className="mt-3 rounded-lg bg-raised px-3 py-2 text-sm">
+                    {income > 0
+                      ? <>Based on {owner === 'partner' && hh.hasPartner ? `${hh.partner.name || 'your partner'}’s` : 'your'} income of {money(income)}, the compulsory repayment is about <span className="font-semibold">{money(compulsory)} a year</span>{compulsory > 0 ? <> ({money(compulsory / 12)} a month), taken through the tax system</> : <>, because it’s under the repayment threshold</>}.{compulsory > 0 && (d.balance ?? 0) > 0 && <> At that rate it’s paid off in about {Math.ceil((d.balance ?? 0) / (compulsory + (d.voluntaryMonthly ?? 0) * 12))} years.</>}</>
+                      : <>Add {owner === 'partner' ? 'their' : 'your'} income in the Income step to see the compulsory repayment.</>}
+                    <span className="block text-xs text-muted mt-1">2026–27 estimate from the ATO’s marginal repayment rates. Indexation isn’t included.</span>
+                  </p>
+                )}
+              </div>
+            );
+          })}
+          <button type="button" className="btn-quiet" onClick={() => update((d) => { d.finances.debts.push({ ...emptyDebt(), owner: 'you' }); })}><Icon name="plus" className="h-4 w-4" />Add a debt</button>
           {f.debts.length === 0 && <p className="text-sm text-muted">No other debts? Skip this and continue.</p>}
         </div>
-      </div>
-      {thorough && <p className="text-xs text-muted">We use the higher of your figure and a standard living-cost benchmark for your household size, as lenders do.</p>}
+      </section>
+      <p className="text-xs text-muted">We use the higher of your living costs and a standard benchmark for your household size, as lenders do.</p>
     </div>
   );
 }
@@ -362,11 +422,11 @@ function Review({ go }: { go: (n: number) => void }) {
   const missing: string[] = [];
   if (!hh.you.age) missing.push('your age');
   if (!hh.you.salary && hh.you.employment !== 'not-working') missing.push('your income');
-  if (!p.finances.livingMonthly) missing.push('living costs');
+  if (!livingCosts(p)) missing.push('living costs');
   const sections = [
     { step: 0, title: 'About you', lines: [`${hh.you.name || 'You'}${hh.you.age ? `, ${hh.you.age}` : ''}${hh.hasPartner ? ` and ${hh.partner.name || 'partner'}${hh.partner.age ? `, ${hh.partner.age}` : ''}` : ''}`, `${hh.dependants.length} dependant${hh.dependants.length === 1 ? '' : 's'} · ${hh.state}`] },
     { step: 1, title: 'Income', lines: [`${money((hh.you.salary ?? 0) + (hh.hasPartner ? hh.partner.salary ?? 0 : 0))} household salary`, `${money(hh.otherIncome ?? 0)} other income`] },
-    { step: 2, title: 'Spending and debts', lines: [`${money(p.finances.livingMonthly ?? 0)} a month living costs`, `${p.finances.debts.length} other debt${p.finances.debts.length === 1 ? '' : 's'} · ${money(pos.otherDebt)}`] },
+    { step: 2, title: 'Spending and debts', lines: [`${p.finances.housing === 'rent' ? `Renting, ${money(p.finances.rentMonthly ?? 0)} a month` : p.finances.housing === 'own' ? 'Owns their home' : 'Not paying rent or a mortgage'}`, `${money(livingCosts(p))} a month living costs`, `${p.finances.debts.length} other debt${p.finances.debts.length === 1 ? '' : 's'} · ${money(pos.otherDebt)}`] },
     { step: 3, title: 'Cash and super', lines: [`${money(pos.cash)} cash`, `${money(pos.superBal)} super`] },
     { step: 4, title: 'Properties', lines: p.properties.length ? p.properties.map((x) => `${x.address}, ${x.suburb}`) : ['None yet'] },
     { step: 5, title: 'Shares and crypto', lines: [`${p.holdings.length} holdings · ${money(pos.shares.value)}`] },

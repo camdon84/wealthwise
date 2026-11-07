@@ -18,17 +18,47 @@ export function pv(ratePct: number, years: number, monthly: number) {
   return (monthly * (1 - Math.pow(1 + r, -k))) / r;
 }
 
-/* ---------- Tax (2025–26 resident rates + 2% Medicare levy) ---------- */
+/* ---------- Tax (2026–27 resident rates + 2% Medicare levy) ---------- */
 export function incomeTax(gross: number) {
   const g = Math.max(0, gross);
   let t = 0;
-  if (g > 190000) t = 51638 + (g - 190000) * 0.45;
-  else if (g > 135000) t = 31288 + (g - 135000) * 0.37;
-  else if (g > 45000) t = 4288 + (g - 45000) * 0.3;
-  else if (g > 18200) t = (g - 18200) * 0.16;
+  if (g > 190000) t = 51370 + (g - 190000) * 0.45;
+  else if (g > 135000) t = 31020 + (g - 135000) * 0.37;
+  else if (g > 45000) t = 4020 + (g - 45000) * 0.3;
+  else if (g > 18200) t = (g - 18200) * 0.15;
   return t + (g > 27222 ? g * 0.02 : 0);
 }
 export const afterTax = (gross: number) => gross - incomeTax(gross);
+
+/** Compulsory HELP/HECS repayment, 2026–27 estimate: the 2025–26 marginal scale indexed to the $69,528 threshold. */
+export function hecsCompulsory(income: number) {
+  const t1 = 69528, t2 = 129716, t3 = 186052;
+  if (income <= t1) return 0;
+  if (income >= t3) return income * 0.1;
+  if (income <= t2) return (income - t1) * 0.15;
+  return (t2 - t1) * 0.15 + (income - t2) * 0.17;
+}
+
+export function livingCosts(p: Profile) {
+  const f = p.finances;
+  return f.livingMode === 'breakdown' ? Object.values(f.livingBreakdown ?? {}).reduce((a: number, v) => a + n(v), 0) : n(f.livingMonthly);
+}
+/** Monthly housing cost not already counted through a property's loan: rent, or a mortgage figure entered directly. */
+export function housingMonthly(p: Profile) {
+  const f = p.finances;
+  if (f.housing === 'rent') return n(f.rentMonthly);
+  return 0;
+}
+export const mortgageShare = (p: Profile) => (p.finances.housing === 'own' ? Math.min(100, Math.max(0, p.finances.mortgageSharePct ?? 100)) / 100 : 1);
+
+/** HECS: compulsory repayments for each person who owes it, plus voluntary extras. Annual. */
+export function hecsAnnual(p: Profile, youSal = n(p.household.you.salary), partSal = n(p.household.partner.salary)) {
+  const debts = p.finances.debts.filter((d) => d.kind === 'hecs' && n(d.balance) > 0);
+  const owes = (who: 'you' | 'partner') => debts.some((d) => (d.owner ?? 'you') === who);
+  const compulsory = (owes('you') ? hecsCompulsory(youSal + n(p.household.otherIncome)) : 0) + (p.household.hasPartner && owes('partner') ? hecsCompulsory(partSal) : 0);
+  const voluntary = debts.reduce((a, d) => a + n(d.voluntaryMonthly) * 12, 0);
+  return { compulsory, voluntary, balance: debts.reduce((a, d) => a + n(d.balance), 0) };
+}
 
 /* ---------- Property ---------- */
 export interface Valuation { value: number; low: number; high: number; sources: number; basis: 'sources' | 'indexed' | 'none' }
@@ -105,9 +135,10 @@ export function borrowingCapacity(p: Profile, overrides: { cardLimitCut?: number
   const youGross = n(hh.you.salary) + n(hh.otherIncome) * 0.8 + rent;
   const partnerGross = hh.hasPartner ? n(hh.partner.salary) : 0;
   const netMonthly = (afterTax(youGross) + (partnerGross ? afterTax(partnerGross) : 0)) / 12;
-  const living = Math.max(n(p.finances.livingMonthly), livingFloor(p));
+  const living = Math.max(livingCosts(p), livingFloor(p)) + housingMonthly(p);
   const cardLimits = p.finances.debts.filter((d) => d.kind === 'credit-card').reduce((s, d) => s + n(d.limit), 0) - n(overrides.cardLimitCut);
-  const commitments = p.finances.debts.filter((d) => d.kind !== 'credit-card').reduce((s, d) => s + n(d.monthlyRepayment), 0) + Math.max(0, cardLimits) * 0.038;
+  const commitments = p.finances.debts.filter((d) => d.kind !== 'credit-card' && d.kind !== 'hecs').reduce((s, d) => s + n(d.monthlyRepayment), 0) + Math.max(0, cardLimits) * 0.038
+    + hecsAnnual(p).compulsory / 12;
   const assessed = p.properties.reduce(
     (s, pr) => s + pr.loans.reduce((t, l) => t + pmt(n(l.rate) + a.serviceBuffer, Math.max(5, n(l.yearsLeft) || 25), n(l.balance)), 0), 0);
   const surplus = netMonthly - living - commitments - assessed;
@@ -129,11 +160,17 @@ export function position(p: Profile, quotes: Quotes) {
   const bc = borrowingCapacity(p);
   const propCashflow = props.reduce((a, x) => a + (x.pr.use === 'investment' ? x.s.cashflow : 0), 0);
   const hh = p.household;
-  const takeHome = (afterTax(n(hh.you.salary) + n(hh.otherIncome)) + (hh.hasPartner ? afterTax(n(hh.partner.salary)) : 0)) / 12;
-  const homeCosts = props.reduce((a, x) => a + (x.pr.use === 'home' ? x.s.repayments + n(x.pr.annualCosts) : 0), 0);
-  const monthlySurplus = takeHome + (propCashflow - homeCosts) / 12 - Math.max(n(p.finances.livingMonthly), livingFloor(p))
-    - p.finances.debts.reduce((a, d) => a + n(d.monthlyRepayment), 0);
-  return { takeHome, monthlySurplus, props, propValue, propDebt, usable, shares, superBal, cash, otherDebt, assets, liabilities, netWorth: assets - liabilities, bc, propCashflow };
+  const hecs = hecsAnnual(p);
+  const takeHome = (afterTax(n(hh.you.salary) + n(hh.otherIncome)) + (hh.hasPartner ? afterTax(n(hh.partner.salary)) : 0) - hecs.compulsory) / 12;
+  const f = p.finances;
+  const homeLoanRepay = f.housing === 'own' && f.mortgageMonthly != null
+    ? n(f.mortgageMonthly) * 12
+    : props.reduce((a, x) => a + (x.pr.use === 'home' ? x.s.repayments : 0), 0);
+  const homeCosts = homeLoanRepay * mortgageShare(p) + props.reduce((a, x) => a + (x.pr.use === 'home' ? n(x.pr.annualCosts) : 0), 0);
+  const living = Math.max(livingCosts(p), livingFloor(p));
+  const monthlySurplus = takeHome + (propCashflow - homeCosts) / 12 - living - housingMonthly(p)
+    - f.debts.filter((d) => d.kind !== 'hecs').reduce((a, d) => a + n(d.monthlyRepayment), 0) - hecs.voluntary / 12;
+  return { takeHome, monthlySurplus, hecs, living, homeCosts, props, propValue, propDebt, usable, shares, superBal, cash, otherDebt, assets, liabilities, netWorth: assets - liabilities, bc, propCashflow };
 }
 
 /* ---------- Projection ---------- */
@@ -152,26 +189,28 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
   const y0 = thisYear();
   const retireYear = y0 + (retireAge - startAge);
 
-  type Sim = { value: number; debt: number; rate: number; io: boolean; years: number; rent: number; costs: number; mgmt: number; g: number; invest: boolean };
+  type Sim = { value: number; debt: number; rate: number; io: boolean; years: number; rent: number; costs: number; mgmt: number; g: number; invest: boolean; pay?: number };
   const sims: Sim[] = pos.props.map(({ pr, s }) => ({
     value: s.val.value, debt: s.debt, rate: s.avgRate || 6, io: pr.loans.every((l) => l.type === 'io'),
     years: Math.max(1, ...pr.loans.map((l) => n(l.yearsLeft) || 25)), rent: s.rentGross, costs: n(pr.annualCosts),
-    mgmt: n(pr.managementPct) / 100, g: pr.growthRate / 100, invest: pr.use === 'investment',
+    mgmt: n(pr.managementPct) / 100, g: pr.growthRate / 100, invest: pr.use === 'investment', pay: pr.use === 'home' ? share : 1,
   }));
   let shares = pos.shares.value;
   let sup = pos.superBal;
   let cash = pos.cash;
-  let otherDebt = pos.otherDebt;
+  let otherDebt = pos.otherDebt - hecsAnnual(p).balance;
   let youSal = n(p.household.you.salary);
   let partSal = p.household.hasPartner ? n(p.household.partner.salary) : 0;
-  let living = Math.max(n(p.finances.livingMonthly), livingFloor(p)) * 12;
+  let living = (Math.max(livingCosts(p), livingFloor(p)) + housingMonthly(p)) * 12;
+  let hecsBal = hecsAnnual(p).balance;
+  const share = mortgageShare(p);
   let newPrice = a.newPurchasePrice;
   const buffer = n(p.finances.buffer) || living / 4;
-  const otherRepay = p.finances.debts.reduce((s, d) => s + n(d.monthlyRepayment), 0) * 12;
+  const otherRepay = p.finances.debts.filter((d) => d.kind !== 'hecs').reduce((s, d) => s + n(d.monthlyRepayment), 0) * 12;
   const cardLoad = p.finances.debts.filter((d) => d.kind === 'credit-card').reduce((s, d) => s + n(d.limit), 0) * 0.038;
   const serviceSurplus = (list: { rate: number; debt: number; rent: number }[], ys: number, ps: number, liv: number, otherAnnual: number) => {
     const rent80 = list.reduce((t, s) => t + s.rent, 0) * 0.8;
-    const net = (afterTax(ys + n(p.household.otherIncome) * 0.8 + rent80) + (ps ? afterTax(ps) : 0)) / 12;
+    const net = (afterTax(ys + n(p.household.otherIncome) * 0.8 + rent80) + (ps ? afterTax(ps) : 0) - (hecsBal > 0 ? hecsAnnual(p, ys, ps).compulsory : 0)) / 12;
     const assessed = list.reduce((t, s) => t + pmt(s.rate + a.serviceBuffer, 30, s.debt), 0);
     return net - Math.max(liv / 12, 0) - assessed - cardLoad - otherAnnual / 12;
   };
@@ -198,7 +237,7 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
           s.debt = Math.max(0, s.debt - (repay - interest));
           s.years = Math.max(1, s.years - 1);
         }
-        propNet += s.rent * (1 - s.mgmt) - s.costs - repay;
+        propNet += s.rent * (1 - s.mgmt) - s.costs - repay * (s.invest ? 1 : s.pay ?? 1);
       }
       youSal = working ? youSal * 1.03 : 0;
       partSal = working ? partSal * 1.03 : 0;
@@ -208,7 +247,9 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
       shares *= 1 + a.shareReturn / 100;
       const debtRepay = otherDebt > 0 ? Math.min(otherDebt, otherRepay) : 0;
       otherDebt -= debtRepay;
-      const net = afterTax(youSal + n(p.household.otherIncome)) + (partSal ? afterTax(partSal) : 0);
+      let hecsPaid = 0;
+      if (hecsBal > 0) { const h = hecsAnnual(p, youSal, partSal); hecsPaid = Math.min(hecsBal, h.compulsory + h.voluntary); hecsBal -= hecsPaid; }
+      const net = afterTax(youSal + n(p.household.otherIncome)) + (partSal ? afterTax(partSal) : 0) - hecsPaid;
       const drawdown = working ? 0 : shares * 0.04;
       shares -= drawdown;
       cash += net + propNet + drawdown - living - debtRepay;
@@ -247,7 +288,7 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
     const surplusM = serviceSurplus(sims, youSal, partSal, living, otherDebt > 0 ? otherRepay : 0);
     points.push({
       year, age, propertyValue, propertyDebt, propertyEquity: propertyValue - propertyDebt, shares, super: sup, cash,
-      netWorth: propertyValue - propertyDebt + shares + sup + cash - otherDebt,
+      netWorth: propertyValue - propertyDebt + shares + sup + cash - otherDebt - Math.max(0, hecsBal),
       passiveIncome, passiveIncomeReal: passiveIncome / deflator, properties: sims.length,
       borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, surplusM)) : 0,
       monthlySavings: monthlyNet, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,

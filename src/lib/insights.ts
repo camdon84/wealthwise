@@ -1,5 +1,5 @@
 import type { Profile } from './types';
-import { borrowingCapacity, position, project, propertyStats, type Quotes } from './calc';
+import { borrowingCapacity, livingCosts, position, project, propertyStats, type Quotes } from './calc';
 import { money } from './format';
 
 export type InsightKind = 'opportunity' | 'watch' | 'milestone' | 'goal';
@@ -124,7 +124,7 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
   }
 
   // 7. Buffer
-  const living = Math.max(p.finances.livingMonthly ?? 0, 1);
+  const living = Math.max(livingCosts(p), 1);
   const months = (p.finances.cash ?? 0) / living;
   if (months < 3) out.push({
     id: 'buffer', kind: 'watch', title: `Your cash buffer covers ${months.toFixed(1)} months`,

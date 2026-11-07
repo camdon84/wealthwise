@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Profile, Session } from './types';
 import { createAdapter } from './storage';
+import { normalize } from './defaults';
 
 const adapter = createAdapter();
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -39,24 +40,24 @@ export const useApp = create<State>((set, get) => ({
   async init() {
     applyTheme(get().theme);
     const session = await adapter.currentSession().catch(() => null);
-    const profile = session ? await adapter.loadProfile(session) : null;
+    const profile = session ? normalize(await adapter.loadProfile(session)) : null;
     set({ session, profile, ready: true });
   },
   async signUp(name, email, pw) {
     const session = await adapter.signUp(name, email, pw);
-    set({ session, profile: await adapter.loadProfile(session) });
+    set({ session, profile: normalize(await adapter.loadProfile(session)) });
   },
   async signIn(email, pw) {
     const session = await adapter.signIn(email, pw);
-    set({ session, profile: await adapter.loadProfile(session) });
+    set({ session, profile: normalize(await adapter.loadProfile(session)) });
   },
   async signInDemo() {
     const session = await adapter.signInDemo();
-    set({ session, profile: await adapter.loadProfile(session) });
+    set({ session, profile: normalize(await adapter.loadProfile(session)) });
   },
   async signInSandbox() {
     const session = await adapter.signInSandbox();
-    set({ session, profile: await adapter.loadProfile(session) });
+    set({ session, profile: normalize(await adapter.loadProfile(session)) });
   },
   async signOut() {
     await adapter.signOut();

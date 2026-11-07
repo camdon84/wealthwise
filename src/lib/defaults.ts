@@ -1,4 +1,4 @@
-import type { Assumptions, Debt, Holding, Loan, Profile, Property } from './types';
+import type { Assumptions, Debt, Finances, Holding, Loan, Profile, Property } from './types';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -14,6 +14,38 @@ export const defaultAssumptions: Assumptions = {
   serviceBuffer: 3,
 };
 
+export const LIVING_CATEGORIES: { key: string; label: string }[] = [
+  { key: 'groceries', label: 'Groceries' },
+  { key: 'energy', label: 'Electricity and gas' },
+  { key: 'water', label: 'Water' },
+  { key: 'internet', label: 'Internet and phone' },
+  { key: 'subscriptions', label: 'Subscriptions (streaming, apps, gym)' },
+  { key: 'petrol', label: 'Petrol and tolls' },
+  { key: 'transport', label: 'Public transport' },
+  { key: 'carInsurance', label: 'Car insurance' },
+  { key: 'carRunning', label: 'Car rego and servicing' },
+  { key: 'health', label: 'Health insurance' },
+  { key: 'homeInsurance', label: 'Home and contents insurance' },
+  { key: 'school', label: 'School fees and childcare' },
+  { key: 'kids', label: 'Kids’ activities' },
+  { key: 'eatingOut', label: 'Eating out and entertainment' },
+  { key: 'clothing', label: 'Clothing and personal care' },
+  { key: 'medical', label: 'Medical and pharmacy' },
+  { key: 'pets', label: 'Pets' },
+  { key: 'other', label: 'Anything else' },
+];
+
+const financeDefaults = (): Pick<Finances, 'housing' | 'rentMonthly' | 'mortgageMonthly' | 'mortgageSharePct' | 'livingMode' | 'livingBreakdown'> =>
+  ({ housing: 'own', rentMonthly: null, mortgageMonthly: null, mortgageSharePct: 100, livingMode: 'total', livingBreakdown: {} });
+
+/** Fill in fields added after a profile was first saved. */
+export function normalize(p: Profile): Profile {
+  p.finances = { ...financeDefaults(), ...p.finances };
+  p.finances.livingBreakdown ??= {};
+  p.mode = 'thorough';
+  return p;
+}
+
 export const emptyLoan = (): Loan => ({ id: uid(), lender: '', balance: null, rate: null, type: 'pi', yearsLeft: 25, offset: null });
 export const emptyDebt = (): Debt => ({ id: uid(), kind: 'car', label: '', balance: null, monthlyRepayment: null, limit: null });
 
@@ -26,7 +58,7 @@ export const emptyProperty = (): Property => ({
 export function blankProfile(name: string): Profile {
   return {
     version: 1,
-    mode: 'simple',
+    mode: 'thorough',
     onboardingStep: 0,
     onboarded: false,
     household: {
@@ -34,7 +66,7 @@ export function blankProfile(name: string): Profile {
       you: { name, age: null, salary: null, employment: 'payg', superBalance: null },
       partner: { name: '', age: null, salary: null, employment: 'payg', superBalance: null },
     },
-    finances: { livingMonthly: null, cash: null, offsetIsCash: true, buffer: null, debts: [] },
+    finances: { ...financeDefaults(), livingMonthly: null, cash: null, offsetIsCash: true, buffer: null, debts: [] },
     properties: [],
     holdings: [],
     goals: { retirementAge: 60, passiveIncome: 120000, targetProperties: 4, risk: 3, events: [] },
@@ -57,12 +89,16 @@ export function demoProfile(): Profile {
     partner: { name: 'Ana', age: 33, salary: 98000, employment: 'payg', superBalance: 74000 },
   };
   p.finances = {
-    livingMonthly: 5800, cash: 38000, offsetIsCash: true, buffer: 20000,
+    housing: 'own', rentMonthly: null, mortgageMonthly: null, mortgageSharePct: 100, livingMode: 'breakdown',
+    livingBreakdown: { groceries: 1400, energy: 260, water: 90, internet: 120, subscriptions: 85, petrol: 420, transport: 60, carInsurance: 140, carRunning: 110, health: 380, homeInsurance: 210, school: 650, kids: 180, eatingOut: 600, clothing: 250, medical: 120, pets: 90, other: 235 },
+    livingMonthly: 5400, cash: 38000, offsetIsCash: true, buffer: 20000,
     debts: [
       { id: uid(), kind: 'car', label: 'Car loan', balance: 21000, monthlyRepayment: 640, limit: null },
       { id: uid(), kind: 'credit-card', label: 'Credit card', balance: 1800, monthlyRepayment: null, limit: 12000 },
+      { id: uid(), kind: 'hecs', label: 'HECS / HELP', balance: 18000, monthlyRepayment: null, limit: null, owner: 'partner', voluntaryMonthly: 0 },
     ],
   };
+
   const today = new Date().toISOString().slice(0, 10);
   const props: Property[] = [
     {

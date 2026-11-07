@@ -26,6 +26,8 @@ export interface Debt {
   balance: number | null;
   monthlyRepayment: number | null;
   limit: number | null; // credit cards
+  owner?: 'you' | 'partner'; // HECS
+  voluntaryMonthly?: number | null; // HECS extra repayments
 }
 
 export interface Loan {
@@ -89,6 +91,12 @@ export interface Goals {
 }
 
 export interface Finances {
+  housing: 'own' | 'rent' | 'other';
+  rentMonthly: number | null;
+  mortgageMonthly: number | null;
+  mortgageSharePct: number; // share of the home loan repayments this household pays
+  livingMode: 'total' | 'breakdown';
+  livingBreakdown: Record<string, number | null>;
   livingMonthly: number | null;
   cash: number | null;
   offsetIsCash: boolean;
