@@ -151,3 +151,23 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
 
   return out;
 }
+
+/* Facts for Wise's AI write-up. Figures are rounded so small price moves don't trigger a new write-up. */
+export function wiseFacts(p: Profile, quotes: Quotes, insights: Insight[]) {
+  const pos = position(p, quotes);
+  const proj = project(p, quotes);
+  const r = (v: number, to = 1000) => Math.round(v / to) * to;
+  const year = new Date().getFullYear();
+  const atRetire = proj.points.find((x) => x.year === proj.retireYear) ?? proj.points[proj.points.length - 1];
+  return {
+    household: { age: p.household.you.age, partner: p.household.hasPartner, dependants: p.household.dependants.length, state: p.household.state },
+    goal: { stopWorkAge: p.goals.retirementAge, incomeWantedTodayDollars: p.goals.passiveIncome, propertiesWanted: p.goals.targetProperties },
+    today: {
+      netWorth: r(pos.netWorth, 5000), usableEquity: r(pos.usable, 5000), borrowingCapacity: r(pos.bc.capacity, 10000), leftOverEachMonth: r(pos.monthlySurplus, 100),
+      cash: r(pos.cash), super: r(pos.superBal, 5000), sharesValue: r(pos.shares.value, 5000),
+      properties: pos.props.map(({ pr, s }) => ({ suburb: `${pr.suburb} ${pr.state}`, use: pr.use, value: r(s.val.value, 5000), equity: r(s.equity, 5000), ageYears: pr.yearBuilt ? year - pr.yearBuilt : null, cashflowPerYear: r(s.cashflow, 100) })),
+    },
+    projection: { incomeAtStopWorkTodayDollars: r(atRetire?.passiveIncomeReal ?? 0), gapToGoal: r((atRetire?.passiveIncomeReal ?? 0) - p.goals.passiveIncome), nextPurchaseYear: proj.purchases[0]?.year ?? null },
+    observations: insights.map((i) => i.title),
+  };
+}

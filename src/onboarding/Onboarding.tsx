@@ -25,6 +25,8 @@ export function Onboarding() {
   const profile = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const signOut = useApp((s) => s.signOut);
+  const session = useApp((s) => s.session);
+  const restart = useApp((s) => s.signInSandbox);
   const step = profile.onboardingStep;
   const thorough = profile.mode === 'thorough';
   const go = (n: number) => { update((p) => { p.onboardingStep = Math.max(0, Math.min(STEPS.length - 1, n)); }); window.scrollTo({ top: 0 }); };
@@ -41,9 +43,12 @@ export function Onboarding() {
           <Logo />
           <div className="flex items-center gap-3">
             <Segmented size="sm" label="Setup detail" value={profile.mode} onChange={(v) => update((p) => { p.mode = v; })} options={[{ value: 'simple', label: 'Simple' }, { value: 'thorough', label: 'Thorough' }]} />
-            <button className="btn-ghost hidden sm:inline-flex" onClick={signOut}>Save and exit</button>
+            {session?.sandbox
+              ? <><button className="btn-ghost hidden sm:inline-flex" onClick={() => restart()}>Start again</button><button className="btn-ghost hidden sm:inline-flex" onClick={signOut}>Leave test mode</button></>
+              : <button className="btn-ghost hidden sm:inline-flex" onClick={signOut}>Save and exit</button>}
           </div>
         </div>
+        {session?.sandbox && <p className="bg-brass px-5 py-1.5 text-center text-xs font-medium text-ground">Test mode. Nothing you enter is saved, and you can start again at any time.</p>}
         <div className="h-1 bg-line/60"><div className="h-1 bg-brass transition-all duration-500" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} /></div>
       </header>
 

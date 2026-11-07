@@ -5,8 +5,9 @@ import type { Profile } from './types';
  * 7–30 days of headlines, summarises them with AI and stores a briefing with source links.
  * The preview has no server, so it shows sample briefings that are clearly labelled.
  */
-export interface BriefItem { id: string; scope: string; headline: string; body: string; tone: 'up' | 'down' | 'flat'; stat?: string; statLabel?: string }
-export interface Briefing { kind: 'property' | 'equity'; sample: boolean; asOf: string; items: BriefItem[] }
+export interface BriefSource { title: string; source: string; url: string; date: string }
+export interface BriefItem { id: string; scope: string; headline: string; body: string; tone: 'up' | 'down' | 'flat'; stat?: string; statLabel?: string; sources?: BriefSource[] }
+export interface Briefing { kind: 'property' | 'equity'; sample: boolean; asOf: string; items: BriefItem[]; count?: number }
 
 export function propertyPulse(p: Profile): Briefing {
   const suburbs = [...new Map(p.properties.map((pr) => [pr.suburb, pr])).values()].filter((pr) => pr.suburb);
@@ -49,4 +50,19 @@ export function equitySpot(): Briefing {
       { id: 'eq-5', scope: 'Movers', headline: 'Lithium names slide as prices fall again', body: 'Lithium producers led the losers after spot prices hit a fresh low on oversupply. Several miners have flagged output cuts.', tone: 'down', stat: '−7%', statLabel: 'sector, week' },
     ],
   };
+}
+
+const live = (import.meta as any).env?.VITE_STORAGE === 'api';
+const memo = new Map<string, Promise<Briefing>>();
+
+/** Live briefing from the server, falling back to the labelled sample if it can't be reached. */
+export function loadBriefing(kind: 'property' | 'equity', p: Profile): Promise<Briefing> {
+  const fallback = kind === 'property' ? propertyPulse(p) : equitySpot();
+  if (!live) return Promise.resolve(fallback);
+  const subs = [...new Set(p.properties.filter((x) => x.suburb).map((x) => `${x.suburb.trim()}|${x.state}`))].slice(0, 3).join(',');
+  const url = `/api/briefing?kind=${kind}${kind === 'property' && subs ? `&suburbs=${encodeURIComponent(subs)}` : ''}`;
+  if (!memo.has(url)) {
+    memo.set(url, fetch(url).then((r) => (r.ok ? r.json() : Promise.reject())).then((b: Briefing) => (b.items?.length ? b : fallback)).catch(() => { memo.delete(url); return fallback; }));
+  }
+  return memo.get(url)!;
 }

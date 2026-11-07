@@ -12,5 +12,7 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "wealthwise", "database_id": "72ad86e1-366d-4940-ab37-64bac244d250" }
   ],
+  "ai": { "binding": "AI" },
+  "triggers": { "crons": ["0 20 * * *"] },
   "observability": { "enabled": true }
 }

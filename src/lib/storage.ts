@@ -12,6 +12,7 @@ export interface StorageAdapter {
   signUp(name: string, email: string, password: string): Promise<Session>;
   signIn(email: string, password: string): Promise<Session>;
   signInDemo(): Promise<Session>;
+  signInSandbox(): Promise<Session>;
   signOut(): Promise<void>;
   loadProfile(session: Session): Promise<Profile>;
   saveProfile(session: Session, profile: Profile): Promise<void>;
@@ -37,6 +38,7 @@ type UserRec = { id: string; email: string; name: string; pw: string };
 const USERS = 'gw.users';
 const SESSION = 'gw.session';
 const DEMO: Session = { userId: 'demo', email: 'demo@wealthwise.app', name: 'Tom', demo: true };
+const SANDBOX: Session = { userId: 'sandbox', email: 'test mode', name: '', demo: true, sandbox: true };
 
 class LocalAdapter implements StorageAdapter {
   kind = 'local' as const;
@@ -61,7 +63,8 @@ class LocalAdapter implements StorageAdapter {
     return s;
   }
   async signInDemo() { ls.set(SESSION, JSON.stringify(DEMO)); return DEMO; }
-  async signOut() { ls.del(SESSION); }
+  async signInSandbox() { ls.del(`gw.profile.${SANDBOX.userId}`); ls.set(SESSION, JSON.stringify(SANDBOX)); return SANDBOX; }
+  async signOut() { const s = await this.currentSession(); if (s?.sandbox) ls.del(`gw.profile.${SANDBOX.userId}`); ls.del(SESSION); }
   async loadProfile(s: Session) {
     const raw = ls.get(`gw.profile.${s.userId}`);
     if (raw) return JSON.parse(raw) as Profile;
@@ -86,7 +89,12 @@ class ApiAdapter implements StorageAdapter {
   signUp(name: string, email: string, password: string) { return this.call<Session>('/signup', { method: 'POST', body: JSON.stringify({ name, email, password }) }); }
   signIn(email: string, password: string) { return this.call<Session>('/signin', { method: 'POST', body: JSON.stringify({ email, password }) }); }
   signInDemo() { return this.local.signInDemo(); }
-  async signOut() { await this.local.signOut(); await this.call('/signout', { method: 'POST' }).catch(() => {}); }
+  signInSandbox() { return this.local.signInSandbox(); }
+  async signOut() {
+    const s = await this.local.currentSession();
+    await this.local.signOut();
+    if (!s?.demo) await this.call('/signout', { method: 'POST' }).catch(() => {});
+  }
   async loadProfile(s: Session) {
     if (s.demo) return this.local.loadProfile(s);
     return (await this.call<Profile | null>('/profile')) ?? blankProfile(s.name);

@@ -122,4 +122,4 @@ export interface Profile {
   updatedAt: string;
 }
 
-export interface Session { userId: string; email: string; name: string; demo?: boolean }
+export interface Session { userId: string; email: string; name: string; demo?: boolean; sandbox?: boolean }

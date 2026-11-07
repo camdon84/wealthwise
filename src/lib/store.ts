@@ -15,6 +15,7 @@ interface State {
   signUp(name: string, email: string, pw: string): Promise<void>;
   signIn(email: string, pw: string): Promise<void>;
   signInDemo(): Promise<void>;
+  signInSandbox(): Promise<void>;
   signOut(): Promise<void>;
   update(fn: (p: Profile) => void): void;
   replace(p: Profile): void;
@@ -51,6 +52,10 @@ export const useApp = create<State>((set, get) => ({
   },
   async signInDemo() {
     const session = await adapter.signInDemo();
+    set({ session, profile: await adapter.loadProfile(session) });
+  },
+  async signInSandbox() {
+    const session = await adapter.signInSandbox();
     set({ session, profile: await adapter.loadProfile(session) });
   },
   async signOut() {

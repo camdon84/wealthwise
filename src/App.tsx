@@ -51,7 +51,7 @@ function Shell() {
       <aside className="hidden border-r border-line bg-surface lg:flex lg:flex-col lg:justify-between lg:sticky lg:top-0 lg:h-screen p-4">
         <div><div className="px-2 py-2"><Logo /></div><div className="mt-6">{nav}</div></div>
         <div className="space-y-1 border-t border-line pt-4">
-          <p className="px-3 pb-2 text-xs text-muted">{session?.demo ? 'Demo account' : session?.email}</p>
+          <p className="px-3 pb-2 text-xs text-muted">{session?.sandbox ? 'Test mode, nothing is saved' : session?.demo ? 'Demo account' : session?.email}</p>
           <button className="btn-ghost w-full justify-start" onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} className="h-4 w-4" />{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button>
           <button className="btn-ghost w-full justify-start" onClick={signOut}><Icon name="out" className="h-4 w-4" />Sign out</button>
         </div>

@@ -6,7 +6,7 @@
  *   only its SHA-256 hash is stored.
  * - Quotes: 15–20 minute delayed prices, cached in D1 so free limits hold.
  */
-export interface Env { DB: D1Database; ASSETS: Fetcher }
+export interface Env { DB: D1Database; ASSETS: Fetcher; AI: Ai }
 
 const COOKIE = 'ww_session';
 const SESSION_DAYS = 30;
@@ -42,6 +42,7 @@ async function ensureSchema(db: D1Database) {
     db.prepare('CREATE TABLE IF NOT EXISTS profiles (user_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL)'),
     db.prepare('CREATE TABLE IF NOT EXISTS quotes (key TEXT PRIMARY KEY, price REAL NOT NULL, change REAL NOT NULL, as_of TEXT NOT NULL, fetched_at INTEGER NOT NULL)'),
     db.prepare('CREATE TABLE IF NOT EXISTS login_failures (email TEXT NOT NULL, at INTEGER NOT NULL)'),
+    db.prepare('CREATE TABLE IF NOT EXISTS ai_cache (key TEXT PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL)'),
   ]);
   schemaReady = true;
 }
@@ -189,11 +190,20 @@ async function api(req: Request, env: Env, path: string) {
   }
 
   if (path === '/api/quotes' && method === 'GET') return quotes(req, env);
+  if (path === '/api/briefing' && method === 'GET') return briefingRoute(req, env);
+  if (path === '/api/wise' && method === 'POST') return wiseRoute(req, env);
 
   return fail('Not found', 404);
 }
 
 export default {
+  async scheduled(_c: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil((async () => {
+      await ensureSchema(env.DB);
+      await nationalBriefing(env, 'equity', true);
+      await nationalBriefing(env, 'property', true);
+    })());
+  },
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     if (url.pathname.startsWith('/api/')) {
@@ -203,3 +213,135 @@ export default {
     return env.ASSETS.fetch(req);
   },
 };
+
+/* ---------- AI briefings (Property Pulse, Equity Spot) and Wise's take ----------
+ * Headlines come from Google News search feeds for the last 7–30 days. Cloudflare Workers AI
+ * (free daily allowance) summarises them in its own words; every item links to its sources.
+ * Results are cached in D1 and refreshed each morning by the cron trigger.
+ */
+const MODEL = '@cf/openai/gpt-oss-120b';
+type Headline = { title: string; source: string; url: string; date: string };
+
+const decode = (s: string) => s.replace(/<!\[CDATA\[|\]\]>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+
+async function news(query: string): Promise<Headline[]> {
+  const res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-AU&gl=AU&ceid=AU:en`, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' } });
+  if (!res.ok) return [];
+  const xml = await res.text();
+  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 12).map(([, it]) => {
+    const raw = decode(it.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '');
+    const source = decode(it.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1] ?? '');
+    const title = source && raw.endsWith(` - ${source}`) ? raw.slice(0, -(source.length + 3)) : raw;
+    return { title, source, url: decode(it.match(/<link>([\s\S]*?)<\/link>/)?.[1] ?? ''), date: new Date(it.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] ?? Date.now()).toISOString() };
+  });
+}
+
+async function gather(queries: string[], max = 18, filter?: RegExp) {
+  const all = (await Promise.all(queries.map((q) => news(q).catch(() => [])))).flat();
+  const seen = new Set<string>();
+  return all
+    .filter((h) => h.title && !seen.has(h.title.toLowerCase()) && seen.add(h.title.toLowerCase()))
+    .filter((h) => !filter || filter.test(h.title))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, max);
+}
+
+async function askAI(env: Env, system: string, user: string): Promise<any> {
+  const r: any = await env.AI.run(MODEL as any, { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], max_tokens: 4000, reasoning: { effort: 'low' } } as any);
+  const text: string = typeof r?.response === 'string' ? r.response : r?.response ? JSON.stringify(r.response) : r?.choices?.[0]?.message?.content ?? '';
+  const json = text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1);
+  return JSON.parse(json);
+}
+
+const BRIEF_RULES = `Use ONLY the numbered headlines. Report only what they say: no added interpretation, causes, motives or predictions they don't state. Plain Australian English, in your own words; never copy a headline word for word. Never recommend buying, selling or holding any investment or property, and never present a stock as a pick.
+Reply with JSON only:
+{"items":[{"scope":"short label","headline":"max 10 words","body":"1-2 sentences, max 35 words","tone":"up|down|flat","stat":"a short figure copied exactly from a cited headline, or empty","statLabel":"max 5 words, or empty","sources":[1]}]}`;
+
+function shape(raw: any, heads: Headline[], idPrefix: string) {
+  const items = Array.isArray(raw?.items) ? raw.items : [];
+  return items.slice(0, 5).map((it: any, i: number) => {
+    const srcs = (Array.isArray(it.sources) ? it.sources : []).map((n: number) => heads[n - 1]).filter(Boolean).slice(0, 3);
+    const cited = srcs.map((h: Headline) => h.title).join(' ');
+    const stat = typeof it.stat === 'string' && it.stat && cited.includes(it.stat) ? it.stat : ''; // only figures that really appear in the sources
+    return {
+      id: `${idPrefix}-${i}`, scope: String(it.scope || '').slice(0, 40), headline: String(it.headline || '').slice(0, 120), body: String(it.body || '').slice(0, 400),
+      tone: ['up', 'down', 'flat'].includes(it.tone) ? it.tone : 'flat', stat: stat || undefined, statLabel: stat ? String(it.statLabel || '').slice(0, 40) : undefined,
+      sources: srcs.map((h: Headline) => ({ title: h.title, source: h.source, url: h.url, date: h.date })),
+    };
+  }).filter((it: any) => it.headline && it.body && it.sources.length);
+}
+
+const numbered = (heads: Headline[]) => heads.map((h, i) => `[${i + 1}] ${h.date.slice(0, 10)} | ${h.title} (${h.source})`).join('\n');
+
+async function cached(env: Env, key: string, maxAgeMs: number, make: () => Promise<any>, force = false) {
+  const row = await env.DB.prepare('SELECT data, created_at FROM ai_cache WHERE key = ?').bind(key).first<{ data: string; created_at: number }>();
+  if (row && !force && Date.now() - row.created_at < maxAgeMs) return JSON.parse(row.data);
+  try {
+    const data = await make();
+    await env.DB.prepare('INSERT INTO ai_cache (key, data, created_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data, created_at = excluded.created_at')
+      .bind(key, JSON.stringify(data), Date.now()).run();
+    return data;
+  } catch (e) {
+    console.error('ai', key, e);
+    return row ? JSON.parse(row.data) : null; // serve the last good copy if the refresh fails
+  }
+}
+
+const QUERIES = {
+  equity: ['ASX 200 when:7d', 'Australian shares week when:7d', 'ASX IPO listing when:21d', 'Wall Street stocks Nasdaq when:7d', 'RBA interest rate decision when:14d'],
+  property: ['Australian property market when:7d', 'house prices Australia when:7d', 'auction clearance rate when:7d', 'rents vacancy Australia when:14d', 'home lending investors Australia when:14d'],
+};
+
+function nationalBriefing(env: Env, kind: 'equity' | 'property', force = false) {
+  return cached(env, `brief:${kind}`, 20 * 3600e3, async () => {
+    const heads = await gather(QUERIES[kind]);
+    if (heads.length < 3) throw new Error('not enough headlines');
+    const focus = kind === 'equity'
+      ? 'You write the weekly share-market briefing ("Equity Spot") for an Australian personal-wealth app: index moves, interest rates, IPOs and listings, big company moves, global markets. 3 to 5 items, each a different theme, most recent first. Scope labels like ASX 200, Wall Street, Rates, IPOs, Movers, Commodities.'
+      : 'You write the national property briefing ("Property Pulse") for an Australian personal-wealth app: values, auctions, rents, lending, buyer sentiment. 3 to 4 items, each a different theme, most recent first. Scope labels like National, Sydney, Brisbane, Rents, Lending.';
+    return { asOf: new Date().toISOString(), items: shape(await askAI(env, `${focus}\n${BRIEF_RULES}`, `Headlines:\n${numbered(heads)}`), heads, kind), count: heads.length };
+  }, force);
+}
+
+const PROPERTY_WORDS = /(propert|house|home|unit|apartment|real estate|price|market|rent|auction|sold|sale|listing|buyer|develop|land|median|record)/i;
+const NOT_PROPERTY = /(police|charged|crash|arrest|court|stabb|assault|fire crews|missing)/i;
+
+function suburbBriefing(env: Env, suburb: string, state: string) {
+  return cached(env, `brief:suburb:${suburb.toLowerCase()}:${state}`, 3 * 864e5, async () => {
+    const heads = (await gather([`"${suburb}" ${state} property OR "real estate" OR house when:30d`], 10, PROPERTY_WORDS)).filter((h) => !NOT_PROPERTY.test(h.title));
+    if (!heads.length) return { asOf: new Date().toISOString(), items: [] };
+    const sys = `You write one local property update about ${suburb} ${state} for an Australian personal-wealth app. Write at most ONE item, only from headlines that are clearly about property or the housing market in or right around ${suburb}; if none are, return {"items":[]}. Scope must be "${suburb} ${state}".\n${BRIEF_RULES}`;
+    return { asOf: new Date().toISOString(), items: shape(await askAI(env, sys, `Headlines:\n${numbered(heads)}`), heads, `sub-${suburb}`) };
+  });
+}
+
+async function briefingRoute(req: Request, env: Env) {
+  const u = new URL(req.url);
+  const kind = u.searchParams.get('kind') === 'property' ? 'property' : 'equity';
+  const national = await nationalBriefing(env, kind);
+  let items = national?.items ?? [];
+  if (kind === 'property') {
+    const subs = (u.searchParams.get('suburbs') || '').split(',').map((s) => s.split('|')).filter(([s, st]) => s && /^[A-Za-z' -]{2,40}$/.test(s) && /^(QLD|NSW|VIC|SA|WA|TAS|ACT|NT)$/.test(st)).slice(0, 3);
+    const local = (await Promise.all(subs.map(([s, st]) => suburbBriefing(env, s.trim(), st)))).flatMap((b) => b?.items ?? []);
+    items = [...items, ...local];
+  }
+  if (!national) return fail('Briefing unavailable right now.', 503);
+  return json({ kind, sample: false, asOf: national.asOf, count: national.count, items }, 200, { 'cache-control': 'public, max-age=600' });
+}
+
+async function wiseRoute(req: Request, env: Env) {
+  const text = await req.text();
+  if (text.length > 8000) return fail('Too much data.', 413);
+  let facts: any;
+  try { facts = JSON.parse(text); } catch { return fail('Could not read that.'); }
+  const key = `wise:${await sha256(text)}`;
+  const data = await cached(env, key, 7 * 864e5, async () => {
+    const sys = `You are Wise, the assistant inside WealthWise, an Australian property and wealth planning app. You get a household's figures, already calculated exactly by the app, plus the app's rule-based observations.
+Write a short, warm, plain-English overview of where they stand against their goal, then up to 2 ideas or scenarios worth exploring in the app (for example a renovation, timing the next purchase, building a buffer, testing a later retirement age).
+Rules: use ONLY the numbers given and never calculate new ones. This is general information, not personal financial advice: suggest things to explore or questions to ask a broker, accountant or licensed adviser; never tell them to buy, sell or borrow, and never name a lender, fund or stock.
+Reply with JSON only: {"summary":"2-3 sentences, max 60 words","ideas":[{"title":"max 8 words","body":"1-2 sentences, max 40 words"}]}`;
+    const out = await askAI(env, sys, JSON.stringify(facts));
+    return { summary: String(out?.summary || '').slice(0, 600), ideas: (Array.isArray(out?.ideas) ? out.ideas : []).slice(0, 2).map((i: any) => ({ title: String(i.title || '').slice(0, 80), body: String(i.body || '').slice(0, 300) })) };
+  });
+  return data?.summary ? json(data) : fail('Wise is unavailable right now.', 503);
+}
