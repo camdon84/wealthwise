@@ -40,7 +40,30 @@ export function toReal(points: YearPoint[], inflation: number): YearPoint[] {
   });
 }
 
-export function WealthChart({ points, retireYear, height = 320, real }: { points: YearPoint[]; retireYear: number; height?: number; real?: boolean }) {
+export function SeriesToggles({ hidden, onChange }: { hidden: string[]; onChange: (h: string[]) => void }) {
+  return (
+    <ul className="flex flex-wrap gap-x-2 gap-y-1" aria-label="Show or hide each part of the chart">
+      {wealthSeries.map((s) => {
+        const on = !hidden.includes(s.key);
+        const onlyOne = on && wealthSeries.length - hidden.length === 1;
+        return (
+          <li key={s.key}>
+            <label className={`flex cursor-pointer select-none items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-raised ${on ? 'text-ink' : 'text-muted line-through decoration-muted/60'}`} title={onlyOne ? 'At least one needs to stay on' : undefined}>
+              <input type="checkbox" className="sr-only" checked={on} disabled={onlyOne} onChange={() => onChange(on ? [...hidden, s.key] : hidden.filter((k) => k !== s.key))} />
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-[4px] border" style={{ background: on ? s.color : 'transparent', borderColor: s.color }} aria-hidden="true">
+                {on && <svg viewBox="0 0 12 12" className="h-2.5 w-2.5"><path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="rgb(var(--surface))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+              </span>
+              {s.label}
+            </label>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function WealthChart({ points, retireYear, height = 320, real, hidden = [] }: { points: YearPoint[]; retireYear: number; height?: number; real?: boolean; hidden?: string[] }) {
+  const shown = wealthSeries.filter((s) => !hidden.includes(s.key));
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={points} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
@@ -50,11 +73,11 @@ export function WealthChart({ points, retireYear, height = 320, real }: { points
         <CartesianGrid vertical={false} stroke={C.grid} strokeDasharray="2 4" />
         <XAxis dataKey="year" {...axis} interval="preserveStartEnd" minTickGap={28} />
         <YAxis {...axis} width={56} tickFormatter={(v) => money(v, { compact: true })} />
-        <Tooltip content={<Tip rows={wealthSeries} real={real} />} cursor={{ stroke: C.muted, strokeDasharray: '3 3' }} />
-        {wealthSeries.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} strokeWidth={1.5} fill={`url(#g-${s.key})`} isAnimationActive={false} />)}
+        <Tooltip content={<Tip rows={shown} real={real} />} cursor={{ stroke: C.muted, strokeDasharray: '3 3' }} />
+        {shown.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} strokeWidth={1.5} fill={`url(#g-${s.key})`} isAnimationActive={false} />)}
         <ReferenceLine x={retireYear} stroke={C.brass} strokeDasharray="4 4" label={{ value: 'Stop work', position: 'insideTopRight', fill: C.brass, fontSize: 11 }} />
         {points.filter((p) => p.bought).map((p) => (
-          <ReferenceDot key={p.year} x={p.year} y={p.propertyEquity + p.shares + p.super + p.cash} r={5} fill="rgb(var(--surface))" stroke={C.brass} strokeWidth={2}
+          <ReferenceDot key={p.year} x={p.year} y={shown.reduce((t, s) => t + (p[s.key] as number), 0)} r={5} fill="rgb(var(--surface))" stroke={C.brass} strokeWidth={2}
             label={{ value: `Buy #${p.properties}`, position: 'top', fill: C.muted, fontSize: 10 }} />
         ))}
       </AreaChart>
