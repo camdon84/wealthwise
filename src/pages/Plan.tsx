@@ -273,6 +273,17 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
   const years = Math.max(1, p.goals.retirementAge - startAge);
   const realAtRetire = proj.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years);
   const over = cap != null && proj.shareMonthly > cap.monthly + 1;
+  // With a delayed start there are fewer years to invest, so work the monthly amount out from the projection itself
+  const neededDelayed = useMemo(() => {
+    const target = p.goals.sharesTarget ?? 0;
+    if (!p.goals.shareStartAfter || target <= 0) return null;
+    const at = (v: number) => { const x: typeof p = JSON.parse(JSON.stringify(p)); x.goals.shareMonthly = v; return project(x, quotes).sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years); };
+    if (at(30000) < target) return null;
+    let lo = 0, hi = 30000;
+    for (let k = 0; k < 16; k++) { const mid = (lo + hi) / 2; if (at(mid) >= target) hi = mid; else lo = mid; }
+    return Math.ceil(hi / 10) * 10;
+  }, [p, quotes, years]);
+  const needed = neededDelayed ?? required;
   const useAmount = (v: number) => update((d) => { d.goals.shareMonthly = Math.round(v); });
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
@@ -285,6 +296,22 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
           <Field label="Share portfolio value at retirement" hint="In today’s money. Leave blank if you don’t have a retirement goal.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
           <Field label="Invest each month" hint={auto ? (p.goals.sharesTarget ? 'Worked out from your target. Type your own amount to change it.' : 'Rises with inflation each year.') : 'Your own amount, rising with inflation each year.'}>{(id) => <MoneyInput id={id} value={auto ? (p.goals.sharesTarget ? Math.round(required) : null) : p.goals.shareMonthly ?? null} onChange={(v) => update((d) => { d.goals.shareMonthly = v ?? 0; })} suffix="/ month" />}</Field>
         </div>
+        {(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).length > 0 && (
+          <div className="mt-4 rounded-xl border border-line p-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={!!p.goals.shareStartAfter}
+                onChange={(e) => update((d) => { d.goals.shareStartAfter = e.target.checked ? 1 : null; if (e.target.checked && d.goals.shareMonthly == null) d.goals.shareMonthly = Math.round(proj.shareMonthly || required); })} />
+              <span className="text-sm">I don’t want to invest in shares until after I’ve bought
+                {p.goals.shareStartAfter ? (
+                  <select className="mx-1.5 rounded-md border border-line bg-surface px-1.5 py-0.5 text-sm" value={p.goals.shareStartAfter} onClick={(e) => e.preventDefault()} onChange={(e) => update((d) => { d.goals.shareStartAfter = Number(e.target.value); })}>
+                    {(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).map((pp, k) => <option key={pp.id} value={k + 1}>{pp.label || `property ${p.properties.length + k + 1}`}</option>)}
+                  </select>
+                ) : ' my next property'}.
+                <span className="block text-xs text-muted">Your monthly amount stays the same; it just starts once that purchase is done.{p.goals.shareStartAfter && proj.purchases[p.goals.shareStartAfter - 1] ? ` On these numbers that’s ${proj.purchases[p.goals.shareStartAfter - 1].year + 1}.` : p.goals.shareStartAfter ? ' On these numbers that purchase doesn’t happen before you stop work, so no shares would be bought.' : ''}</span>
+              </span>
+            </label>
+          </div>
+        )}
         <div className="mt-5 rounded-xl bg-raised p-4 ring-1 ring-line">
           {auto && p.goals.sharesTarget ? (<>
             <p className="text-sm text-muted">To reach {money(p.goals.sharesTarget, { compact: true })} by {p.goals.retirementAge} at {p.assumptions.shareReturn}% a year, you’d invest about</p>
@@ -294,7 +321,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
             <p className="text-sm text-muted">By investing {money(proj.shareMonthly)} a month, you’d have about</p>
             <p className="font-display text-3xl font-semibold">{money(realAtRetire, { compact: true })} <span className="text-base font-normal text-muted">by {p.goals.retirementAge}</span></p>
             <p className="text-xs text-muted">In today’s money, at {p.assumptions.shareReturn}% a year.{p.goals.sharesTarget ? (realAtRetire >= p.goals.sharesTarget * 0.98 ? ` That meets your ${money(p.goals.sharesTarget, { compact: true })} target.` : ` That’s short of your ${money(p.goals.sharesTarget, { compact: true })} target.`) : ''}{proj.points.some((x) => x.sharePlanned > 0 && x.shareContribution < x.sharePlanned * 0.98) ? ' Some years your savings can’t cover the full amount, so less goes in.' : ''}</p>
-            {p.goals.sharesTarget ? <button className="btn-quiet mt-3 text-sm" onClick={() => update((d) => { d.goals.shareMonthly = null; })}>Invest what’s needed for my target instead ({money(required)} a month)</button> : null}
+            {p.goals.sharesTarget && realAtRetire < p.goals.sharesTarget * 0.98 ? <button className="btn-quiet mt-3 text-sm" onClick={() => update((d) => { d.goals.shareMonthly = d.goals.shareStartAfter ? needed : null; })}>Invest what’s needed for my target instead ({money(needed)} a month{p.goals.shareStartAfter ? ', from the later start' : ''})</button> : null}
           </>) : (
             <p className="text-sm text-muted">Enter a share portfolio value for retirement, or how much you’d invest each month, to see where it gets you by {p.goals.retirementAge}.</p>
           )}
@@ -356,7 +383,7 @@ function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quot
                 return (
                   <tr key={row.v} className={`border-b border-line last:border-0 ${isCurrent ? 'bg-brass/10' : ''}`}>
                     <td className="py-2.5 pr-3"><span className="font-semibold">{money(row.v)}</span>
-                      <span className="block text-[11px] text-muted">{[isCurrent && 'your plan', (p.goals.sharesTarget ?? 0) > 0 && Math.abs(row.v - required) < 1 && 'reaches your share target', cap != null && row.v === cap && 'most that still fits every property'].filter(Boolean).join(' · ')}</span></td>
+                      <span className="block text-[11px] text-muted">{[isCurrent && 'your plan', (p.goals.sharesTarget ?? 0) > 0 && row.shares >= (p.goals.sharesTarget ?? 0) * 0.98 && rows.find((x) => x.shares >= (p.goals.sharesTarget ?? 0) * 0.98)?.v === row.v && 'reaches your share target', cap != null && row.v === cap && 'most that still fits every property'].filter(Boolean).join(' · ')}</span></td>
                     {row.buys.map((b, k) => <td key={k} className={`px-2 py-2.5 text-right ${!b.year || b.late ? 'font-medium text-clay' : ''}`}>{b.year ?? 'Doesn’t fit'}</td>)}
                     <td className="px-2 py-2.5 text-right">{money(row.shares, { compact: true })}</td>
                     <td className="py-2.5 pl-2 text-right">{!isCurrent && <button className={`text-xs font-medium hover:underline ${broken ? 'text-muted' : 'text-brass'}`} onClick={() => onUse(row.v)}>Use</button>}</td>
@@ -385,7 +412,6 @@ function Projections({ quotes }: { quotes: Quotes }) {
   const proj = check.proj;
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
   const [hidden, setHidden] = useState<string[]>([]);
-  const [detail, setDetail] = useState<'all' | 'key'>('all');
   const pts = proj.points;
   const runsOutYear = proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null;
   return (
@@ -410,14 +436,11 @@ function Projections({ quotes }: { quotes: Quotes }) {
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">What happens, year by year</h2>
         <p className="mt-1 text-sm text-muted">Worked out from your figures, goals and assumptions. Change any of them and this updates.</p>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-muted">Each year shows your cash at year end (including your {money(proj.buffer, { compact: true })} emergency fund), rent collected and what goes into shares, {dollars === 'real' ? 'in today’s money' : 'in the dollars of that year'}.</p>
-          <Segmented size="sm" label="Timeline detail" value={detail} onChange={setDetail} options={[{ value: 'all', label: 'Every year' }, { value: 'key', label: 'Key events' }]} />
-        </div>
+        <p className="mt-4 text-xs text-muted">Milestone years only. Under each one: your cash at year end (including your {money(proj.buffer, { compact: true })} emergency fund), rent collected and what goes into shares, {dollars === 'real' ? 'in today’s money' : 'in the dollars of that year'}.</p>
         <ol className="mt-4 divide-y divide-line">
           {pts.map((pt, i) => {
             const evs = proj.events.filter((e) => e.year === pt.year);
-            if (detail === 'key' && evs.length === 0) return null;
+            if (evs.length === 0) return null;
             const d = dollars === 'real' ? Math.pow(1 + p.assumptions.inflation / 100, i) : 1;
             const c = (v: number) => money(v / d, { compact: true });
             const working = pt.age < p.goals.retirementAge;

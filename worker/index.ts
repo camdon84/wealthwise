@@ -251,7 +251,7 @@ async function api(req: Request, env: Env, path: string) {
     }
     if (method === 'PUT') {
       const text = await req.text();
-      if (text.length > 500_000) return fail('That profile is too large to save.', 413);
+      if (text.length > 1_800_000) return fail('That profile is too large to save. Try smaller property photos.', 413);
       let parsed: any;
       try { parsed = JSON.parse(text); } catch { return fail('That profile could not be read.'); }
       if (!parsed || parsed.version !== 1) return fail('That profile could not be read.');

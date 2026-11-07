@@ -290,7 +290,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   let block: PurchaseBlock | null = null;
   let waitFrom: number | null = null;
   let shortfallYear: number | null = null;
-  let superGone = false, reinvestSaid = false, sharesGoneSaid = false, shareShortSaid = false;
+  let superGone = false, reinvestSaid = false, sharesGoneSaid = false, shareShortSaid = false, shareStartSaid = false;
   let sharesAtRetire = 0;
   let runsOutAge: number | null = null;
   const kidsEnd = new Set<string>();
@@ -301,7 +301,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   }
   otherDebt = debtSims.reduce((t, d) => t + d.bal, 0);
 
-  if (shareMonthly > 0) say(y0, 'shares', p.goals.shareMonthly == null ? `Invest about ${fmt(shareMonthly)} a month in shares${p.goals.sharesTarget ? ` to reach your ${fmt(n(p.goals.sharesTarget))} goal by ${retireAge}` : ''}, rising with inflation.` : `Invest ${fmt(shareMonthly)} a month in shares (your own amount), rising with inflation.`);
+  if (shareMonthly > 0 && !n(p.goals.shareStartAfter)) say(y0, 'shares', p.goals.shareMonthly == null ? `Invest about ${fmt(shareMonthly)} a month in shares${p.goals.sharesTarget ? ` to reach your ${fmt(n(p.goals.sharesTarget))} goal by ${retireAge}` : ''}, rising with inflation.` : `Invest ${fmt(shareMonthly)} a month in shares (your own amount), rising with inflation.`);
   if (cryptoExcluded > 0) say(y0, 'goal', `Your ${fmt(cryptoExcluded)} in crypto stays in today’s net worth but isn’t projected forward, because its future value can’t be reasonably estimated.`);
 
   for (let i = 0; i <= endAge - startAge; i++) {
@@ -399,10 +399,12 @@ export function project(p: Profile, quotes: Quotes): Projection {
       if (working) {
         cash += net + propNet + offsetSaving - living - debtRepay - eventCost; // planned one-off costs come before investing
         // Shares are bought only from savings above the emergency fund: you can't invest money you don't have
-        sharePlanned = shareMonthly * 12 * infl(i);
+        const waitForBuys = n(p.goals.shareStartAfter);
+        sharePlanned = waitForBuys > 0 && purchases.length < waitForBuys ? 0 : shareMonthly * 12 * infl(i);
+        if (waitForBuys > 0 && sharePlanned > 0 && !shareStartSaid) { shareStartSaid = true; say(year, 'shares', `Start investing ${fmt(shareMonthly)} a month in shares (in today’s money), now that property ${p.properties.length + waitForBuys} is bought.`); }
         contribution = Math.min(sharePlanned, Math.max(0, cash - buffer * infl(i)));
         shares += contribution; shareCost += contribution; cash -= contribution;
-        if (sharePlanned > 0 && contribution < sharePlanned * 0.98 && !shareShortSaid) { shareShortSaid = true; say(year, 'shares', `Your savings can’t cover the full ${fmt(shareMonthly)} a month share plan this year, so only ${fmt(contribution / 12 / infl(i))} a month goes in. Shares are only bought from money above your emergency fund.`); }
+        if (sharePlanned > 0 && contribution < sharePlanned * 0.98 && !shareShortSaid && (!n(p.goals.shareStartAfter) || shareStartSaid)) { shareShortSaid = true; say(year, 'shares', `Your savings can’t cover the full ${fmt(shareMonthly)} a month share plan this year, so only ${fmt(contribution / 12 / infl(i))} a month goes in. Shares are only bought from money above your emergency fund.`); }
         if (cash < 0 && shortfallYear == null) shortfallYear = year;
       } else {
         if (age === retireAge) {

@@ -6,7 +6,7 @@ import type { Profile } from './types';
  * Checks whether the plan holds together, and if it doesn't, tests changes against the same
  * projection so every recommendation is one that actually fixes the problem on these numbers.
  */
-export interface PlanCheck { works: boolean; problems: string[]; fixes: string[]; good: string[]; proj: Projection }
+export interface PlanCheck { works: boolean; problems: string[]; fixes: string[]; good: string[]; ideas: string[]; proj: Projection }
 
 const clone = (p: Profile): Profile => JSON.parse(JSON.stringify(p));
 const m = (v: number) => money(v, { compact: true });
@@ -149,5 +149,63 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   }
   if (cashOk(r) && position(p, quotes).monthlySurplus < 0) problems.push('You’re spending more than you earn each month right now. Check your living costs in My details.');
 
-  return { works: problems.length === 0, problems, fixes: [...new Set(fixes)], good, proj: r };
+  const ideas = [...buyIdeas(p, r, run), ...(lastsOk(r) && cashOk(r) && propsOk(p, r) ? retireIdeas(p, run) : [])];
+  return { works: problems.length === 0, problems, fixes: [...new Set(fixes)], good, ideas, proj: r };
+}
+
+/** Tested levers that would bring a property purchase forward. */
+function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) => Projection): string[] {
+  const owned = p.properties.length;
+  const planned = (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - owned));
+  if (planned.length === 0) return [];
+  const base = planned.map((_, k) => r.purchases[k]?.year ?? null);
+  const levers: { text: string; mod: (x: Profile) => void }[] = [];
+  if (r.shareMonthly > 0) {
+    levers.push({ text: 'don’t invest in shares until then', mod: (x) => { x.goals.shareMonthly = 0; } });
+    if (!p.goals.shareStartAfter) levers.push({ text: `keep your ${m(r.shareMonthly)} a month share plan but start it once your planned properties are bought (tick the box in Shares)`, mod: (x) => { x.goals.shareMonthly = Math.round(r.shareMonthly); x.goals.shareStartAfter = planned.length; } });
+    levers.push({ text: `halve your share plan to about ${money(Math.round(r.shareMonthly / 2 / 50) * 50)} a month`, mod: (x) => { x.goals.shareMonthly = Math.round(r.shareMonthly / 2); } });
+  }
+  const withDebt = p.properties.filter((pr) => pr.loans.some((l) => (l.balance ?? 0) > 0));
+  if (withDebt.some((pr) => pr.planIo5)) levers.push({ text: 'switch your current loans from interest-only to principal and interest', mod: (x) => { x.properties.forEach((pr) => { pr.planIo5 = false; }); } });
+  if (withDebt.some((pr) => !pr.planIo5)) levers.push({ text: 'move your current loans to interest-only for 5 years, so repayments are lower while you save', mod: (x) => { x.properties.forEach((pr) => { pr.planIo5 = true; }); } });
+  if (planned.some((pp) => pp.ioFirst5 === false)) levers.push({ text: 'use interest-only for the first 5 years on new purchases', mod: (x) => { x.plannedPurchases?.forEach((pp) => { pp.ioFirst5 = true; }); } });
+  if (withDebt.some((pr) => pr.planPayOff && pr.use === 'investment') || planned.some((pp) => pp.payOff)) levers.push({ text: 'don’t pay the investment loans off by retirement (it means bigger repayments now)', mod: (x) => { x.properties.forEach((pr) => { if (pr.use === 'investment') pr.planPayOff = false; }); x.plannedPurchases?.forEach((pp) => { pp.payOff = false; }); } });
+  levers.push({ text: `aim for a property about 10% cheaper (around ${m(round(planned[0].price * 0.9, 5000))} in today’s money)`, mod: (x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= 0.9; }); } });
+  levers.push({ text: 'trim your living costs by about 10%', mod: (x) => { const f = x.finances; if (f.livingMonthly) f.livingMonthly *= 0.9; for (const k in f.livingBreakdown ?? {}) if (f.livingBreakdown[k]) f.livingBreakdown[k] = (f.livingBreakdown[k] ?? 0) * 0.9; } });
+
+  const out: { k: number; gain: number; text: string }[] = [];
+  for (const lv of levers) {
+    const rr = run(lv.mod);
+    if (!lastsOk(rr) || !cashOk(rr)) continue;
+    let best: { k: number; gain: number; to: number } | null = null;
+    planned.forEach((_, k) => {
+      const was = base[k], now = rr.purchases[k]?.year ?? null;
+      if (now == null) return;
+      const gain = was == null ? 99 : was - now;
+      if (gain >= 1 && !best) best = { k, gain, to: now }; // the next purchase that moves is the one worth talking about
+    });
+    if (best) {
+      const b = best as { k: number; gain: number; to: number };
+      const name = planned[b.k].label || `property ${owned + b.k + 1}`;
+      out.push({ k: b.k, gain: b.gain, text: base[b.k] == null
+        ? `To fit ${name} in before you stop work (around ${b.to}), ${lv.text}.`
+        : `To buy ${name} sooner (${b.to} instead of ${base[b.k]}), ${lv.text}.` });
+    }
+  }
+  return out.sort((a, b) => a.k - b.k || b.gain - a.gain).slice(0, 3).map((x) => x.text);
+}
+
+/** When the plan has room to spare: an earlier finish, or a bigger retirement income. */
+function retireIdeas(p: Profile, run: (mod: (x: Profile) => void) => Projection): string[] {
+  const out: string[] = [];
+  const age = p.household.you.age ?? 35;
+  for (let d = 5; d >= 1; d--) {
+    const at = p.goals.retirementAge - d;
+    if (at <= age + 2) continue;
+    const rr = run((x) => { x.goals.retirementAge = at; });
+    if (lastsOk(rr) && cashOk(rr) && propsOk({ ...p, goals: { ...p.goals, retirementAge: at } }, rr)) { out.push(`You could stop work at ${at} instead of ${p.goals.retirementAge} and still reach your property goal with money lasting to ${p.goals.lifeExpectancy ?? 90}.`); break; }
+  }
+  const most = bisect(p.goals.passiveIncome, p.goals.passiveIncome * 4, (v) => lastsOk(run((x) => { x.goals.passiveIncome = v; })), 12);
+  if (most != null && most > p.goals.passiveIncome * 1.15) out.push(`Or stop at ${p.goals.retirementAge} as planned and live on up to about ${m(round(most, 5000))} a year in retirement instead of ${m(p.goals.passiveIncome)}.`);
+  return out;
 }

@@ -4,14 +4,14 @@ import { propertyStats } from '../lib/calc';
 import { money, pct } from '../lib/format';
 import { uid } from '../lib/defaults';
 import { PropertyPhoto } from '../components/Aerial';
-import { Field, Icon, MoneyInput, NumInput, Select, Segmented } from '../components/ui';
+import { Field, Icon, MoneyInput, Select } from '../components/ui';
 import { priceMode } from '../lib/prices';
 import type { Renovation } from '../lib/types';
 
 /** Typical 2026 Australian costs (mid-range, metro) and a simple value-uplift rule of thumb for each item. */
 const ITEMS = [
-  { key: 'kitchen', label: 'Kitchen renovation', low: 25000, high: 45000, budget: 30000, mult: 1.5 },
-  { key: 'bathroom', label: 'Bathroom renovation', low: 15000, high: 35000, budget: 26000, mult: 1.5 },
+  { key: 'kitchen', label: 'Kitchen renovation', low: 25000, high: 45000, budget: 30000, mult: 1.7 },
+  { key: 'bathroom', label: 'Bathroom renovation', low: 15000, high: 35000, budget: 26000, mult: 1.7 },
   { key: 'addBathroom', label: 'Add a bathroom or ensuite', low: 25000, high: 50000, budget: 35000, mult: 2 },
   { key: 'addBedroom', label: 'Add a bedroom', low: 40000, high: 90000, budget: 60000, mult: 2 },
   { key: 'paintIn', label: 'Paint inside', low: 6000, high: 15000, budget: 9000, mult: 2 },
@@ -21,6 +21,7 @@ const ITEMS = [
   { key: 'landscaping', label: 'Front yard and landscaping', low: 5000, high: 20000, budget: 10000, mult: 2 },
   { key: 'deck', label: 'Deck or outdoor area', low: 10000, high: 30000, budget: 18000, mult: 1.5 },
   { key: 'roof', label: 'Roof restoration', low: 8000, high: 15000, budget: 11000, mult: 1.2 },
+  { key: 'pool', label: 'Add a pool', low: 50000, high: 90000, budget: 65000, mult: 2 },
 ];
 
 export function Renovate() {
@@ -65,7 +66,7 @@ export function Renovate() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <section className="panel p-5 sm:p-6">
           <h2 className="font-display text-xl font-semibold">What would you do?</h2>
-          <p className="mt-1 text-sm text-muted">Typical mid-range costs in 2026. Set your own budget and how much value you expect each dollar to add.</p>
+          <p className="mt-1 text-sm text-muted">Typical mid-range costs in 2026. Tick what you’d do and set your own budget.</p>
           <ul className="mt-5 divide-y divide-line">
             {rows.map((r) => (
               <li key={r.key} className="py-3">
@@ -77,8 +78,6 @@ export function Renovate() {
                   {r.state.on && (
                     <div className="flex items-center gap-2">
                       <div className="w-36"><MoneyInput value={r.state.budget} onChange={(v) => set(r.key, { budget: v })} /></div>
-                      <span className="text-sm text-muted">×</span>
-                      <div className="w-20"><NumInput value={r.state.mult} onChange={(v) => set(r.key, { mult: v })} step={0.1} /></div>
                       <span className="w-24 text-right text-sm font-medium text-gum">+{money((r.state.budget ?? 0) * (r.state.mult ?? 1), { compact: true })}</span>
                     </div>
                   )}
@@ -86,7 +85,7 @@ export function Renovate() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-[11px] text-muted">“×” is the value you expect each dollar to add, a simple rule of thumb. Resale studies often find kitchens and bathrooms return less than their cost, while cosmetic work can return more. A local agent or valuer can tell you what buyers in {pr.suburb} pay for.</p>
+          <p className="mt-3 text-[11px] text-muted">Value added is a rule-of-thumb estimate for each type of work, not a valuation. A local agent or valuer can tell you what buyers in {pr.suburb} pay for.</p>
         </section>
 
         <aside className="space-y-6">

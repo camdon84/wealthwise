@@ -89,6 +89,7 @@ export interface Property {
   bedrooms: number | null;
   yearBuilt: number | null;
   planIo5?: boolean; // plan: interest-only for the next 5 years
+  photo?: string | null; // the user's own photo (small JPEG data URL); replaces the aerial view
   renoAdds?: { id: string; amount: number; date: string }[]; // value added by finished renovations (see propertyValuation)
   geo?: { lat: number; lon: number; street?: boolean } | null; // looked up from the address for the aerial photo; null = not found
   planPayOff?: boolean; // plan: paid off by retirement (otherwise an investment is sold at retirement, a home loan is cleared from super)
@@ -113,6 +114,7 @@ export interface Goals {
   lifeExpectancy?: number; // age the plan runs to
   sharesTarget?: number | null; // share portfolio wanted at retirement, today's money
   shareMonthly?: number | null; // planned monthly share investment; null = whatever reaches the target
+  shareStartAfter?: number | null; // don't start the share plan until this many planned purchases are bought
   passiveIncome: number; // today's dollars p.a.
   targetProperties: number;
   risk: number; // 1-5

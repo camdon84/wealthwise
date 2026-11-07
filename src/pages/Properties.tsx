@@ -4,7 +4,7 @@ import { propertyStats } from '../lib/calc';
 import { money, monthYear, pct } from '../lib/format';
 import { emptyProperty, uid } from '../lib/defaults';
 import type { Property, ValuationEntry } from '../lib/types';
-import { PropertyPhoto } from '../components/Aerial';
+import { PhotoControls, PropertyPhoto } from '../components/Aerial';
 import { PropertyEditor } from '../components/PropertyEditor';
 import { Icon, MoneyInput, Select, Segmented } from '../components/ui';
 
@@ -129,6 +129,7 @@ function PropertyDetail({ property: pr, onClose, onEdit }: { property: Property;
   return (
     <Sheet title={pr.address} onClose={onClose} actions={<button className="btn-primary" onClick={onEdit}><Icon name="details" className="h-4 w-4" />Edit property details</button>}>
       <PropertyPhoto property={pr} className="h-52 w-full rounded-xl border border-line" />
+      <PhotoControls property={pr} />
       <p className="mt-3 text-sm text-muted">{pr.suburb} {pr.state} {pr.postcode} · {pr.kind}{pr.bedrooms ? `, ${pr.bedrooms} bed` : ''}{pr.yearBuilt ? ` · built ${pr.yearBuilt}` : ''} · bought {monthYear(pr.purchaseDate)} for {money(pr.purchasePrice)}</p>
 
       <section className="mt-6 panel p-5">

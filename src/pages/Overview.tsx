@@ -13,6 +13,7 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
   const pos = useMemo(() => position(p, quotes), [p, quotes]);
   const proj = useMemo(() => project(p, quotes), [p, quotes]);
   const life = p.goals.lifeExpectancy ?? 90;
+  const atRetire = proj.points.find((x) => x.year === proj.retireYear);
   const span = Math.max(1, life - p.goals.retirementAge);
   const progress = proj.runsOutAge == null ? 1 : Math.max(0, Math.min(1, (proj.runsOutAge - p.goals.retirementAge) / span));
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
@@ -34,9 +35,15 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
           <div className="p-5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-sm text-muted">Net worth</p>
+                <p className="text-sm text-muted">{p.household.hasPartner ? 'Your combined net worth' : 'Your current net worth'}</p>
                 <p className="font-display text-5xl font-semibold tracking-tight">{money(pos.netWorth)}</p>
                 <p className="mt-1 text-sm text-muted">{money(pos.assets, { compact: true })} in assets, {money(pos.liabilities, { compact: true })} owing</p>
+                {atRetire && (
+                  <div className="mt-4">
+                    <p className="text-sm text-muted">{p.household.hasPartner ? 'Your combined net worth' : 'Your net worth'} at retirement age ({p.goals.retirementAge})</p>
+                    <p className="font-display text-3xl font-semibold tracking-tight text-gum">{money(atRetire.netWorth / Math.pow(1 + p.assumptions.inflation / 100, atRetire.year - proj.points[0].year), { compact: true })} <span className="text-sm font-normal text-muted">in today’s money · {money(atRetire.netWorth, { compact: true })} in {atRetire.year} dollars</span></p>
+                  </div>
+                )}
               </div>
               <div className="flex flex-col items-end gap-3">
                 <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
