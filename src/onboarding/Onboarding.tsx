@@ -159,6 +159,33 @@ function AboutYou({ thorough }: { thorough: boolean }) {
   );
 }
 
+/** Expected promotions: a new salary from a given year, then the yearly pay rise carries on from there. */
+function Promotions({ who }: { who: 'you' | 'partner' }) {
+  const p = useApp((s) => s.profile)!;
+  const update = useApp((s) => s.update);
+  const list = p.household[who].promotions ?? [];
+  const y0 = new Date().getFullYear();
+  const age = p.household[who].age ?? p.household.you.age ?? 35;
+  const years = Array.from({ length: Math.max(1, p.goals.retirementAge - age) }, (_, j) => y0 + 1 + j).map((y) => ({ value: String(y), label: String(y) }));
+  const set = (fn: (l: NonNullable<typeof list>) => void) => update((d) => { const l = (d.household[who].promotions ??= []); fn(l); });
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <p className="field-label">Expected promotions</p>
+      <p className="-mt-1 mb-3 text-xs text-muted">A new salary from the year you expect it. Your yearly pay rise carries on from there.</p>
+      <div className="space-y-2">
+        {list.map((pr, k) => (
+          <div key={pr.id} className="flex flex-wrap items-center gap-2">
+            <div className="w-28"><Select value={String(pr.year)} onChange={(v) => set((l) => { l[k].year = Number(v); })} options={years} /></div>
+            <div className="w-48"><MoneyInput value={pr.salary} onChange={(v) => set((l) => { l[k].salary = v ?? 0; })} suffix="/ year" /></div>
+            <button className="btn-ghost p-2" aria-label="Remove promotion" onClick={() => set((l) => { l.splice(k, 1); })}><Icon name="trash" className="h-4 w-4" /></button>
+          </div>
+        ))}
+      </div>
+      <button className="btn-quiet mt-2 text-sm" onClick={() => set((l) => { l.push({ id: uid(), year: y0 + 2, salary: Math.round(((p.household[who].salary ?? 0) * 1.2) / 5000) * 5000 }); })}><Icon name="plus" className="h-4 w-4" />Add a promotion</button>
+    </div>
+  );
+}
+
 export function Income({ thorough, withDates }: { thorough: boolean; withDates?: boolean }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
@@ -173,7 +200,9 @@ export function Income({ thorough, withDates }: { thorough: boolean; withDates?:
             <Field label="Job title">{(id) => <TextInput id={id} value={hh[who].jobTitle ?? ''} onChange={(v) => update((d) => { d.household[who].jobTitle = v; })} placeholder="e.g. Project manager" />}</Field>
             <Field label="Salary before tax" hint={withDates ? <AsOf date={hh[who].salaryAsOf} onToday={() => update((d) => { d.household[who].salaryAsOf = today(); })} /> : 'Include regular overtime and allowances. Leave super out.'}>{(id) => <MoneyInput id={id} value={hh[who].salary} onChange={(v) => update((d) => { d.household[who].salary = v; if (withDates) d.household[who].salaryAsOf = today(); })} suffix="/ year" />}</Field>
             {thorough && <div><p className="field-label">Work</p><Segmented size="sm" value={hh[who].employment} onChange={(v) => update((d) => { d.household[who].employment = v; })} options={[...emp]} /></div>}
+            <Field label="Expected pay rise each year" hint="About 3% keeps pace with wages. Inflation is assumed at 2.75%.">{(id) => <NumInput id={id} value={hh[who].salaryGrowth ?? 3} onChange={(v) => update((d) => { d.household[who].salaryGrowth = v ?? 3; })} step={0.5} suffix="% / yr" />}</Field>
           </div>
+          <Promotions who={who} />
         </div>
       ))}
       <Field label="Other income" hint="Bonuses, dividends, side business, family payments. Rent from your properties comes in the property step.">{(id) => <MoneyInput id={id} value={hh.otherIncome} onChange={(v) => update((d) => { d.household.otherIncome = v; })} suffix="/ year" />}</Field>

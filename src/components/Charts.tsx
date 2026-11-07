@@ -22,7 +22,8 @@ function Tip({ active, payload, label, rows, real }: any) {
         </p>
       ))}
       {d.bought && <p className="mt-1.5 text-brass">Buys property for {money(d.bought, { compact: true })}</p>}
-      {d.paidOff && <p className="mt-1.5 text-clay">Paid off: {d.paidOff.join(', ')}</p>}
+      {d.paidOff && <p className="mt-1.5 text-gum">Paid off: {d.paidOff.join(', ')}</p>}
+      {d.sold && <p className="mt-1.5 text-clay">Sold: {d.sold.join(', ')}</p>}
     </div>
   );
 }
@@ -85,7 +86,11 @@ export function WealthChart({ points, retireYear, height = 320, real, hidden = [
             label={{ value: `Buy #${p.properties}`, position: 'top', fill: C.muted, fontSize: 10 }} />
         ))}
         {points.filter((p) => p.paidOff).map((p) => (
-          <ReferenceDot key={`d${p.year}`} x={p.year} y={shown.reduce((t, s) => t + Math.max(0, p[s.key] as number), 0)} r={4.5} fill={C.clay} stroke="rgb(var(--surface))" strokeWidth={1.5} />
+          <ReferenceDot key={`d${p.year}`} x={p.year} y={shown.reduce((t, s) => t + Math.max(0, p[s.key] as number), 0)} r={4.5} fill={C.equity} stroke="rgb(var(--surface))" strokeWidth={1.5} />
+        ))}
+        {points.filter((p) => p.sold).map((p) => (
+          <ReferenceDot key={`s${p.year}`} x={p.year} y={shown.reduce((t, s) => t + Math.max(0, p[s.key] as number), 0)} r={5} fill="rgb(var(--surface))" stroke={C.clay} strokeWidth={2}
+            label={{ value: p.sold!.length > 1 ? `Sell ×${p.sold!.length}` : 'Sell', position: 'top', fill: C.clay, fontSize: 10 }} />
         ))}
       </AreaChart>
     </ResponsiveContainer>
@@ -98,7 +103,8 @@ export function MarkerKey({ points }: { points: YearPoint[] }) {
   return (
     <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
       <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: C.brass }} />Property bought</li>
-      {debts.length > 0 && <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: C.clay }} />Debt paid off: {debts.join(' · ')}</li>}
+      {points.some((p) => p.sold) && <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: C.clay }} />Property sold</li>}
+      {debts.length > 0 && <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: C.equity }} />Debt paid off: {debts.join(' · ')}</li>}
     </ul>
   );
 }

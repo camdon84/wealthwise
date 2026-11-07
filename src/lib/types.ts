@@ -12,6 +12,8 @@ export interface Person {
   jobTitle?: string;
   salaryAsOf?: string; // yyyy-mm-dd the salary was last confirmed
   superAsOf?: string; // yyyy-mm-dd the super balance was last confirmed
+  salaryGrowth?: number | null; // expected pay rise each year, %
+  promotions?: { id: string; year: number; salary: number }[]; // new salary (before tax) from that year
 }
 
 export interface Dependant {

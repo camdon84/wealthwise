@@ -367,7 +367,7 @@ function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quot
 
 /* ---------- Your Wise Future ---------- */
 const EVENT_STYLE: Record<string, { icon: string; cls: string }> = {
-  buy: { icon: 'property', cls: 'bg-brass/15 text-brass' }, sell: { icon: 'arrow', cls: 'bg-sky/15 text-sky' }, debt: { icon: 'check', cls: 'bg-gum/15 text-gum' },
+  buy: { icon: 'property', cls: 'bg-brass/15 text-brass' }, pay: { icon: 'arrow', cls: 'bg-gum/15 text-gum' }, sell: { icon: 'arrow', cls: 'bg-sky/15 text-sky' }, debt: { icon: 'check', cls: 'bg-gum/15 text-gum' },
   kids: { icon: 'family', cls: 'bg-sage/20 text-sage' }, retire: { icon: 'spark', cls: 'bg-brass text-ground' }, super: { icon: 'plan', cls: 'bg-gum/15 text-gum' },
   shares: { icon: 'shares', cls: 'bg-sky/15 text-sky' }, runout: { icon: 'x', cls: 'bg-clay/15 text-clay' }, cost: { icon: 'details', cls: 'bg-line text-ink' }, goal: { icon: 'check', cls: 'bg-gum/15 text-gum' },
 };

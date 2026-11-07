@@ -194,10 +194,10 @@ export interface YearPoint {
   year: number; age: number; propertyValue: number; propertyDebt: number; propertyEquity: number; shares: number; super: number; cash: number;
   netWorth: number; passiveIncome: number; passiveIncomeReal: number; properties: number; borrowing: number; monthlySavings: number;
   repayUp2: number; repayBase: number; repayDown2: number; bought?: number;
-  spendGoalReal: number; spendFundedReal: number; shareContribution: number; sharePlanned: number; rentIncome: number; superDrawn: number; paidOff?: string[];
+  spendGoalReal: number; spendFundedReal: number; shareContribution: number; sharePlanned: number; rentIncome: number; superDrawn: number; paidOff?: string[]; sold?: string[];
 }
 export interface PurchaseBlock { year: number; reason: 'deposit' | 'servicing' | 'date'; price: number; deposit: number; available: number; monthlyShort: number }
-export interface PlanEvent { year: number; age: number; kind: 'buy' | 'sell' | 'debt' | 'kids' | 'retire' | 'super' | 'shares' | 'runout' | 'cost' | 'goal'; text: string }
+export interface PlanEvent { year: number; age: number; kind: 'buy' | 'sell' | 'debt' | 'pay' | 'kids' | 'retire' | 'super' | 'shares' | 'runout' | 'cost' | 'goal'; text: string }
 export interface Projection {
   points: YearPoint[]; purchases: { year: number; price: number; id?: string }[]; shortfallYear: number | null; sharesAtRetire: number; buffer: number; retireYear: number; block: PurchaseBlock | null;
   events: PlanEvent[]; runsOutAge: number | null; shareMonthly: number; requiredShareMonthly: number; cryptoExcluded: number;
@@ -312,6 +312,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
     let contribution = 0;
     let spendGoal = 0, spendFunded = 0, superDrawn = 0, sharePlanned = 0;
     const paidOff: string[] = i === 0 ? [...paidAtStart] : [];
+    const sold: string[] = [];
 
     if (i > 0) {
       // Property: grow, collect rent, pay loans (interest-only while that lasts, then principal and interest)
@@ -351,8 +352,14 @@ export function project(p: Profile, quotes: Quotes): Projection {
       const avgRate = debtTotal ? sims.reduce((t, s) => t + s.debt * s.rate, 0) / debtTotal : 0;
       const offsetSaving = Math.min(Math.max(0, cash), debtTotal) * avgRate / 100;
 
-      youSal = working ? youSal * 1.03 : 0;
-      partSal = working ? partSal * 1.03 : 0;
+      const nextSalary = (who: 'you' | 'partner', cur: number) => {
+        const person = p.household[who];
+        const promo = (person.promotions ?? []).filter((x) => x.year === year && x.salary > 0).pop();
+        if (promo) { say(year, 'pay', `${person.name ? `${person.name}’s` : who === 'you' ? 'Your' : 'Your partner’s'} salary steps up to ${fmt(promo.salary)} with a promotion.`); return promo.salary; }
+        return cur * (1 + (person.salaryGrowth ?? 3) / 100);
+      };
+      youSal = working ? nextSalary('you', youSal) : 0;
+      partSal = working && p.household.hasPartner ? nextSalary('partner', partSal) : 0;
       living = (baseLiving + dependantsMonthly(p, i)) * 12 * infl(i);
       for (const d of p.household.dependantsDetail ?? []) if (d.age != null && d.age + i === d.supportUntil && !kidsEnd.has(d.id)) { kidsEnd.add(d.id); say(year, 'kids', `${d.name || 'A dependant'} turns ${d.supportUntil}: their costs drop out of your budget.`); }
       // Super: employer contributions (12%, capped at the concessional cap, less 15% contributions tax), grows at the assumed return after fees
@@ -384,7 +391,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         const s = sims[idx];
         const proceeds = s.value * (1 - SELL_COSTS) - s.debt - Math.max(0, s.value - s.cost) * CGT_RATE;
         sims.splice(idx, 1);
-        cash += proceeds;
+        cash += proceeds; sold.push(s.name);
         say(year, 'sell', `Sell ${s.name} for about ${fmt(s.value / infl(i))} in today’s money${why}, freeing about ${fmt(proceeds / infl(i))} after the loan, selling costs and tax.`);
       };
 
@@ -498,7 +505,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       passiveIncome, passiveIncomeReal: passiveIncome / infl(i), properties: sims.length,
       borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, false))) : 0,
       monthlySavings: monthlyNet, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
-      spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, rentIncome: sims.filter((x) => x.invest).reduce((t, x) => t + x.rent, 0), superDrawn, paidOff: paidOff.length ? paidOff : undefined,
+      spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, rentIncome: sims.filter((x) => x.invest).reduce((t, x) => t + x.rent, 0), superDrawn, paidOff: paidOff.length ? paidOff : undefined, sold: sold.length ? sold : undefined,
     });
   }
   if (runsOutAge == null) say(y0 + (endAge - startAge), 'goal', `Your money lasts to ${endAge}, with about ${fmt((points[points.length - 1].netWorth) / infl(endAge - startAge))} in today’s money left over.`);
