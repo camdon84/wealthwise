@@ -404,7 +404,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
         <h2 className="font-display text-xl font-semibold">What happens, year by year</h2>
         <p className="mt-1 text-sm text-muted">Worked out from your figures, goals and assumptions. Change any of them and this updates.</p>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-muted">Each year shows your cash at year end (including your {money(proj.buffer, { compact: true })} emergency fund) and what goes into shares, {dollars === 'real' ? 'in today’s money' : 'in the dollars of that year'}.</p>
+          <p className="text-xs text-muted">Each year shows your cash at year end (including your {money(proj.buffer, { compact: true })} emergency fund), rent collected and what goes into shares, {dollars === 'real' ? 'in today’s money' : 'in the dollars of that year'}.</p>
           <Segmented size="sm" label="Timeline detail" value={detail} onChange={setDetail} options={[{ value: 'all', label: 'Every year' }, { value: 'key', label: 'Key events' }]} />
         </div>
         <ol className="mt-4 divide-y divide-line">
@@ -414,9 +414,10 @@ function Projections({ quotes }: { quotes: Quotes }) {
             const d = dollars === 'real' ? Math.pow(1 + p.assumptions.inflation / 100, i) : 1;
             const c = (v: number) => money(v / d, { compact: true });
             const working = pt.age < p.goals.retirementAge;
+            const rent = pt.rentIncome > 0 ? [`Rent ${c(pt.rentIncome)}`] : [];
             const stats = working
-              ? [`Cash at year end ${c(Math.max(0, pt.cash))}`, pt.sharePlanned > 0 && pt.shareContribution < pt.sharePlanned * 0.98 ? `${c(pt.shareContribution)} into shares (plan ${c(pt.sharePlanned)})` : pt.shareContribution > 0 ? `${c(pt.shareContribution)} into shares` : 'Nothing into shares', `Shares ${c(pt.shares)}`, `Super ${c(pt.super)}`]
-              : [pt.superDrawn > 0 ? `${c(pt.superDrawn)} paid from super` : pt.age < 60 ? 'Super not open until 60' : 'Super used up', `Cash at year end ${c(Math.max(0, pt.cash))}`, `Shares ${c(pt.shares)}`, `Super left ${c(pt.super)}`];
+              ? [`Cash at year end ${c(Math.max(0, pt.cash))}`, ...rent, pt.sharePlanned > 0 && pt.shareContribution < pt.sharePlanned * 0.98 ? `${c(pt.shareContribution)} into shares (plan ${c(pt.sharePlanned)})` : pt.shareContribution > 0 ? `${c(pt.shareContribution)} into shares` : 'Nothing into shares', `Shares ${c(pt.shares)}`, `Super ${c(pt.super)}`]
+              : [pt.superDrawn > 0 ? `${c(pt.superDrawn)} paid from super` : pt.age < 60 ? 'Super not open until 60' : 'Super used up', ...rent, `Cash at year end ${c(Math.max(0, pt.cash))}`, `Shares ${c(pt.shares)}`, `Super left ${c(pt.super)}`];
             return (
               <li key={pt.year} className={`flex gap-4 py-3 ${pt.age === p.goals.retirementAge ? 'bg-brass/5' : ''}`}>
                 <div className="w-16 shrink-0 text-right"><p className="font-display font-semibold">{pt.year}</p><p className="text-xs text-muted">age {pt.age}</p></div>

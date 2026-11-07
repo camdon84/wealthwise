@@ -43,6 +43,7 @@ async function ensureSchema(db: D1Database) {
     db.prepare('CREATE TABLE IF NOT EXISTS quotes (key TEXT PRIMARY KEY, price REAL NOT NULL, change REAL NOT NULL, as_of TEXT NOT NULL, fetched_at INTEGER NOT NULL)'),
     db.prepare('CREATE TABLE IF NOT EXISTS login_failures (email TEXT NOT NULL, at INTEGER NOT NULL)'),
     db.prepare('CREATE TABLE IF NOT EXISTS ai_cache (key TEXT PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL)'),
+    db.prepare('CREATE TABLE IF NOT EXISTS image_runs (who TEXT NOT NULL, at INTEGER NOT NULL)'),
   ]);
   schemaReady = true;
 }
@@ -83,6 +84,44 @@ async function geocode(req: Request, env: Env) {
   const out = first ? { lat: Number(first.lat), lon: Number(first.lon), street: first.addresstype === 'road' } : null;
   await env.DB.prepare('INSERT OR REPLACE INTO ai_cache (key, data, created_at) VALUES (?, ?, ?)').bind(key, JSON.stringify(out), Date.now()).run();
   return json(out, 200, { 'cache-control': 'public, max-age=86400' });
+}
+
+/* ---------- AI renovation preview (FLUX.2 klein on Workers AI, editing the user's photo) ---------- */
+const STYLE_WORDS: Record<string, string> = {
+  modern: 'modern, clean lines, flat-panel cabinetry, stone benchtops, matte black tapware',
+  coastal: 'coastal Hamptons, white shaker cabinetry, light timber, soft blue accents',
+  scandi: 'Scandinavian, pale oak, white walls, simple handle-less joinery, warm minimal',
+  industrial: 'industrial, dark cabinetry, concrete-look surfaces, black steel, pendant lights',
+  classic: 'classic Queenslander, painted timber, VJ panelling, brass fittings, warm and traditional',
+};
+async function renovateImage(req: Request, env: Env) {
+  const who = (await currentUser(req, env))?.id ?? `ip:${req.headers.get('cf-connecting-ip') ?? 'unknown'}`;
+  const dayAgo = Date.now() - 864e5;
+  const used = await env.DB.prepare('SELECT COUNT(*) AS n FROM image_runs WHERE who = ? AND at > ?').bind(who, dayAgo).first<{ n: number }>();
+  if ((used?.n ?? 0) >= 12) return fail('That’s the limit for AI previews today. Try again tomorrow.', 429);
+  const form = await req.formData().catch(() => null);
+  const photo = form?.get('photo');
+  if (!form || !photo || typeof photo === 'string') return fail('Add a photo of the room first.');
+  if (photo.size > 600_000) return fail('That photo is too large. Try a smaller one.', 413);
+  const room = String(form.get('room') ?? 'kitchen').slice(0, 30);
+  const style = STYLE_WORDS[String(form.get('style') ?? 'modern')] ?? STYLE_WORDS.modern;
+  const extra = String(form.get('notes') ?? '').slice(0, 200);
+  const prompt = `Renovate the ${room} in image 0 in a ${style} style. Keep exactly the same camera angle, room shape, walls, windows, doors and ceiling height. Replace the old finishes, cabinetry, benchtops, flooring, fixtures and lighting with new ones. ${extra} Photorealistic real-estate listing photo, bright natural light, tidy, no people, no text.`;
+  const out = new FormData();
+  out.append('input_image_0', photo, 'room.jpg');
+  out.append('prompt', prompt);
+  out.append('width', String(form.get('width') ?? 1024));
+  out.append('height', String(form.get('height') ?? 768));
+  const packed = new Response(out);
+  try {
+    const res: any = await (env.AI as any).run('@cf/black-forest-labs/flux-2-klein-4b', { multipart: { body: packed.body, contentType: packed.headers.get('content-type') } });
+    const image = res?.image ?? res?.result?.image;
+    if (!image) return fail('The AI didn’t return an image. Try again.', 502);
+    await env.DB.prepare('INSERT INTO image_runs (who, at) VALUES (?, ?)').bind(who, Date.now()).run();
+    return json({ image: `data:image/jpeg;base64,${image}` });
+  } catch (e: any) {
+    return fail(`The AI preview didn’t work this time (${String(e?.message ?? e).slice(0, 120)}).`, 502);
+  }
 }
 
 async function body<T>(req: Request): Promise<T | null> {
@@ -228,6 +267,7 @@ async function api(req: Request, env: Env, path: string) {
   if (path === '/api/wise' && method === 'POST') return wiseRoute(req, env);
   if (path === '/api/documents/read' && method === 'POST') return readDocument(req, env);
   if (path === '/api/geocode' && method === 'GET') return geocode(req, env);
+  if (path === '/api/renovate-image' && method === 'POST') return renovateImage(req, env);
   if (path === '/api/cash-rate' && method === 'GET') {
     const data = await cashRate(env);
     return data ? json(data, 200, { 'cache-control': 'public, max-age=1800' }) : fail('Cash rate unavailable right now.', 503);

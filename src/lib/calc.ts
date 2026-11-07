@@ -76,9 +76,11 @@ export function hecsAnnual(p: Profile, youSal = n(p.household.you.salary), partS
 export interface Valuation { value: number; low: number; high: number; sources: number; basis: 'sources' | 'indexed' | 'none' }
 
 export function propertyValuation(p: Property): Valuation {
-  const latest = new Map<string, number>();
-  [...p.valuations].sort((a, b) => a.date.localeCompare(b.date)).forEach((v) => latest.set(v.source, v.value));
-  const vals = [...latest.values()].filter((v) => v > 0);
+  // Finished renovations add their value on top of any estimate made before they were done; later estimates already include them.
+  const addsAfter = (date: string) => (p.renoAdds ?? []).filter((r) => r.date >= date).reduce((t, r) => t + r.amount, 0);
+  const latest = new Map<string, { value: number; date: string }>();
+  [...p.valuations].sort((a, b) => a.date.localeCompare(b.date)).forEach((v) => latest.set(v.source, { value: v.value, date: v.date }));
+  const vals = [...latest.values()].filter((v) => v.value > 0).map((v) => v.value + addsAfter(v.date));
   if (vals.length) {
     const value = vals.reduce((a, b) => a + b, 0) / vals.length;
     return { value, low: Math.min(...vals), high: Math.max(...vals), sources: vals.length, basis: 'sources' };
@@ -86,7 +88,7 @@ export function propertyValuation(p: Property): Valuation {
   if (p.purchasePrice) {
     const [y, m] = (p.purchaseDate || `${thisYear()}-01`).split('-').map(Number);
     const yrs = Math.max(0, (Date.now() - new Date(y, (m || 1) - 1, 1).getTime()) / (365.25 * 864e5));
-    const value = p.purchasePrice * Math.pow(1 + p.growthRate / 100, yrs);
+    const value = p.purchasePrice * Math.pow(1 + p.growthRate / 100, yrs) + addsAfter('');
     return { value, low: value * 0.93, high: value * 1.07, sources: 0, basis: 'indexed' };
   }
   return { value: 0, low: 0, high: 0, sources: 0, basis: 'none' };
@@ -192,7 +194,7 @@ export interface YearPoint {
   year: number; age: number; propertyValue: number; propertyDebt: number; propertyEquity: number; shares: number; super: number; cash: number;
   netWorth: number; passiveIncome: number; passiveIncomeReal: number; properties: number; borrowing: number; monthlySavings: number;
   repayUp2: number; repayBase: number; repayDown2: number; bought?: number;
-  spendGoalReal: number; spendFundedReal: number; shareContribution: number; sharePlanned: number; superDrawn: number; paidOff?: string[];
+  spendGoalReal: number; spendFundedReal: number; shareContribution: number; sharePlanned: number; rentIncome: number; superDrawn: number; paidOff?: string[];
 }
 export interface PurchaseBlock { year: number; reason: 'deposit' | 'servicing' | 'date'; price: number; deposit: number; available: number; monthlyShort: number }
 export interface PlanEvent { year: number; age: number; kind: 'buy' | 'sell' | 'debt' | 'kids' | 'retire' | 'super' | 'shares' | 'runout' | 'cost' | 'goal'; text: string }
@@ -239,14 +241,16 @@ export function project(p: Profile, quotes: Quotes): Projection {
 
   type Sim = {
     name: string; value: number; cost: number; debt: number; rate: number; ioLeft: number; years: number; rent: number; costs: number; mgmt: number; g: number;
-    invest: boolean; pay: number; payOff: boolean; home: boolean;
+    invest: boolean; pay: number; payOff: boolean; home: boolean; pid?: string;
   };
   const sims: Sim[] = pos.props.map(({ pr, s }) => ({
     name: pr.address || 'A property', value: s.val.value, cost: n(pr.purchasePrice) || s.val.value, debt: s.debt, rate: s.avgRate || a.newLoanRate,
     ioLeft: pr.planIo5 ? 5 : 0, years: Math.max(1, ...pr.loans.map((l) => n(l.yearsLeft) || 25)),
     rent: s.rentGross, costs: n(pr.annualCosts), mgmt: n(pr.managementPct) / 100, g: pr.growthRate / 100, invest: pr.use === 'investment', pay: pr.use === 'home' ? share : 1,
-    payOff: pr.planPayOff ?? pr.use === 'home', home: pr.use === 'home',
+    payOff: pr.planPayOff ?? pr.use === 'home', home: pr.use === 'home', pid: pr.id,
   }));
+  const valueNow = new Map(pos.props.map(({ pr, s }) => [pr.id, s.val.value]));
+  const renos = (p.renovations ?? []).filter((r) => !r.done && valueNow.has(r.propertyId));
 
   // Crypto is too volatile to project: it counts in today's net worth but not in the plan.
   const cryptoExcluded = pos.shares.rows.filter((r) => r.h.kind === 'crypto').reduce((t, r) => t + r.value, 0);
@@ -330,6 +334,18 @@ export function project(p: Profile, quotes: Quotes): Projection {
         s.years = Math.max(1, s.years - 1);
         propNet += s.invest ? s.rent * (1 - s.mgmt) - s.costs - repay : -(s.costs + repay * s.pay);
       }
+      // Planned renovations: pay the cost, lift the value (and rent) from that year on
+      let renoCost = 0;
+      for (const r of renos) if (Math.max(r.year, y0 + 1) === year) {
+        const sim = sims.find((x) => x.pid === r.propertyId);
+        if (!sim) continue;
+        renoCost += r.cost * infl(i);
+        const lift = r.uplift / Math.max(1, valueNow.get(r.propertyId) ?? 1);
+        sim.value *= 1 + lift; sim.cost += r.cost * infl(i);
+        if (sim.invest && r.rentPerWeek) sim.rent += r.rentPerWeek * 52 * infl(i);
+        say(year, 'cost', `Renovate ${sim.name} (${r.items.join(', ').toLowerCase() || r.label}): about ${fmt(r.cost)} in today’s money, adding about ${fmt(r.uplift)} to its value${sim.invest && r.rentPerWeek ? ` and ${fmt(r.rentPerWeek)} a week in rent` : ''}.`);
+      }
+
       // Cash sits in an offset where there's debt, saving that interest
       const debtTotal = sims.reduce((t, s) => t + s.debt, 0);
       const avgRate = debtTotal ? sims.reduce((t, s) => t + s.debt * s.rate, 0) / debtTotal : 0;
@@ -372,7 +388,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         say(year, 'sell', `Sell ${s.name} for about ${fmt(s.value / infl(i))} in today’s money${why}, freeing about ${fmt(proceeds / infl(i))} after the loan, selling costs and tax.`);
       };
 
-      const eventCost = p.goals.events.filter((ev) => ev.year === year).reduce((t, ev) => t + n(ev.amount), 0);
+      const eventCost = p.goals.events.filter((ev) => ev.year === year).reduce((t, ev) => t + n(ev.amount), 0) + renoCost;
       if (working) {
         cash += net + propNet + offsetSaving - living - debtRepay - eventCost; // planned one-off costs come before investing
         // Shares are bought only from savings above the emergency fund: you can't invest money you don't have
@@ -408,7 +424,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
           sup -= superDraw; superDrawn = superDraw;
           if (sup < 1000 && superDraw > 0 && !superGone) { superGone = true; sup = 0; say(year, 'super', 'Your super is fully drawn down by now. Rent, savings and shares take over.'); }
         }
-        cash += propNet + offsetSaving + superDraw - spendGoal - debtRepay;
+        cash += propNet + offsetSaving + superDraw - spendGoal - debtRepay - renoCost;
         const floor = buffer * infl(i);
         if (cash < floor - 1) sellShares(floor - cash);
         while (cash < floor - 1) {
@@ -482,7 +498,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       passiveIncome, passiveIncomeReal: passiveIncome / infl(i), properties: sims.length,
       borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, false))) : 0,
       monthlySavings: monthlyNet, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
-      spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, superDrawn, paidOff: paidOff.length ? paidOff : undefined,
+      spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, rentIncome: sims.filter((x) => x.invest).reduce((t, x) => t + x.rent, 0), superDrawn, paidOff: paidOff.length ? paidOff : undefined,
     });
   }
   if (runsOutAge == null) say(y0 + (endAge - startAge), 'goal', `Your money lasts to ${endAge}, with about ${fmt((points[points.length - 1].netWorth) / infl(endAge - startAge))} in today’s money left over.`);

@@ -87,6 +87,7 @@ export interface Property {
   bedrooms: number | null;
   yearBuilt: number | null;
   planIo5?: boolean; // plan: interest-only for the next 5 years
+  renoAdds?: { id: string; amount: number; date: string }[]; // value added by finished renovations (see propertyValuation)
   geo?: { lat: number; lon: number; street?: boolean } | null; // looked up from the address for the aerial photo; null = not found
   planPayOff?: boolean; // plan: paid off by retirement (otherwise an investment is sold at retirement, a home loan is cleared from super)
 }
@@ -160,6 +161,7 @@ export interface Profile {
   firstLookSeen?: boolean;
   documents?: DocRecord[];
   eofy?: { fy: string; done: string[] }; // end-of-financial-year update checklist
+  renovations?: Renovation[];
   cryptoGrowth?: number | null; // the user's own guess, only used on the Crypto page
 
   updatedAt: string;
@@ -177,4 +179,11 @@ export interface PlannedPurchase {
   ioFirst5?: boolean; // interest-only for the first 5 years, then principal and interest
   payOff?: boolean; // paid off by retirement; otherwise sold at retirement
   depositPct?: number; costsPct?: number; holdingPct?: number; mgmtPct?: number;
+}
+
+/** A renovation saved from the Renovator. Planned ones are modelled in the projection in their year; done ones live in the property's valuations. */
+export interface Renovation {
+  id: string; propertyId: string; year: number; label: string; items: string[];
+  cost: number; uplift: number; rentPerWeek: number; // today's money
+  done?: boolean;
 }
