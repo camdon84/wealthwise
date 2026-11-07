@@ -45,7 +45,7 @@ function Shell() {
     <nav aria-label="Main" className="space-y-1">
       {NAV.map((n) => (
         <button key={n.id} onClick={() => { go(n.id); setMenu(false); }} aria-current={current === n.id ? 'page' : undefined}
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${current === n.id ? 'bg-raised text-ink ring-1 ring-line' : 'text-muted hover:text-ink hover:bg-raised/60'}`}>
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${current === n.id ? 'bg-raised text-ink ring-1 ring-line' : 'text-muted hover:text-ink hover:bg-raised/60'}`}>
           <Icon name={n.icon} className="h-[18px] w-[18px]" />{n.label}
           {n.id === 'documents' && due > 0 && <span className="ml-auto rounded-full bg-brass px-1.5 text-[11px] font-semibold text-ground" aria-label={`${due} end of year updates due`}>{due}</span>}
         </button>

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useApp } from '../lib/store';
 import { money, pct } from '../lib/format';
 import { uid } from '../lib/defaults';
+import { longDate } from '../lib/rates';
 import type { DocKind, Holding, Profile, Property } from '../lib/types';
 import { Field, Icon, MoneyInput, NumInput, Select } from '../components/ui';
 
@@ -16,6 +17,7 @@ export const DOC_KINDS: { value: DocKind; label: string }[] = [
   { value: 'trades', label: 'Share trades or holdings' },
   { value: 'other', label: 'Something else' },
 ];
+const nice = (d?: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? longDate(d) : d || '');
 const SAMPLES = [
   { file: 'valuation-sample.pdf', kind: 'valuation' as DocKind, label: 'a valuation' },
   { file: 'super-sample.pdf', kind: 'super' as DocKind, label: 'a super statement' },
@@ -75,7 +77,7 @@ function proposeChanges(p: Profile, r: Reading, pick: { property?: string; perso
     const pr = prop(r.valuation.address);
     if (!pr) return { changes: [], needs: 'property' };
     const v = r.valuation;
-    out.push({ id: 'val', label: `Add a valuation of ${money(v.value)} to ${pr.address}`, detail: `${v.valuer ? `By ${v.valuer}, ` : ''}dated ${v.date || 'today'}. It becomes one of the sources behind the property’s estimated value.`,
+    out.push({ id: 'val', label: `Add a valuation of ${money(v.value)} to ${pr.address}`, detail: `${v.valuer ? `By ${v.valuer}, ` : ''}dated ${nice(v.date) || 'today'}. It becomes one of the sources behind the property’s estimated value.`,
       apply: (d) => d.properties.find((x) => x.id === pr.id)!.valuations.push({ id: uid(), source: 'Bank valuation', value: v.value, date: v.date || new Date().toISOString().slice(0, 10) }) });
     if (v.weeklyRent && pr.use === 'investment' && v.weeklyRent !== pr.weeklyRent) out.push({ id: 'rent', label: `Update rent on ${pr.address} to ${money(v.weeklyRent)} a week`, detail: `Currently ${money(pr.weeklyRent)} a week. The valuer’s rent estimate. Only update if that’s what you now charge.`, apply: (d) => { d.properties.find((x) => x.id === pr.id)!.weeklyRent = v.weeklyRent; } });
   }
@@ -84,7 +86,7 @@ function proposeChanges(p: Profile, r: Reading, pick: { property?: string; perso
     if (!who) return { changes: [], needs: 'person' };
     const person = p.household[who];
     const s = r.super;
-    out.push({ id: 'super', label: `Update ${person.name || (who === 'you' ? 'your' : 'your partner’s')} super to ${money(s.closingBalance)}`, detail: `${s.fund ? `${s.fund}, ` : ''}balance at ${s.periodEnd || 'the statement date'}. Was ${money(person.superBalance)}.${s.returnPercent != null ? ` The fund returned ${pct(s.returnPercent)} for the year.` : ''}`,
+    out.push({ id: 'super', label: `Update ${person.name ? `${person.name}’s` : who === 'you' ? 'your' : 'your partner’s'} super to ${money(s.closingBalance)}`, detail: `${s.fund ? `${s.fund}, ` : ''}balance at ${nice(s.periodEnd) || 'the statement date'}. Was ${money(person.superBalance)}.${s.returnPercent != null ? ` The fund returned ${pct(s.returnPercent)} for the year.` : ''}`,
       apply: (d) => { d.household[who].superBalance = s.closingBalance; if (s.returnPercent != null) d.household[who].superReturn = s.returnPercent; }, eofy: `super-${who}` });
   }
   if (t === 'loan' && r.loan?.balance) {
@@ -93,7 +95,7 @@ function proposeChanges(p: Profile, r: Reading, pick: { property?: string; perso
     const l = r.loan;
     const loan = pr.loans.find((x) => l.lender && x.lender && l.lender.toLowerCase().includes(x.lender.toLowerCase())) ?? pr.loans[0];
     if (loan) {
-      out.push({ id: 'bal', label: `Update the loan on ${pr.address} to ${money(l.balance)}`, detail: `Was ${money(loan.balance)}${l.date ? `. Balance as at ${l.date}` : ''}.`, apply: (d) => { d.properties.find((x) => x.id === pr.id)!.loans.find((x) => x.id === loan.id)!.balance = l.balance; }, eofy: 'loans' });
+      out.push({ id: 'bal', label: `Update the loan on ${pr.address} to ${money(l.balance)}`, detail: `Was ${money(loan.balance)}${l.date ? `. Balance as at ${nice(l.date)}` : ''}.`, apply: (d) => { d.properties.find((x) => x.id === pr.id)!.loans.find((x) => x.id === loan.id)!.balance = l.balance; }, eofy: 'loans' });
       if (l.ratePercent && l.ratePercent !== loan.rate) out.push({ id: 'rate', label: `Update the interest rate to ${l.ratePercent.toFixed(2)}%${l.rateType && l.rateType !== 'null' ? ` ${l.rateType}` : ''}`, detail: `Was ${(loan.rate ?? 0).toFixed(2)}%.`, apply: (d) => { const x = d.properties.find((q) => q.id === pr.id)!.loans.find((q) => q.id === loan.id)!; x.rate = l.ratePercent; if (l.rateType === 'fixed' || l.rateType === 'variable') x.rateType = l.rateType; } });
       if (l.offsetBalance != null && l.offsetBalance !== loan.offset) out.push({ id: 'offset', label: `Update the offset balance to ${money(l.offsetBalance)}`, detail: `Was ${money(loan.offset)}.`, apply: (d) => { d.properties.find((q) => q.id === pr.id)!.loans.find((q) => q.id === loan.id)!.offset = l.offsetBalance; } });
     }
@@ -106,7 +108,7 @@ function proposeChanges(p: Profile, r: Reading, pick: { property?: string; perso
   if (t === 'payslip' && r.payslip?.annualSalary) {
     const who = pick.person ?? matchPerson(p, r.payslip.name);
     if (!who) return { changes: [], needs: 'person' };
-    out.push({ id: 'salary', label: `Update ${p.household[who].name || 'salary'} to ${money(r.payslip.annualSalary)} a year`, detail: `Was ${money(p.household[who].salary)}.`, apply: (d) => { d.household[who].salary = r.payslip.annualSalary; }, eofy: 'income' });
+    out.push({ id: 'salary', label: `Update ${p.household[who].name ? `${p.household[who].name}’s` : 'the'} salary to ${money(r.payslip.annualSalary)} a year`, detail: `Was ${money(p.household[who].salary)}.`, apply: (d) => { d.household[who].salary = r.payslip.annualSalary; }, eofy: 'income' });
   }
   if (t === 'trades' && Array.isArray(r.trades) && r.trades.length) {
     const buys = r.trades.filter((x: any) => x.code && x.units > 0 && x.price > 0);
