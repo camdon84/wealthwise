@@ -106,6 +106,7 @@ export interface Goals {
   retirementAge: number;
   lifeExpectancy?: number; // age the plan runs to
   sharesTarget?: number | null; // share portfolio wanted at retirement, today's money
+  shareMonthly?: number | null; // planned monthly share investment; null = whatever reaches the target
   passiveIncome: number; // today's dollars p.a.
   targetProperties: number;
   risk: number; // 1-5

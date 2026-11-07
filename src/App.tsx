@@ -17,12 +17,13 @@ import { Icon, Logo } from './components/ui';
 const NAV = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
   { id: 'properties', label: 'Properties', icon: 'property' },
-  { id: 'investments', label: 'Shares and crypto', icon: 'shares' },
+  { id: 'investments', label: 'Shares', icon: 'shares' },
+  { id: 'crypto', label: 'Crypto', icon: 'coin' },
   { id: 'plan', label: 'Plan', icon: 'plan' },
-  { id: 'documents', label: 'Upload your documents', icon: 'upload' },
   { id: 'renovate', label: 'Renovator', icon: 'renovate' },
   { id: 'details', label: 'My details', icon: 'details' },
   { id: 'dependants', label: 'Dependants', icon: 'family' },
+  { id: 'documents', label: 'Upload your documents', icon: 'upload' },
   { id: 'account', label: 'Account', icon: 'profile' },
 ];
 
@@ -79,6 +80,7 @@ function Shell() {
           {current === 'overview' && <Overview quotes={quotes} go={go} />}
           {current === 'properties' && <Properties />}
           {current === 'investments' && <Investments quotes={quotes} asOf={asOf} />}
+          {current === 'crypto' && <Investments key="crypto" quotes={quotes} asOf={asOf} mode="crypto" />}
           {current === 'plan' && <Plan quotes={quotes} />}
           {current === 'documents' && <Documents />}
           {current === 'renovate' && <Renovate />}

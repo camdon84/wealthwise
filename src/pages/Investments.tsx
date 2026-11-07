@@ -13,12 +13,16 @@ import { HoldingChart, MarketStrip } from '../components/PriceCharts';
 const KIND_COLOR: Record<Holding['kind'], string> = { etf: 'rgb(var(--sky))', share: 'rgb(var(--gum))', crypto: 'rgb(var(--brass))', fund: 'rgb(var(--sage))' };
 const KIND_LABEL: Record<Holding['kind'], string> = { etf: 'ETFs', share: 'Shares', crypto: 'Crypto', fund: 'Funds' };
 
-export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | null }) {
+export const isCrypto = (h: Holding) => h.kind === 'crypto' || h.exchange === 'CRYPTO';
+
+export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes; asOf: Date | null; mode?: 'shares' | 'crypto' }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const [sheet, setSheet] = useState<'import' | 'trade' | null>(null);
   const [open, setOpen] = useState<string | null>(null);
-  const st = holdingsStats(p.holdings, quotes);
+  const crypto = mode === 'crypto';
+  const mine = p.holdings.filter((h) => isCrypto(h) === crypto);
+  const st = holdingsStats(mine, quotes);
   const byKind = Object.entries(st.rows.reduce<Record<string, number>>((a, r) => { a[r.h.kind] = (a[r.h.kind] ?? 0) + r.value; return a; }, {})).sort((a, b) => b[1] - a[1]);
 
   const merge = (list: Holding[]) => update((d) => {
@@ -33,16 +37,21 @@ export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | nul
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-semibold sm:text-4xl">Shares and crypto</h1>
+          <h1 className="font-display text-3xl font-semibold sm:text-4xl">{crypto ? 'Crypto' : 'Shares'}</h1>
           <p className="text-muted">{priceMode === 'demo' ? 'Demo prices' : 'Prices delayed 15–20 minutes'} · select a holding to see its chart{asOf ? ` · updated ${asOf.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}` : ''}</p>
         </div>
         <div className="flex gap-2">
-          <button className="btn-quiet" onClick={() => setSheet('import')}><Icon name="upload" className="h-4 w-4" />Import a file</button>
+          {!crypto && <button className="btn-quiet" onClick={() => setSheet('import')}><Icon name="upload" className="h-4 w-4" />Import a file</button>}
           <button className="btn-primary" onClick={() => setSheet('trade')}><Icon name="plus" className="h-4 w-4" />Log a trade</button>
         </div>
       </div>
 
-      <MarketStrip />
+      {crypto ? (
+        <div className="flex gap-3 rounded-xl border border-brass/40 bg-brass/10 p-4 text-sm">
+          <Icon name="coin" className="mt-0.5 h-5 w-5 shrink-0 text-brass" />
+          <p>As cryptocurrency is a volatile asset, we cannot measure its future performance. Your crypto counts towards your net worth today, but it’s left out of your plan, projections and Your Wise Future.</p>
+        </div>
+      ) : <MarketStrip />}
 
       <section className="panel p-5 sm:p-6">
         <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
@@ -59,8 +68,8 @@ export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | nul
         )}
       </section>
 
-      {p.holdings.length === 0 ? (
-        <div className="panel p-10 text-center"><p className="font-medium">No holdings yet</p><p className="mt-1 text-sm text-muted">Import your broker’s trade history or log a trade to start tracking.</p></div>
+      {mine.length === 0 ? (
+        <div className="panel p-10 text-center"><p className="font-medium">{crypto ? 'No crypto yet' : 'No shares yet'}</p><p className="mt-1 text-sm text-muted">{crypto ? 'Log a trade to track a coin at live prices.' : 'Import your broker’s trade history or log a trade to start tracking.'}</p></div>
       ) : (
         <div className="panel overflow-x-auto">
           <table className="w-full text-sm">
@@ -89,20 +98,20 @@ export function Investments({ quotes, asOf }: { quotes: Quotes; asOf: Date | nul
           <div className="panel p-5"><HoldingChart h={r.h} currentPrice={r.price} /></div>
         </Sheet>) : null; })()}
       {sheet === 'import' && <Sheet title="Import trades" onClose={() => setSheet(null)}><CsvImport onImport={(h) => { merge(h); setSheet(null); }} /></Sheet>}
-      {sheet === 'trade' && <Sheet title="Log a trade" onClose={() => setSheet(null)}><TradeForm onDone={() => setSheet(null)} /></Sheet>}
+      {sheet === 'trade' && <Sheet title="Log a trade" onClose={() => setSheet(null)}><TradeForm onDone={() => setSheet(null)} crypto={crypto} /></Sheet>}
     </div>
   );
 }
 
-function TradeForm({ onDone }: { onDone: () => void }) {
+function TradeForm({ onDone, crypto }: { onDone: () => void; crypto?: boolean }) {
   const update = useApp((s) => s.update);
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [code, setCode] = useState('');
-  const [exchange, setExchange] = useState<Holding['exchange']>('ASX');
+  const [exchange, setExchange] = useState<Holding['exchange']>(crypto ? 'CRYPTO' : 'ASX');
   const [units, setUnits] = useState<number | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [fees, setFees] = useState<number | null>(9.5);
-  const [currency, setCurrency] = useState('AUD');
+  const [currency, setCurrency] = useState(crypto ? defaultCurrency('CRYPTO') : 'AUD');
   const [error, setError] = useState('');
   const save = () => {
     if (!code || !units || !price) return setError('Enter a code, units and price.');
@@ -124,8 +133,8 @@ function TradeForm({ onDone }: { onDone: () => void }) {
     <div className="space-y-5">
       <Segmented value={side} onChange={setSide} options={[{ value: 'buy', label: 'Bought' }, { value: 'sell', label: 'Sold' }]} />
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Code">{(id) => <TextInput id={id} value={code} onChange={(v) => setCode(v.toUpperCase().trim())} placeholder="VAS" />}</Field>
-        <Field label="Market">{(id) => <Select id={id} value={exchange} onChange={(v) => { setExchange(v); setCurrency(defaultCurrency(v)); }} options={[{ value: 'ASX', label: 'ASX' }, { value: 'NASDAQ', label: 'NASDAQ' }, { value: 'NYSE', label: 'NYSE' }, { value: 'CRYPTO', label: 'Crypto' }]} />}</Field>
+        <Field label="Code">{(id) => <TextInput id={id} value={code} onChange={(v) => setCode(v.toUpperCase().trim())} placeholder={crypto ? 'BTC' : 'VAS'} />}</Field>
+        <Field label="Market">{(id) => <Select id={id} value={exchange} onChange={(v) => { setExchange(v); setCurrency(defaultCurrency(v)); }} options={crypto ? [{ value: 'CRYPTO', label: 'Crypto' }] : [{ value: 'ASX', label: 'ASX' }, { value: 'NASDAQ', label: 'NASDAQ' }, { value: 'NYSE', label: 'NYSE' }]} />}</Field>
         <Field label="Units">{(id) => <NumInput id={id} value={units} onChange={setUnits} step={0.0001} />}</Field>
         <Field label="Price per unit" className="sm:col-span-2">{(id) => <PriceInput id={id} value={price} onChange={setPrice} currency={currency} onCurrency={setCurrency} />}</Field>
         <Field label="Brokerage">{(id) => <MoneyInput id={id} value={fees} onChange={setFees} />}</Field>

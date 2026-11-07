@@ -95,6 +95,7 @@ export function Icon({ name, className = 'h-5 w-5' }: { name: string; className?
   const paths: Record<string, ReactNode> = {
     overview: <path d="M3 13h4v8H3zM10 8h4v13h-4zM17 3h4v18h-4z" />,
     property: <path d="M3 11l9-7 9 7v10H3zM9 21v-6h6v6" />,
+    coin: <><circle cx="12" cy="12" r="8.5" /><path d="M10 8h3.2a2 2 0 0 1 0 4H10m0 0h3.6a2 2 0 0 1 0 4H10V8m1.5-2v2m0 8v2" /></>,
     shares: <path d="M3 17l6-6 4 4 8-8M15 7h6v6" />,
     plan: <path d="M4 20V4M4 20h16M8 16c3-1 4-6 7-7s4-3 5-5" />,
     renovate: <path d="M14 4l6 6-9 9H5v-6zM12 6l6 6" />,

@@ -12,8 +12,9 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
   const p = useApp((s) => s.profile)!;
   const pos = useMemo(() => position(p, quotes), [p, quotes]);
   const proj = useMemo(() => project(p, quotes), [p, quotes]);
-  const retire = proj.points.find((x) => x.year === proj.retireYear) ?? proj.points[proj.points.length - 1];
-  const progress = Math.min(1, (retire?.passiveIncomeReal ?? 0) / Math.max(1, p.goals.passiveIncome));
+  const life = p.goals.lifeExpectancy ?? 90;
+  const span = Math.max(1, life - p.goals.retirementAge);
+  const progress = proj.runsOutAge == null ? 1 : Math.max(0, Math.min(1, (proj.runsOutAge - p.goals.retirementAge) / span));
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
   const [hidden, setHidden] = useState<string[]>([]);
   const hour = new Date().getHours();
@@ -50,9 +51,9 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
             <Kpi label="Borrowing capacity" value={money(pos.bc.capacity, { compact: true })} sub="estimate, before a lender checks" />
             <Kpi label="Left over each month" value={money(pos.monthlySurplus)} sub="after living costs and all repayments" />
             <div className="bg-surface p-5">
-              <p className="text-xs text-muted">Income at {p.goals.retirementAge}, today’s dollars</p>
-              <p className="font-display text-2xl font-semibold mt-0.5">{money(retire?.passiveIncomeReal ?? 0, { compact: true })}<span className="text-sm font-normal text-muted"> / {money(p.goals.passiveIncome, { compact: true })} goal</span></p>
-              <div className="mt-2 h-1.5 rounded-full bg-line"><div className="h-1.5 rounded-full bg-brass" style={{ width: `${progress * 100}%` }} /></div>
+              <p className="text-xs text-muted">Living on {money(p.goals.passiveIncome, { compact: true })} a year from {p.goals.retirementAge}</p>
+              <p className={`font-display text-2xl font-semibold mt-0.5 ${proj.runsOutAge == null ? '' : 'text-clay'}`}>{proj.runsOutAge == null ? `Lasts past ${life}` : `Runs out at ${proj.runsOutAge}`}</p>
+              <div className="mt-2 h-1.5 rounded-full bg-line"><div className={`h-1.5 rounded-full ${proj.runsOutAge == null ? 'bg-gum' : 'bg-clay'}`} style={{ width: `${progress * 100}%` }} /></div>
             </div>
           </div>
         </div>

@@ -42,7 +42,7 @@ export function WisePanel({ profile, quotes, go }: { profile: Profile; quotes: Q
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brass text-ground"><Icon name="spark" /></span>
         <div>
-          <h2 id="wise-h" className="font-display text-xl font-semibold">Wise</h2>
+          <h2 id="wise-h" className="font-display text-xl font-semibold">Wise Insights</h2>
           <p className="text-sm text-muted">{insights.length} ideas from your numbers, refreshed whenever they change</p>
         </div>
       </div>
@@ -111,7 +111,7 @@ export function NewsPanel({ profile }: { profile: Profile }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-raised ring-1 ring-line text-ink"><Icon name="news" /></span>
-          <div><h2 className="font-display text-xl font-semibold">{tab === 'property' ? 'Property Pulse' : 'Equity Spot'}</h2><p className="text-sm text-muted">{tab === 'property' ? 'Your suburbs and the national market' : 'What the share market did this week'}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wider text-brass">News and updates</p><h2 className="font-display text-xl font-semibold">{tab === 'property' ? 'Property Pulse' : 'Equity Spot'}</h2><p className="text-sm text-muted">{tab === 'property' ? 'Your suburbs and the national market' : 'What the share market did this week'}</p></div>
         </div>
         <Segmented size="sm" label="Briefing" value={tab} onChange={setTab} options={[{ value: 'property', label: 'Property' }, { value: 'equity', label: 'Shares' }]} />
       </div>

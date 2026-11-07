@@ -62,8 +62,9 @@ export function SeriesToggles({ hidden, onChange }: { hidden: string[]; onChange
   );
 }
 
-export function WealthChart({ points, retireYear, height = 320, real, hidden = [] }: { points: YearPoint[]; retireYear: number; height?: number; real?: boolean; hidden?: string[] }) {
+export function WealthChart({ points, retireYear, height = 320, real, hidden = [], runsOutYear }: { points: YearPoint[]; retireYear: number; height?: number; real?: boolean; hidden?: string[]; runsOutYear?: number | null }) {
   const shown = wealthSeries.filter((s) => !hidden.includes(s.key));
+  points = points.map((p) => ({ ...p, cash: Math.max(0, p.cash), netWorth: p.netWorth - Math.min(0, p.cash) })); // a shortfall shows as the money running out, not negative cash
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={points} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
@@ -76,6 +77,7 @@ export function WealthChart({ points, retireYear, height = 320, real, hidden = [
         <Tooltip content={<Tip rows={shown} real={real} />} cursor={{ stroke: C.muted, strokeDasharray: '3 3' }} />
         {shown.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} strokeWidth={1.5} fill={`url(#g-${s.key})`} isAnimationActive={false} />)}
         <ReferenceLine x={retireYear} stroke={C.brass} strokeDasharray="4 4" label={{ value: 'Stop work', position: 'insideTopRight', fill: C.brass, fontSize: 11 }} />
+        {runsOutYear != null && <ReferenceLine x={runsOutYear} stroke={C.clay} strokeWidth={1.5} label={{ value: 'Money runs out', position: 'insideTopLeft', fill: C.clay, fontSize: 11 }} />}
         {points.filter((p) => p.bought).map((p) => (
           <ReferenceDot key={p.year} x={p.year} y={shown.reduce((t, s) => t + (p[s.key] as number), 0)} r={5} fill="rgb(var(--surface))" stroke={C.brass} strokeWidth={2}
             label={{ value: `Buy #${p.properties}`, position: 'top', fill: C.muted, fontSize: 10 }} />
