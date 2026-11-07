@@ -3,7 +3,7 @@ import { useApp } from '../lib/store';
 import { project, position } from '../lib/calc';
 import { money } from '../lib/format';
 import type { Quotes } from '../lib/calc';
-import { SeriesToggles, WealthChart, toReal } from '../components/Charts';
+import { MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
 import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { NewsPanel, WisePanel } from '../components/Assistants';
 import { RateWatch } from '../components/RateWatch';
@@ -43,7 +43,8 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
                 <SeriesToggles hidden={hidden} onChange={setHidden} />
               </div>
             </div>
-            <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} hidden={hidden} /></div>
+            <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} hidden={hidden} runsOutYear={proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null} /></div>
+            <MarkerKey points={proj.points} />
             <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} /> Projected from your current position to age {p.goals.lifeExpectancy ?? 90}, using the assumptions in your plan. Markers show when your equity could fund each new purchase.</p>
           </div>
           <div className="grid grid-cols-2 gap-px border-t border-line bg-line lg:grid-cols-1 lg:border-l lg:border-t-0">

@@ -192,15 +192,16 @@ export interface YearPoint {
   year: number; age: number; propertyValue: number; propertyDebt: number; propertyEquity: number; shares: number; super: number; cash: number;
   netWorth: number; passiveIncome: number; passiveIncomeReal: number; properties: number; borrowing: number; monthlySavings: number;
   repayUp2: number; repayBase: number; repayDown2: number; bought?: number;
-  spendGoalReal: number; spendFundedReal: number; shareContribution: number;
+  spendGoalReal: number; spendFundedReal: number; shareContribution: number; superDrawn: number; paidOff?: string[];
 }
 export interface PurchaseBlock { year: number; reason: 'deposit' | 'servicing' | 'date'; price: number; deposit: number; available: number; monthlyShort: number }
 export interface PlanEvent { year: number; age: number; kind: 'buy' | 'sell' | 'debt' | 'kids' | 'retire' | 'super' | 'shares' | 'runout' | 'cost' | 'goal'; text: string }
 export interface Projection {
-  points: YearPoint[]; purchases: { year: number; price: number; id?: string }[]; shortfallYear: number | null; sharesAtRetire: number; retireYear: number; block: PurchaseBlock | null;
+  points: YearPoint[]; purchases: { year: number; price: number; id?: string }[]; shortfallYear: number | null; sharesAtRetire: number; buffer: number; retireYear: number; block: PurchaseBlock | null;
   events: PlanEvent[]; runsOutAge: number | null; shareMonthly: number; requiredShareMonthly: number; cryptoExcluded: number;
 }
 
+const FALLBACK_DEBT_RATE: Record<string, number> = { car: 9.5, personal: 12.5, 'credit-card': 20.99, other: 10 };
 const SG_RATE = 0.12; // superannuation guarantee
 const CC_CAP = 32500; // concessional contributions cap, 2026-27
 const PRESERVATION_AGE = 60;
@@ -255,21 +256,28 @@ export function project(p: Profile, quotes: Quotes): Projection {
   const shareMonthly = p.goals.shareMonthly == null ? reqMonthly : n(p.goals.shareMonthly);
   let sup = pos.superBal;
   let cash = pos.cash;
-  let otherDebt = pos.otherDebt - hecsAnnual(p).balance;
   let youSal = n(p.household.you.salary);
   let partSal = p.household.hasPartner ? n(p.household.partner.salary) : 0;
   const baseLiving = Math.max(livingCosts(p), livingFloor(p) - dependantsMonthly(p)) + housingMonthly(p);
   let living = (baseLiving + dependantsMonthly(p)) * 12;
   let hecsBal = hecsAnnual(p).balance;
   const buffer = n(p.finances.buffer) || living / 4;
-  const otherRepay = p.finances.debts.filter((d) => d.kind !== 'hecs').reduce((t, d) => t + n(d.monthlyRepayment), 0) * 12;
+  // Car loans, personal loans and cards, one by one. Loans run off on their repayments; cards are cleared as soon as savings above the emergency fund allow.
+  const DEBT_NAME: Record<string, string> = { car: 'car loan', personal: 'personal loan', 'credit-card': 'credit card', other: 'loan' };
+  const debtSims = p.finances.debts.filter((d) => d.kind !== 'hecs' && n(d.balance) > 0).map((d) => {
+    const rate = n(d.rate ?? FALLBACK_DEBT_RATE[d.kind] ?? 10) / 100;
+    const monthly = n(d.monthlyRepayment) || pmt(rate * 100, 5, n(d.balance));
+    return { name: d.label?.trim() || DEBT_NAME[d.kind] || 'loan', card: d.kind === 'credit-card', bal: n(d.balance), rate, monthly };
+  });
+  let otherDebt = debtSims.reduce((t, d) => t + d.bal, 0);
+  const otherRepay = () => debtSims.filter((d) => d.bal > 0).reduce((t, d) => t + d.monthly, 0) * 12;
   const cardLoad = p.finances.debts.filter((d) => d.kind === 'credit-card').reduce((t, d) => t + n(d.limit), 0) * 0.038 * 12;
   /** Monthly surplus as a lender would assess it. Car loans and cards only count against the first new purchase; after that they're assumed paid off. */
   const serviceSurplus = (list: Sim[], ys: number, ps: number, liv: number, countOtherDebts: boolean) => {
     const rent80 = list.reduce((t, s) => t + s.rent, 0) * 0.8;
     const net = afterTax(ys + n(p.household.otherIncome) * 0.8 + rent80) + (ps ? afterTax(ps) : 0) - (hecsBal > 0 ? hecsAnnual(p, ys, ps).compulsory : 0);
     const assessed = list.reduce((t, s) => t + pmt(s.rate + a.serviceBuffer, 30, s.debt) * 12, 0);
-    const others = countOtherDebts ? (otherDebt > 0 ? otherRepay : 0) + cardLoad : 0;
+    const others = countOtherDebts ? otherRepay() + cardLoad : 0;
     return (net - liv - assessed - others) / 12;
   };
 
@@ -282,7 +290,12 @@ export function project(p: Profile, quotes: Quotes): Projection {
   let sharesAtRetire = 0;
   let runsOutAge: number | null = null;
   const kidsEnd = new Set<string>();
-  let debtsCleared = otherDebt <= 0;
+  const paidAtStart: string[] = [];
+  for (const d of debtSims) if (d.card) {
+    const pay = Math.min(d.bal, Math.max(0, cash - buffer));
+    if (pay >= d.bal - 1) { cash -= d.bal; paidAtStart.push(d.name); say(y0, 'debt', `Pay off the ${d.name} now (${fmt(d.bal)}) from savings above your emergency fund. At ${Math.round(d.rate * 1000) / 10}% it’s the most expensive money you owe.`); d.bal = 0; }
+  }
+  otherDebt = debtSims.reduce((t, d) => t + d.bal, 0);
 
   if (shareMonthly > 0) say(y0, 'shares', `Invest about ${fmt(shareMonthly)} a month in shares${p.goals.sharesTarget ? ` to reach your ${fmt(n(p.goals.sharesTarget))} goal by ${retireAge}` : ''}, rising with inflation.`);
   if (cryptoExcluded > 0) say(y0, 'goal', `Your ${fmt(cryptoExcluded)} in crypto stays in today’s net worth but isn’t projected forward, because its future value can’t be reasonably estimated.`);
@@ -293,7 +306,8 @@ export function project(p: Profile, quotes: Quotes): Projection {
     const working = age < retireAge;
     let bought: number | undefined;
     let contribution = 0;
-    let spendGoal = 0, spendFunded = 0;
+    let spendGoal = 0, spendFunded = 0, superDrawn = 0;
+    const paidOff: string[] = i === 0 ? [...paidAtStart] : [];
 
     if (i > 0) {
       // Property: grow, collect rent, pay loans (interest-only while that lasts, then principal and interest)
@@ -330,11 +344,17 @@ export function project(p: Profile, quotes: Quotes): Projection {
       sup = sup * (1 + a.superReturn / 100) + (Math.min(youSal * SG_RATE, ccCap) + Math.min(partSal * SG_RATE, ccCap)) * 0.85;
       shares *= 1 + a.shareReturn / 100;
 
-      const debtRepay = otherDebt > 0 ? Math.min(otherDebt, otherRepay) : 0;
-      otherDebt -= debtRepay;
-      if (!debtsCleared && otherDebt <= 0) { debtsCleared = true; say(year, 'debt', 'Car loans and personal debts are paid off.'); }
+      let debtRepay = 0;
+      for (const d of debtSims) if (d.bal > 0) {
+        const interest = d.bal * d.rate;
+        let pay = Math.min(d.bal + interest, d.monthly * 12);
+        if (d.card) pay = Math.max(pay, Math.min(d.bal + interest, Math.max(0, cash - buffer * infl(i)))); // spare savings clear the card first
+        d.bal = Math.max(0, d.bal + interest - pay); debtRepay += pay;
+        if (d.bal <= 1) { d.bal = 0; paidOff.push(d.name); say(year, 'debt', `${d.name[0].toUpperCase()}${d.name.slice(1)} paid off${d.card ? ' from spare savings' : ' on its regular repayments'}.`); }
+      }
+      otherDebt = debtSims.reduce((t, d) => t + d.bal, 0);
       let hecsPaid = 0;
-      if (hecsBal > 0) { const h = hecsAnnual(p, youSal, partSal); hecsPaid = Math.min(hecsBal, h.compulsory + h.voluntary); hecsBal -= hecsPaid; if (hecsBal <= 0) say(year, 'debt', 'HECS is paid off.'); }
+      if (hecsBal > 0) { const h = hecsAnnual(p, youSal, partSal); hecsPaid = Math.min(hecsBal, h.compulsory + h.voluntary); hecsBal -= hecsPaid; if (hecsBal <= 0) { paidOff.push('HECS'); say(year, 'debt', 'HECS is paid off.'); } }
       const net = afterTax(youSal + n(p.household.otherIncome)) + (partSal ? afterTax(partSal) : 0) - hecsPaid;
 
       const sellShares = (need: number) => {
@@ -381,7 +401,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         let superDraw = 0;
         if (age >= PRESERVATION_AGE && sup > 0) {
           superDraw = Math.min(sup, Math.max(sup * minDrawdown(age), spendGoal));
-          sup -= superDraw;
+          sup -= superDraw; superDrawn = superDraw;
           if (sup < 1000 && superDraw > 0 && !superGone) { superGone = true; sup = 0; say(year, 'super', 'Your super is fully drawn down by now. Rent, savings and shares take over.'); }
         }
         cash += propNet + offsetSaving + superDraw - spendGoal - debtRepay;
@@ -458,12 +478,12 @@ export function project(p: Profile, quotes: Quotes): Projection {
       passiveIncome, passiveIncomeReal: passiveIncome / infl(i), properties: sims.length,
       borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, false))) : 0,
       monthlySavings: monthlyNet, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
-      spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution,
+      spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, superDrawn, paidOff: paidOff.length ? paidOff : undefined,
     });
   }
   if (runsOutAge == null) say(y0 + (endAge - startAge), 'goal', `Your money lasts to ${endAge}, with about ${fmt((points[points.length - 1].netWorth) / infl(endAge - startAge))} in today’s money left over.`);
   events.sort((x, y) => x.year - y.year);
-  return { points, purchases, retireYear, block: purchases.length + p.properties.length >= p.goals.targetProperties ? null : block, events, runsOutAge, shortfallYear, sharesAtRetire, shareMonthly, requiredShareMonthly: reqMonthly, cryptoExcluded };
+  return { points, purchases, retireYear, block: purchases.length + p.properties.length >= p.goals.targetProperties ? null : block, events, runsOutAge, shortfallYear, sharesAtRetire, buffer, shareMonthly, requiredShareMonthly: reqMonthly, cryptoExcluded };
 }
 
 const fmt = (v: number) => {

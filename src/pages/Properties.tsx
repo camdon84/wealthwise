@@ -4,7 +4,7 @@ import { propertyStats } from '../lib/calc';
 import { money, monthYear, pct } from '../lib/format';
 import { emptyProperty, uid } from '../lib/defaults';
 import type { Property, ValuationEntry } from '../lib/types';
-import { LotPlan } from '../components/LotPlan';
+import { PropertyPhoto } from '../components/Aerial';
 import { PropertyEditor } from '../components/PropertyEditor';
 import { Icon, MoneyInput, Select, Segmented } from '../components/ui';
 
@@ -48,7 +48,7 @@ export function Properties() {
             const s = propertyStats(pr, lvr);
             return (
               <button key={pr.id} onClick={() => setSelected(pr.id)} className="panel overflow-hidden text-left transition-colors hover:border-brass/60">
-                <LotPlan property={pr} className="h-36 w-full" />
+                <PropertyPhoto property={pr} className="h-36 w-full" />
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div><p className="font-semibold">{pr.address}</p><p className="text-sm text-muted">{pr.suburb} {pr.state} {pr.postcode}</p></div>
@@ -90,7 +90,7 @@ export function Properties() {
           <PropertyEditor value={editing} onChange={setEditing} thorough />
           <div className="mt-6 flex justify-between">
             {p.properties.some((x) => x.id === editing.id) ? <button className="btn-ghost text-clay" onClick={() => { update((d) => { d.properties = d.properties.filter((x) => x.id !== editing.id); }); setEditing(null); }}>Remove property</button> : <span />}
-            <button className="btn-primary" disabled={!editing.address} onClick={() => { update((d) => { const i = d.properties.findIndex((x) => x.id === editing.id); if (i >= 0) d.properties[i] = editing; else d.properties.push(editing); }); setEditing(null); }}>Save property</button>
+            <button className="btn-primary" disabled={!editing.address} onClick={() => { update((d) => { const i = d.properties.findIndex((x) => x.id === editing.id); const prev = i >= 0 ? d.properties[i] : null; const next = { ...editing }; if (prev && (prev.address !== next.address || prev.suburb !== next.suburb || prev.postcode !== next.postcode)) delete next.geo; if (i >= 0) d.properties[i] = next; else d.properties.push(next); }); setEditing(null); }}>Save property</button>
           </div>
         </Sheet>
       )}
@@ -123,7 +123,7 @@ function PropertyDetail({ property: pr, onClose, onEdit }: { property: Property;
 
   return (
     <Sheet title={pr.address} onClose={onClose}>
-      <LotPlan property={pr} className="h-44 w-full rounded-xl border border-line" />
+      <PropertyPhoto property={pr} className="h-52 w-full rounded-xl border border-line" />
       <p className="mt-3 text-sm text-muted">{pr.suburb} {pr.state} {pr.postcode} · {pr.kind}{pr.bedrooms ? `, ${pr.bedrooms} bed` : ''}{pr.yearBuilt ? ` · built ${pr.yearBuilt}` : ''} · bought {monthYear(pr.purchaseDate)} for {money(pr.purchasePrice)}</p>
 
       <section className="mt-6 panel p-5">

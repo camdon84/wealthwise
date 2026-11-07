@@ -87,6 +87,7 @@ export interface Property {
   bedrooms: number | null;
   yearBuilt: number | null;
   planIo5?: boolean; // plan: interest-only for the next 5 years
+  geo?: { lat: number; lon: number; street?: boolean } | null; // looked up from the address for the aerial photo; null = not found
   planPayOff?: boolean; // plan: paid off by retirement (otherwise an investment is sold at retirement, a home loan is cleared from super)
 }
 

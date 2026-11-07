@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
 import { pmt, position, project, propertyStats, requiredShareMonthly, type Quotes } from '../lib/calc';
-import { planCheck } from '../lib/planCheck';
+import { maxShareMonthly, planCheck } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { wiseInsights } from '../lib/insights';
 import { money } from '../lib/format';
 import { plannedPurchase } from '../lib/defaults';
 import { useCashRate } from '../lib/rates';
 import type { Assumptions, PlannedPurchase, Property } from '../lib/types';
-import { MiniLine, SeriesToggles, chartColors as C, WealthChart, toReal } from '../components/Charts';
+import { MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
 import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { useWiseTake } from '../components/Assistants';
 import { Field, Icon, MoneyInput, NumInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
@@ -262,15 +262,17 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
   const update = useApp((s) => s.update);
   const proj = useMemo(() => project(p, quotes), [p, quotes]);
   const pos = useMemo(() => position(p, quotes), [p, quotes]);
+  const cap = useMemo(() => maxShareMonthly(p, quotes), [p, quotes]);
   const sharesNow = pos.shares.value - proj.cryptoExcluded;
   const required = requiredShareMonthly(p, sharesNow);
   const auto = p.goals.shareMonthly == null;
   const startAge = p.household.you.age ?? 35;
   const years = Math.max(1, p.goals.retirementAge - startAge);
   const realAtRetire = proj.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years);
-  const pts = proj.points.filter((x) => x.age <= p.goals.retirementAge).map((x, i) => ({ ...x, sharesReal: (x.age === p.goals.retirementAge ? proj.sharesAtRetire : x.shares) / Math.pow(1 + p.assumptions.inflation / 100, i) }));
+  const over = cap != null && proj.shareMonthly > cap.monthly + 1;
+  const useAmount = (v: number) => update((d) => { d.goals.shareMonthly = Math.round(v); });
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">Your share plan</h2>
         <p className="mt-1 text-sm text-muted">Shares only. Crypto is tracked in its own tab but left out of the plan.</p>
@@ -288,16 +290,75 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
           <Segmented value={auto ? 'auto' : 'custom'} onChange={(v) => update((d) => { d.goals.shareMonthly = v === 'auto' ? null : Math.round(required); })} options={[{ value: 'auto', label: 'What’s needed for my goal' }, { value: 'custom', label: 'My own amount' }]} />
           {!auto && <div className="mt-3 max-w-xs"><MoneyInput value={p.goals.shareMonthly ?? null} onChange={(v) => update((d) => { d.goals.shareMonthly = v ?? 0; })} suffix="/ month" /></div>}
         </div>
-        <p className={`mt-6 text-sm ${realAtRetire >= (p.goals.sharesTarget ?? 0) ? 'text-gum' : 'text-clay'}`}>
+        {over && cap && (
+          <div role="alert" className="mt-5 flex gap-3 rounded-xl border border-clay/50 bg-clay/10 p-4">
+            <Icon name="x" className="mt-0.5 h-5 w-5 shrink-0 text-clay" />
+            <div>
+              <p className="font-semibold">This share plan stops your property purchases</p>
+              <p className="mt-1 text-sm">Based on your property purchasing goals, the maximum you can invest in shares is <span className="font-semibold">{money(cap.monthly)} a month</span>. That grows to about {money(cap.sharesAtRetireReal, { compact: true })} by {p.goals.retirementAge} in today’s money.</p>
+              <button className="btn-quiet mt-3" onClick={() => useAmount(cap.monthly)}>Use {money(cap.monthly)} a month</button>
+            </div>
+          </div>
+        )}
+        {!over && cap && <p className="mt-5 text-sm text-gum">Your property plan still works. You could invest up to {money(cap.monthly)} a month before it starts delaying a purchase.</p>}
+        <p className={`mt-4 text-sm ${realAtRetire >= (p.goals.sharesTarget ?? 0) ? 'text-gum' : 'text-clay'}`}>
           At {money(proj.shareMonthly)} a month, your shares reach about {money(realAtRetire, { compact: true })} in today’s money by {p.goals.retirementAge}{p.goals.sharesTarget ? (realAtRetire >= p.goals.sharesTarget ? ', on target.' : `, short of your ${money(p.goals.sharesTarget, { compact: true })} goal.`) : '.'}
         </p>
-        <p className="mt-2 text-xs text-muted">This money comes out of your savings before anything is set aside for property deposits, so a bigger share plan can push purchases later. Check Your Wise Future to see the trade-off.</p>
       </section>
-      <section className="panel p-5 sm:p-6">
-        <h3 className="font-display text-lg font-semibold">Shares to retirement, in today’s money</h3>
-        <div className="mt-3 -ml-2"><MiniLine points={pts as any} retireYear={proj.retireYear} goal={p.goals.sharesTarget ?? undefined} series={[{ key: 'sharesReal' as any, label: 'Shares', color: C.shares }]} height={280} /></div>
-      </section>
+      <ShareTradeOff quotes={quotes} current={proj.shareMonthly} required={required} cap={cap?.monthly ?? null} onUse={useAmount} />
     </div>
+  );
+}
+
+/** Property-first view of the share plan: what each monthly amount does to the purchase years. */
+function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quotes; current: number; required: number; cap: number | null; onUse: (v: number) => void }) {
+  const p = useApp((s) => s.profile)!;
+  const owned = p.properties.length;
+  const planned = (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - owned));
+  const rows = useMemo(() => {
+    const top = Math.max(required, current, cap ?? 0, 1000);
+    const steps = [0, 500, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000].filter((v) => v <= top * 1.1);
+    const amounts = [...new Set([...steps, Math.round(current), Math.round(required), ...(cap != null ? [cap] : [])])].sort((x, y) => x - y).slice(0, 10);
+    const years = Math.max(1, p.goals.retirementAge - (p.household.you.age ?? 35));
+    return amounts.map((v) => {
+      const x: typeof p = JSON.parse(JSON.stringify(p)); x.goals.shareMonthly = v;
+      const r = project(x, quotes);
+      return { v, buys: planned.map((pp, k) => ({ year: r.purchases[k]?.year ?? null, late: !!pp.buyBy && (!r.purchases[k] || r.purchases[k].year >= pp.buyBy) })), shares: r.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years), lasts: r.runsOutAge };
+    });
+  }, [p, quotes, current, required, cap]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <section className="panel p-5 sm:p-6">
+      <h3 className="font-display text-lg font-semibold">What your share plan does to your properties</h3>
+      <p className="mt-1 text-sm text-muted">Every dollar into shares comes out of the savings that fund your deposits. Here’s when each property lands at different monthly amounts.</p>
+      {planned.length === 0 ? <p className="mt-6 text-sm text-muted">You haven’t planned any more properties. Raise “Properties owned by retirement” in Goals to see the trade-off.</p> : (
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted"><tr className="border-b border-line">
+              <th className="py-2 pr-3 text-left font-medium">Shares a month</th>
+              {planned.map((pp, k) => <th key={pp.id} className="px-2 py-2 text-right font-medium">{pp.label || `Property ${owned + k + 1}`}{pp.buyBy ? <span className="block font-normal">before {pp.buyBy}</span> : null}</th>)}
+              <th className="px-2 py-2 text-right font-medium">Shares at {p.goals.retirementAge}</th>
+              <th className="py-2 pl-2" />
+            </tr></thead>
+            <tbody>
+              {rows.map((row) => {
+                const isCurrent = Math.abs(row.v - current) < 1;
+                const broken = row.buys.some((b) => !b.year || b.late);
+                return (
+                  <tr key={row.v} className={`border-b border-line last:border-0 ${isCurrent ? 'bg-brass/10' : ''}`}>
+                    <td className="py-2.5 pr-3"><span className="font-semibold">{money(row.v)}</span>
+                      <span className="block text-[11px] text-muted">{[isCurrent && 'your plan', Math.abs(row.v - required) < 1 && 'reaches your share goal', cap != null && row.v === cap && 'most before properties slip'].filter(Boolean).join(' · ')}</span></td>
+                    {row.buys.map((b, k) => <td key={k} className={`px-2 py-2.5 text-right ${!b.year || b.late ? 'font-medium text-clay' : ''}`}>{b.year ?? 'Doesn’t fit'}</td>)}
+                    <td className="px-2 py-2.5 text-right">{money(row.shares, { compact: true })}</td>
+                    <td className="py-2.5 pl-2 text-right">{!isCurrent && <button className={`text-xs font-medium hover:underline ${broken ? 'text-muted' : 'text-brass'}`} onClick={() => onUse(row.v)}>Use</button>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="mt-3 text-[11px] text-muted">Shares at {p.goals.retirementAge} are in today’s money. Red means a property misses the year you set, or doesn’t fit before you stop work.</p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -314,6 +375,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
   const proj = check.proj;
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
   const [hidden, setHidden] = useState<string[]>([]);
+  const [detail, setDetail] = useState<'all' | 'key'>('all');
   const pts = proj.points;
   const runsOutYear = proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null;
   return (
@@ -329,6 +391,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
           <div className="mt-3 flex justify-end"><SeriesToggles hidden={hidden} onChange={setHidden} /></div>
           <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} />{proj.cryptoExcluded > 0 && ` Crypto (${money(proj.cryptoExcluded, { compact: true })} today) is left out because its future value can’t be estimated.`}</p>
           <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={320} real={dollars === 'real'} hidden={hidden} runsOutYear={runsOutYear} /></div>
+          <MarkerKey points={pts} />
         </div>
       </section>
 
@@ -337,14 +400,35 @@ function Projections({ quotes }: { quotes: Quotes }) {
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">What happens, year by year</h2>
         <p className="mt-1 text-sm text-muted">Worked out from your figures, goals and assumptions. Change any of them and this updates.</p>
-        <ol className="mt-5 space-y-3">
-          {proj.events.map((e, i) => {
-            const st = EVENT_STYLE[e.kind] ?? EVENT_STYLE.goal;
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-muted">Each year shows your cash at year end (including your {money(proj.buffer, { compact: true })} emergency fund) and what goes into shares, {dollars === 'real' ? 'in today’s money' : 'in the dollars of that year'}.</p>
+          <Segmented size="sm" label="Timeline detail" value={detail} onChange={setDetail} options={[{ value: 'all', label: 'Every year' }, { value: 'key', label: 'Key events' }]} />
+        </div>
+        <ol className="mt-4 divide-y divide-line">
+          {pts.map((pt, i) => {
+            const evs = proj.events.filter((e) => e.year === pt.year);
+            if (detail === 'key' && evs.length === 0) return null;
+            const d = dollars === 'real' ? Math.pow(1 + p.assumptions.inflation / 100, i) : 1;
+            const c = (v: number) => money(v / d, { compact: true });
+            const working = pt.age < p.goals.retirementAge;
+            const stats = working
+              ? [`Cash at year end ${c(Math.max(0, pt.cash))}`, pt.shareContribution > 0 ? `${c(pt.shareContribution)} into shares` : 'Nothing into shares', `Shares ${c(pt.shares)}`, `Super ${c(pt.super)}`]
+              : [pt.superDrawn > 0 ? `${c(pt.superDrawn)} paid from super` : pt.age < 60 ? 'Super not open until 60' : 'Super used up', `Cash at year end ${c(Math.max(0, pt.cash))}`, `Shares ${c(pt.shares)}`, `Super left ${c(pt.super)}`];
             return (
-              <li key={i} className="flex gap-4">
-                <div className="w-20 shrink-0 text-right"><p className="font-display font-semibold">{e.year}</p><p className="text-xs text-muted">age {e.age}</p></div>
-                <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${st.cls}`}><Icon name={st.icon} className="h-4 w-4" /></span>
-                <p className="pt-1 leading-relaxed">{e.text}</p>
+              <li key={pt.year} className={`flex gap-4 py-3 ${pt.age === p.goals.retirementAge ? 'bg-brass/5' : ''}`}>
+                <div className="w-16 shrink-0 text-right"><p className="font-display font-semibold">{pt.year}</p><p className="text-xs text-muted">age {pt.age}</p></div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  {evs.map((e, k) => {
+                    const st = EVENT_STYLE[e.kind] ?? EVENT_STYLE.goal;
+                    return (
+                      <div key={k} className="flex gap-3">
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${st.cls}`}><Icon name={st.icon} className="h-3.5 w-3.5" /></span>
+                        <p className="pt-0.5 leading-relaxed">{e.text}</p>
+                      </div>
+                    );
+                  })}
+                  <p className={`flex flex-wrap gap-x-4 gap-y-1 text-xs ${pt.cash < 0 ? 'text-clay' : 'text-muted'}`}>{stats.map((t) => <span key={t}>{t}</span>)}{pt.cash < 0 && <span className="font-medium">Short by {c(-pt.cash)}</span>}</p>
+                </div>
               </li>
             );
           })}

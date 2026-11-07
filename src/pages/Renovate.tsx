@@ -3,7 +3,7 @@ import { useApp } from '../lib/store';
 import { propertyStats } from '../lib/calc';
 import { money, pct } from '../lib/format';
 import { uid } from '../lib/defaults';
-import { LotPlan } from '../components/LotPlan';
+import { PropertyPhoto } from '../components/Aerial';
 import { Icon, MoneyInput, NumInput } from '../components/ui';
 
 /** Typical 2026 Australian costs (mid-range, metro) and a simple value-uplift rule of thumb for each item. */
@@ -86,7 +86,7 @@ export function Renovate() {
 
         <aside className="space-y-6">
           <section className="panel overflow-hidden">
-            <LotPlan property={pr} className="h-28 w-full" />
+            <PropertyPhoto property={pr} className="h-28 w-full" />
             <div className="p-5 sm:p-6">
               <p className="text-sm text-muted">{pr.address}{age ? ` · ${age} years old` : ''}</p>
               <div className="mt-4 grid grid-cols-2 gap-4">

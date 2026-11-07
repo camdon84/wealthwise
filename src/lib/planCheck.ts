@@ -27,6 +27,23 @@ function bisect(lo: number, hi: number, test: (v: number) => boolean, steps = 12
   return lo;
 }
 
+/**
+ * The most a person could put into shares each month (today's money) and still buy every planned property on time.
+ * null when the properties don't fit even with no share plan.
+ */
+export function maxShareMonthly(p: Profile, quotes: Quotes): { monthly: number; sharesAtRetireReal: number } | null {
+  if ((p.goals.targetProperties ?? 0) <= p.properties.length) return null;
+  const at = (v: number) => { const x = clone(p); x.goals.shareMonthly = v; return project(x, quotes); };
+  if (!propsOk(p, at(0))) return null;
+  const hi = Math.max(20000, (p.goals.shareMonthly ?? 0) * 2);
+  if (propsOk(p, at(hi))) return null; // shares don't compete with the property plan in any realistic range
+  const best = bisect(0, hi, (v) => propsOk(p, at(v)), 14) ?? 0;
+  const monthly = Math.floor(best / 50) * 50;
+  const r = at(monthly);
+  const years = Math.max(1, p.goals.retirementAge - (p.household.you.age ?? 35));
+  return { monthly, sharesAtRetireReal: r.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years) };
+}
+
 export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   const r = project(p, quotes);
   const g = p.goals;
@@ -60,7 +77,10 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
     const got = r.purchases[k];
     if (!got || got.year >= pp.buyBy) problems.push(`${pp.label || `Property ${owned + k + 1}`}: you want it before ${pp.buyBy}, but ${got ? `the earliest it fits is ${got.year}` : 'it doesn’t fit before you stop work'}.`);
   });
+  const cap = !propsOk(p, r) && r.shareMonthly > 0 ? maxShareMonthly(p, quotes) : null;
+  if (cap) problems.push(`Your share plan of ${m(r.shareMonthly)} a month uses savings your property plan needs. Based on your property purchasing goals, the most you can invest in shares is about ${money(cap.monthly)} a month, which grows to about ${m(cap.sharesAtRetireReal)} by ${retireAge}.`);
   if (!propsOk(p, r)) {
+    if (cap) fixes.push(`Invest ${money(cap.monthly)} a month in shares (choose “My own amount” in Shares), or lower your share goal to about ${m(round(cap.sharesAtRetireReal, 50000))}.`);
     // Cheaper properties
     const scale = bisect(0.3, 1, (f) => propsOk(p, run((x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= f; }); })));
     if (scale != null && scale < 0.97) {
@@ -68,7 +88,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
       fixes.push(`Choose cheaper properties: about ${prices.length === 1 ? `${prices[0]} each` : prices.join(', then ')} in today’s money would fit.`);
     }
     // Smaller share goal frees savings for deposits
-    if (r.shareMonthly > 0) {
+    if (r.shareMonthly > 0 && !cap) {
       const target = g.sharesTarget ?? 0;
       const ok0 = propsOk(p, run((x) => { x.goals.shareMonthly = 0; }));
       if (ok0) {

@@ -67,6 +67,24 @@ async function currentUser(req: Request, env: Env) {
     .bind(await sha256(token), Date.now()).first<{ id: string; email: string; name: string }>();
 }
 
+/* ---------- address lookup for aerial photos (OpenStreetMap Nominatim, cached so we stay well inside its 1 request/second policy) ---------- */
+async function geocode(req: Request, env: Env) {
+  const q = (new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 200);
+  if (q.length < 6) return fail('Enter an address.', 400);
+  const key = `geo:${q.toLowerCase()}`;
+  const hit = await env.DB.prepare('SELECT data FROM ai_cache WHERE key = ?').bind(key).first<{ data: string }>();
+  if (hit) return json(JSON.parse(hit.data));
+  const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=au&q=${encodeURIComponent(q)}`, {
+    headers: { 'User-Agent': 'WealthWise/1.0 (portfolio demo; https://wealthwise.cam-donley.workers.dev)', 'Accept-Language': 'en-AU' },
+  });
+  if (!r.ok) return fail('Map lookup is unavailable right now.', 503);
+  const list = (await r.json()) as { lat: string; lon: string; addresstype?: string; type?: string }[];
+  const first = list[0];
+  const out = first ? { lat: Number(first.lat), lon: Number(first.lon), street: first.addresstype === 'road' } : null;
+  await env.DB.prepare('INSERT OR REPLACE INTO ai_cache (key, data, created_at) VALUES (?, ?, ?)').bind(key, JSON.stringify(out), Date.now()).run();
+  return json(out, 200, { 'cache-control': 'public, max-age=86400' });
+}
+
 async function body<T>(req: Request): Promise<T | null> {
   try { return (await req.json()) as T; } catch { return null; }
 }
@@ -209,6 +227,7 @@ async function api(req: Request, env: Env, path: string) {
   if (path === '/api/briefing' && method === 'GET') return briefingRoute(req, env);
   if (path === '/api/wise' && method === 'POST') return wiseRoute(req, env);
   if (path === '/api/documents/read' && method === 'POST') return readDocument(req, env);
+  if (path === '/api/geocode' && method === 'GET') return geocode(req, env);
   if (path === '/api/cash-rate' && method === 'GET') {
     const data = await cashRate(env);
     return data ? json(data, 200, { 'cache-control': 'public, max-age=1800' }) : fail('Cash rate unavailable right now.', 503);
