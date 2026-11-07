@@ -16,7 +16,12 @@ export function Properties() {
   const update = useApp((s) => s.update);
   const [view, setView] = useState<'cards' | 'list'>('cards');
   const [selected, setSelected] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Property | null>(null);
+  const [editing, setEditing] = useState<Property | null>(() => {
+    const id = useNavIntent.getState().editProperty; if (!id) return null;
+    useNavIntent.getState().set({ editProperty: null });
+    const found = useApp.getState().profile?.properties.find((x) => x.id === id);
+    return found ? structuredClone(found) : null;
+  });
   const lvr = p.assumptions.lvr;
   const sel = p.properties.find((x) => x.id === selected);
 
@@ -98,11 +103,11 @@ export function Properties() {
   );
 }
 
-export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Sheet({ title, onClose, children, actions }: { title: string; onClose: () => void; children: React.ReactNode; actions?: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
       <div className="rise h-full w-full max-w-2xl overflow-y-auto bg-ground p-6 shadow-2xl sm:border-l sm:border-line" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-6 flex items-center justify-between gap-4"><h2 className="font-display text-2xl font-semibold">{title}</h2><button className="btn-ghost p-2" aria-label="Close" onClick={onClose}><Icon name="x" /></button></div>
+        <div className="mb-6 flex items-center justify-between gap-4"><h2 className="font-display text-2xl font-semibold">{title}</h2><div className="flex shrink-0 items-center gap-2">{actions}<button className="btn-ghost p-2" aria-label="Close" onClick={onClose}><Icon name="x" /></button></div></div>
         {children}
       </div>
     </div>
@@ -122,7 +127,7 @@ function PropertyDetail({ property: pr, onClose, onEdit }: { property: Property;
     : [['Loan repayments', -s.repayments], ['Rates, insurance, upkeep', -(pr.annualCosts ?? 0)]];
 
   return (
-    <Sheet title={pr.address} onClose={onClose}>
+    <Sheet title={pr.address} onClose={onClose} actions={<button className="btn-primary" onClick={onEdit}><Icon name="details" className="h-4 w-4" />Edit property details</button>}>
       <PropertyPhoto property={pr} className="h-52 w-full rounded-xl border border-line" />
       <p className="mt-3 text-sm text-muted">{pr.suburb} {pr.state} {pr.postcode} · {pr.kind}{pr.bedrooms ? `, ${pr.bedrooms} bed` : ''}{pr.yearBuilt ? ` · built ${pr.yearBuilt}` : ''} · bought {monthYear(pr.purchaseDate)} for {money(pr.purchasePrice)}</p>
 
@@ -175,7 +180,6 @@ function PropertyDetail({ property: pr, onClose, onEdit }: { property: Property;
           {pr.loans.map((l) => <li key={l.id} className="flex justify-between py-2"><span>{l.lender || 'Loan'} · {l.type === 'io' ? 'interest only' : 'P&I'} · {l.rate?.toFixed(2)}%</span><span>{money(l.balance)}</span></li>)}
         </ul>
       </section>
-      <div className="mt-6 flex justify-end"><button className="btn-quiet" onClick={onEdit}>Edit property details</button></div>
     </Sheet>
   );
 }

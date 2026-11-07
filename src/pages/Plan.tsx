@@ -192,6 +192,10 @@ function OwnedRow({ pr, n, open, onToggle, retireAge, startAge }: { pr: Property
   const chips = [home ? 'Home' : 'Investment', s.debt > 0 ? (io5 ? 'Interest-only for 5 years' : 'Principal and interest') : 'No loan', s.debt > 0 ? (payOff ? `Paid off by ${retireAge}` : home ? `Loan cleared from super at retirement` : `Sold at ${retireAge} if a loan is left`) : 'Owned outright'];
   return (
     <RowShell n={n} tone="owned" title={pr.address || 'Property'} sub={`Owned · worth about ${money(s.val.value, { compact: true })} · ${money(s.debt, { compact: true })} owing · ${money(s.equity, { compact: true })} equity`} chips={chips} open={open} onToggle={onToggle}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="font-display text-lg font-semibold">{pr.address}</p>
+        <button className="btn-primary" onClick={() => { useNavIntent.getState().set({ editProperty: pr.id }); location.hash = 'properties'; }}><Icon name="details" className="h-4 w-4" />Edit property details</button>
+      </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="space-y-2 text-sm">
           <p className="font-medium">Current loans</p>
@@ -199,7 +203,6 @@ function OwnedRow({ pr, n, open, onToggle, retireAge, startAge }: { pr: Property
             <p key={l.id} className="text-muted">{l.lender || 'Lender'} · {money(l.balance ?? 0)} at {l.rate ?? '?'}% · {l.type === 'io' ? 'interest-only' : 'principal and interest'} · {l.yearsLeft ?? 25} years left</p>
           ))}
           <p className="text-muted">{pr.use === 'investment' ? `Rent ${money(pr.weeklyRent ?? 0)} a week · ` : ''}growth {pr.growthRate}% a year</p>
-          <button className="btn-quiet mt-2" onClick={() => { location.hash = 'properties'; }}><Icon name="property" className="h-4 w-4" />Edit property details</button>
         </div>
         {s.debt > 0 ? (
           <div className="space-y-4">
