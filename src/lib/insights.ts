@@ -216,7 +216,7 @@ export function wiseFacts(p: Profile, quotes: Quotes, insights: Insight[]) {
     },
     debts: p.finances.debts.filter((d) => (d.balance ?? 0) > 0).map((d) => ({ type: d.kind, owing: r(d.balance ?? 0, 100), ratePercent: d.kind === 'hecs' ? 'indexation only' : d.rate ?? null })),
     homeLoanRatePercent: p.properties.find((x) => x.use === 'home')?.loans[0]?.rate ?? null,
-    cashAboveBuffer: r(Math.max(0, (p.finances.cash ?? 0) - (p.finances.buffer ?? 0)), 500),
+    spareCashAboveEmergencyBuffer: r(Math.max(0, (p.finances.cash ?? 0) - (p.finances.buffer ?? 0)), 500),
     projection: { incomeAtStopWorkTodayDollars: r(atRetire?.passiveIncomeReal ?? 0), gapToGoal: r((atRetire?.passiveIncomeReal ?? 0) - p.goals.passiveIncome), nextPurchaseYear: proj.purchases[0]?.year ?? null },
     observations: insights.map((i) => i.title),
     goalChecks: goalAnalysisLines(p, quotes),
