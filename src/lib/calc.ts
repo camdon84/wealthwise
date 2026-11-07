@@ -189,6 +189,7 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
   const y0 = thisYear();
   const retireYear = y0 + (retireAge - startAge);
 
+  const share = mortgageShare(p);
   type Sim = { value: number; debt: number; rate: number; io: boolean; years: number; rent: number; costs: number; mgmt: number; g: number; invest: boolean; pay?: number };
   const sims: Sim[] = pos.props.map(({ pr, s }) => ({
     value: s.val.value, debt: s.debt, rate: s.avgRate || 6, io: pr.loans.every((l) => l.type === 'io'),
@@ -203,7 +204,6 @@ export function project(p: Profile, quotes: Quotes): { points: YearPoint[]; purc
   let partSal = p.household.hasPartner ? n(p.household.partner.salary) : 0;
   let living = (Math.max(livingCosts(p), livingFloor(p)) + housingMonthly(p)) * 12;
   let hecsBal = hecsAnnual(p).balance;
-  const share = mortgageShare(p);
   let newPrice = a.newPurchasePrice;
   const buffer = n(p.finances.buffer) || living / 4;
   const otherRepay = p.finances.debts.filter((d) => d.kind !== 'hecs').reduce((s, d) => s + n(d.monthlyRepayment), 0) * 12;

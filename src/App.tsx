@@ -8,6 +8,7 @@ import { Properties } from './pages/Properties';
 import { Investments } from './pages/Investments';
 import { Plan } from './pages/Plan';
 import { ProfilePage, Renovate } from './pages/Misc';
+import { FirstLook } from './pages/FirstLook';
 import { Icon, Logo } from './components/ui';
 
 const NAV = [
@@ -34,6 +35,8 @@ function Shell() {
   const { session, saving, theme, toggleTheme, signOut } = useApp();
   const [menu, setMenu] = useState(false);
   const current = NAV.some((n) => n.id === route) ? route : 'overview';
+  const profile = useApp((s) => s.profile)!;
+  if (profile.firstLookSeen === false) return <FirstLook quotes={quotes} />;
 
   const nav = (
     <nav aria-label="Main" className="space-y-1">

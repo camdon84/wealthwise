@@ -112,14 +112,60 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
   }
 
   // 6. Cash outside offset
-  const home = p.properties.find((pr) => pr.use === 'home' && pr.loans.some((l) => l.type === 'pi'));
-  const spare = (p.finances.cash ?? 0) - (home?.loans[0]?.offset ?? 0);
-  if (home && home.loans[0]?.rate && spare > 10000 && !p.finances.offsetIsCash) {
-    const save = (spare * home.loans[0].rate) / 100;
+  const home = p.properties.find((pr) => pr.use === 'home' && pr.loans.some((l) => l.type === 'pi' && (l.balance ?? 0) > 0));
+  const homeL = home?.loans.find((l) => l.type === 'pi' && (l.balance ?? 0) > 0);
+  const inSavings = p.finances.cashSavings ?? 0;
+  const movable = inSavings; // money in an offset stays available, so the whole amount can move
+  if (home && homeL?.rate && movable > 5000) {
+    const save = (movable * homeL.rate) / 100;
     out.push({
-      id: 'offset', kind: 'opportunity', title: 'Cash outside your offset is costing interest',
-      body: `Moving ${money(spare, { compact: true })} into the offset on ${home.address} would save about ${money(save)} a year in interest, and you can still get to it.`,
+      id: 'offset', kind: 'opportunity', title: `${money(movable, { compact: true })} in normal savings could sit in your offset`,
+      body: `Money in an offset reduces the interest on ${home.address} at ${homeL.rate.toFixed(2)}%, and you can still get to it. Moving it would save about ${money(save)} a year, and that saving isn’t taxed the way savings interest is.`,
       figure: money(save, { compact: true }), figureLabel: 'a year saved',
+    });
+  }
+
+  // 6b. High-interest debts: savings and equity compared with what each debt costs
+  const debts = p.finances.debts.filter((d) => d.kind !== 'hecs' && (d.balance ?? 0) > 0 && (d.rate ?? 0) > 0).sort((x, y) => (y.rate ?? 0) - (x.rate ?? 0));
+  const homeLoan = p.properties.find((pr) => pr.use === 'home')?.loans.find((l) => l.rate);
+  const homeRate = homeLoan?.rate ?? null;
+  let spareCash = Math.max(0, (p.finances.cash ?? 0) - (p.finances.buffer ?? 0));
+  const label = (d: (typeof debts)[number]) => ({ car: 'car loan', personal: 'personal loan', 'credit-card': 'credit card', other: 'loan' } as Record<string, string>)[d.kind] || 'loan';
+  for (const d of debts) {
+    const bal = d.balance ?? 0, rate = d.rate ?? 0;
+    if (spareCash >= Math.min(bal, 1000)) {
+      const pay = Math.min(bal, spareCash);
+      spareCash -= pay;
+      out.push({
+        id: `pay-${d.id}`, kind: 'opportunity',
+        title: `Your ${label(d)} costs ${rate.toFixed(1)}%. Your savings could clear ${pay >= bal ? 'it' : 'part of it'}`,
+        body: `You have cash above your emergency buffer. Using ${money(pay, { compact: true })} of it on the ${label(d)} would save about ${money((pay * rate) / 100)} a year in interest, more than that cash earns${homeRate ? ` sitting in an offset at ${homeRate.toFixed(2)}%` : ' in savings'}. Highest-rate debts first usually saves the most.`,
+        figure: money((pay * rate) / 100, { compact: true }), figureLabel: 'a year in interest',
+      });
+    } else if (homeRate && rate > homeRate + 3 && pos.usable > bal) {
+      const save = (bal * (rate - homeRate)) / 100;
+      out.push({
+        id: `equity-${d.id}`, kind: 'opportunity',
+        title: `Your ${label(d)} is at ${rate.toFixed(1)}%, against ${homeRate.toFixed(2)}% on your home loan`,
+        body: `You have ${money(pos.usable, { compact: true })} of usable equity. Moving the ${money(bal, { compact: true })} balance onto the home loan would cut the interest by about ${money(save)} a year. Only if you then pay it off quickly, though: spread over 25+ years it can cost more in total. Worth raising with your broker.`,
+        figure: money(save, { compact: true }), figureLabel: 'a year in interest', ask: 'broker',
+      });
+    }
+  }
+  if (p.finances.debts.some((d) => d.kind === 'hecs' && (d.balance ?? 0) > 0) && debts.length) out.push({
+    id: 'hecs-order', kind: 'watch', title: 'Pay down interest-bearing debts before extra HECS repayments',
+    body: 'HECS doesn’t charge interest, only yearly indexation, and repayments come out through the tax system. Extra money usually goes further on credit cards and loans first.',
+  });
+
+  // 6c. Fixed rates ending soon
+  for (const pr of p.properties) for (const l of pr.loans) {
+    if (l.rateType !== 'fixed' || !l.fixedUntil) continue;
+    const [y, m] = l.fixedUntil.split('-').map(Number);
+    const months = (y - new Date().getFullYear()) * 12 + (m - 1 - new Date().getMonth());
+    if (months >= 0 && months <= 6) out.push({
+      id: `fixed-${l.id}`, kind: 'watch', title: `The fixed rate on ${pr.address} ends in ${months <= 1 ? 'about a month' : `${months} months`}`,
+      body: `You’re fixed at ${(l.rate ?? 0).toFixed(2)}%. When it ends the loan usually rolls onto the lender’s variable rate, often higher than new-customer rates. A good time to compare options with your broker.`,
+      figure: `${(l.rate ?? 0).toFixed(2)}%`, figureLabel: 'fixed rate now', ask: 'broker',
     });
   }
 
@@ -149,7 +195,8 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
     figure: money(pos.netWorth, { compact: true }), figureLabel: 'net worth',
   });
 
-  return out;
+  const rank: Record<InsightKind, number> = { goal: 0, opportunity: 1, watch: 2, milestone: 3 };
+  return out.sort((a, b) => rank[a.kind] - rank[b.kind]);
 }
 
 /* Facts for Wise's AI write-up. Figures are rounded so small price moves don't trigger a new write-up. */
@@ -167,6 +214,9 @@ export function wiseFacts(p: Profile, quotes: Quotes, insights: Insight[]) {
       cash: r(pos.cash), super: r(pos.superBal, 5000), sharesValue: r(pos.shares.value, 5000),
       properties: pos.props.map(({ pr, s }) => ({ suburb: `${pr.suburb} ${pr.state}`, use: pr.use, value: r(s.val.value, 5000), equity: r(s.equity, 5000), ageYears: pr.yearBuilt ? year - pr.yearBuilt : null, cashflowPerYear: r(s.cashflow, 100) })),
     },
+    debts: p.finances.debts.filter((d) => (d.balance ?? 0) > 0).map((d) => ({ type: d.kind, owing: r(d.balance ?? 0, 100), ratePercent: d.kind === 'hecs' ? 'indexation only' : d.rate ?? null })),
+    homeLoanRatePercent: p.properties.find((x) => x.use === 'home')?.loans[0]?.rate ?? null,
+    cashAboveBuffer: r(Math.max(0, (p.finances.cash ?? 0) - (p.finances.buffer ?? 0)), 500),
     projection: { incomeAtStopWorkTodayDollars: r(atRetire?.passiveIncomeReal ?? 0), gapToGoal: r((atRetire?.passiveIncomeReal ?? 0) - p.goals.passiveIncome), nextPurchaseYear: proj.purchases[0]?.year ?? null },
     observations: insights.map((i) => i.title),
   };

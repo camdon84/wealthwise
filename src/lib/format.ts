@@ -8,7 +8,8 @@ export function money(n: number | null | undefined, opts: { compact?: boolean; c
     const a = Math.abs(n);
     const s = n < 0 ? '-' : sign;
     if (a >= 1e6) return `${s}$${(a / 1e6).toFixed(a >= 1e7 ? 1 : 2)}m`;
-    if (a >= 1e3) return `${s}$${Math.round(a / 1e3)}k`;
+    if (a >= 1e4) return `${s}$${Math.round(a / 1e3)}k`;
+    if (a >= 1e3) return `${s}$${Math.round(a).toLocaleString('en-AU')}`;
     return `${s}$${Math.round(a)}`;
   }
   return sign + (opts.cents ? aud2 : aud0).format(n);

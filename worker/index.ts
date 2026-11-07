@@ -192,6 +192,10 @@ async function api(req: Request, env: Env, path: string) {
   if (path === '/api/quotes' && method === 'GET') return quotes(req, env);
   if (path === '/api/briefing' && method === 'GET') return briefingRoute(req, env);
   if (path === '/api/wise' && method === 'POST') return wiseRoute(req, env);
+  if (path === '/api/cash-rate' && method === 'GET') {
+    const data = await cashRate(env);
+    return data ? json(data, 200, { 'cache-control': 'public, max-age=1800' }) : fail('Cash rate unavailable right now.', 503);
+  }
 
   return fail('Not found', 404);
 }
@@ -202,6 +206,7 @@ export default {
       await ensureSchema(env.DB);
       await nationalBriefing(env, 'equity', true);
       await nationalBriefing(env, 'property', true);
+      await cashRate(env, true);
     })());
   },
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -341,9 +346,13 @@ async function wiseRoute(req: Request, env: Env) {
   if (text.length > 8000) return fail('Too much data.', 413);
   let facts: any;
   try { facts = JSON.parse(text); } catch { return fail('Could not read that.'); }
-  const key = `wise:${await sha256(text)}`;
+  const firstLook = new URL(req.url).searchParams.get('mode') === 'first-look';
+  const key = `wise:${firstLook ? 'fl:' : ''}${await sha256(text)}`;
   const data = await cached(env, key, 7 * 864e5, async () => {
-    const sys = `You are Wise, the assistant inside WealthWise, an Australian property and wealth planning app. You get a household's figures, already calculated exactly by the app, plus the app's rule-based observations.
+    const lead = firstLook
+      ? `This is the household's first look straight after finishing setup. Lead with their quickest wins, especially debts: compare each debt's interest rate with their savings, offset and home loan rate, and point out where paying down or restructuring high-interest debt would save money (the app's observations include the exact savings). Then one line on how they track against their goal.\n`
+      : '';
+    const sys = lead + `You are Wise, the assistant inside WealthWise, an Australian property and wealth planning app. You get a household's figures, already calculated exactly by the app, plus the app's rule-based observations.
 Write a short, warm, plain-English overview of where they stand against their goal, then up to 2 ideas or scenarios worth exploring in the app (for example a renovation, timing the next purchase, building a buffer, testing a later retirement age).
 Rules: use ONLY the numbers given and never calculate new ones. This is general information, not personal financial advice: suggest things to explore or questions to ask a broker, accountant or licensed adviser; never tell them to buy, sell or borrow, and never name a lender, fund or stock.
 Reply with JSON only: {"summary":"2-3 sentences, max 60 words","ideas":[{"title":"max 8 words","body":"1-2 sentences, max 40 words"}]}`;
@@ -351,4 +360,21 @@ Reply with JSON only: {"summary":"2-3 sentences, max 60 words","ideas":[{"title"
     return { summary: String(out?.summary || '').slice(0, 600), ideas: (Array.isArray(out?.ideas) ? out.ideas : []).slice(0, 2).map((i: any) => ({ title: String(i.title || '').slice(0, 80), body: String(i.body || '').slice(0, 300) })) };
   });
   return data?.summary ? json(data) : fail('Wise is unavailable right now.', 503);
+}
+
+/* ---------- RBA cash rate (official daily series) ---------- */
+function cashRate(env: Env, force = false) {
+  return cached(env, 'rba:cash-rate', 12 * 3600e3, async () => {
+    const res = await fetch('https://www.rba.gov.au/statistics/tables/csv/f1-data.csv', { headers: { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' } });
+    if (!res.ok) throw new Error(`rba ${res.status}`);
+    const rows = (await res.text()).split(/\r?\n/).map((l) => l.split(',')).filter((c) => /^\d{2}-[A-Za-z]{3}-\d{4}$/.test(c[0]) && c[1] && !isNaN(Number(c[1])));
+    const changes: { date: string; rate: number }[] = [];
+    for (const [d, v] of rows) {
+      const rate = Number(v);
+      if (!changes.length || changes[changes.length - 1].rate !== rate) changes.push({ date: new Date(`${d} UTC`).toISOString().slice(0, 10), rate });
+    }
+    if (!changes.length) throw new Error('no cash rate rows');
+    const recent = changes.slice(-6);
+    return { current: recent[recent.length - 1].rate, effective: recent[recent.length - 1].date, previous: recent[recent.length - 2] ?? null, changes: recent };
+  }, force);
 }

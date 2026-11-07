@@ -3,7 +3,7 @@ import { useApp } from '../lib/store';
 import { useQuotes } from '../lib/hooks';
 import { hecsAnnual, hecsCompulsory, livingCosts, position, propertyStats } from '../lib/calc';
 import { money, num } from '../lib/format';
-import { LIVING_CATEGORIES, emptyDebt, emptyProperty, uid } from '../lib/defaults';
+import { DEBT_RATE, LIVING_CATEGORIES, emptyDebt, emptyProperty, uid } from '../lib/defaults';
 import type { Debt, Holding, Profile, Property } from '../lib/types';
 import { Field, Icon, Logo, MoneyInput, NumInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
 import { PropertyEditor } from '../components/PropertyEditor';
@@ -245,11 +245,12 @@ function Spending(_: { thorough: boolean }) {
             const compulsory = hecsCompulsory(income);
             return (
               <div key={d.id} className="paper rounded-xl border border-line bg-surface p-4">
-                <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr_auto]">
-                  <Field label="Type">{(id) => <Select id={id} value={d.kind} onChange={(v) => setDebt(d.id, { kind: v, owner: d.owner ?? 'you' })} options={[{ value: 'car', label: 'Car loan' }, { value: 'personal', label: 'Personal loan' }, { value: 'hecs', label: 'HECS / HELP' }, { value: 'credit-card', label: 'Credit card' }, { value: 'other', label: 'Other' }]} />}</Field>
+                <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto]">
+                  <Field label="Type">{(id) => <Select id={id} value={d.kind} onChange={(v) => setDebt(d.id, { kind: v, owner: d.owner ?? 'you', rate: v === 'hecs' ? null : d.rate ?? DEBT_RATE[v] })} options={[{ value: 'car', label: 'Car loan' }, { value: 'personal', label: 'Personal loan' }, { value: 'hecs', label: 'HECS / HELP' }, { value: 'credit-card', label: 'Credit card' }, { value: 'other', label: 'Other' }]} />}</Field>
                   <Field label="Amount owing">{(id) => <MoneyInput id={id} value={d.balance} onChange={(v) => setDebt(d.id, { balance: v })} />}</Field>
                   {d.kind === 'credit-card' && <Field label="Card limit">{(id) => <MoneyInput id={id} value={d.limit} onChange={(v) => setDebt(d.id, { limit: v })} />}</Field>}
                   {!isHecs && d.kind !== 'credit-card' && <Field label="Repayment">{(id) => <MoneyInput id={id} value={d.monthlyRepayment} onChange={(v) => setDebt(d.id, { monthlyRepayment: v })} suffix="/ mo" />}</Field>}
+                  {!isHecs && <Field label="Interest rate" hint={d.rate === DEBT_RATE[d.kind] ? 'Typical rate. Change it to yours.' : undefined}>{(id) => <NumInput id={id} value={d.rate ?? null} onChange={(v) => setDebt(d.id, { rate: v })} step={0.01} suffix="% p.a." />}</Field>}
                   {isHecs && hh.hasPartner && <Field label="Whose HECS">{(id) => <Select id={id} value={owner} onChange={(v) => setDebt(d.id, { owner: v })} options={[{ value: 'you', label: hh.you.name || 'Mine' }, { value: 'partner', label: hh.partner.name || 'My partner’s' }]} />}</Field>}
                   {isHecs && <Field label="Extra repayments">{(id) => <MoneyInput id={id} value={d.voluntaryMonthly ?? null} onChange={(v) => setDebt(d.id, { voluntaryMonthly: v })} suffix="/ mo" />}</Field>}
                   <div className="flex items-end"><button type="button" className="btn-ghost" onClick={() => update((x) => { x.finances.debts = x.finances.debts.filter((y) => y.id !== d.id); })}><Icon name="trash" className="h-4 w-4" />Remove</button></div>
@@ -274,17 +275,25 @@ function Spending(_: { thorough: boolean }) {
   );
 }
 
-function CashSuper({ thorough }: { thorough: boolean }) {
+function CashSuper(_: { thorough: boolean }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const hh = p.household; const f = p.finances;
+  const split = (f.cashOffset ?? 0) + (f.cashSavings ?? 0);
+  const diff = (f.cash ?? 0) - split;
   return (
     <div className="space-y-8">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Cash and savings" hint="Include money in offset accounts.">{(id) => <MoneyInput id={id} value={f.cash} onChange={(v) => update((d) => { d.finances.cash = v; })} />}</Field>
-        <Field label="Emergency buffer you want to keep" hint="We won’t count this toward deposits.">{(id) => <MoneyInput id={id} value={f.buffer} onChange={(v) => update((d) => { d.finances.buffer = v; })} />}</Field>
+      <div className="paper rounded-xl border border-line bg-surface p-5">
+        <div className="max-w-sm"><Field label="Total cash savings" hint="Everything you have in cash, offset and savings accounts.">{(id) => <MoneyInput id={id} value={f.cash} onChange={(v) => update((d) => { d.finances.cash = v; })} />}</Field></div>
+        <div className="mt-5 grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
+          <Field label="Amount in an offset account" hint="Reduces the interest on a home loan.">{(id) => <MoneyInput id={id} value={f.cashOffset ?? null} onChange={(v) => update((d) => { d.finances.cashOffset = v; if (d.finances.cash != null && d.finances.cashSavings == null && v != null) d.finances.cashSavings = Math.max(0, d.finances.cash - v); })} />}</Field>
+          <Field label="Amount in cash and normal savings">{(id) => <MoneyInput id={id} value={f.cashSavings ?? null} onChange={(v) => update((d) => { d.finances.cashSavings = v; })} />}</Field>
+        </div>
+        {f.cash != null && split > 0 && Math.abs(diff) >= 1 && (
+          <p className="mt-3 text-sm text-clay">{diff > 0 ? `${money(diff)} of your total isn’t in either box yet.` : `These add up to ${money(split)}, which is ${money(-diff)} more than your total.`} <button className="underline" onClick={() => update((d) => { d.finances.cash = split; })}>Use {money(split)} as the total</button></p>
+        )}
       </div>
-      {thorough && <Toggle checked={f.offsetIsCash} onChange={(v) => update((d) => { d.finances.offsetIsCash = v; })} label="Most of this cash sits in an offset account" description="Turn off if it’s in a savings account. Wise will show what moving it would save." />}
+      <div className="max-w-sm"><Field label="Emergency buffer you want to keep" hint="We won’t count this toward deposits or debt payoff ideas.">{(id) => <MoneyInput id={id} value={f.buffer} onChange={(v) => update((d) => { d.finances.buffer = v; })} />}</Field></div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={`${hh.you.name || 'Your'}${hh.you.name ? '’s' : ''} super balance`}>{(id) => <MoneyInput id={id} value={hh.you.superBalance} onChange={(v) => update((d) => { d.household.you.superBalance = v; })} />}</Field>
         {hh.hasPartner && <Field label={`${hh.partner.name || 'Partner'}${hh.partner.name ? '’s' : ''} super balance`}>{(id) => <MoneyInput id={id} value={hh.partner.superBalance} onChange={(v) => update((d) => { d.household.partner.superBalance = v; })} />}</Field>}
@@ -427,7 +436,7 @@ function Review({ go }: { go: (n: number) => void }) {
     { step: 0, title: 'About you', lines: [`${hh.you.name || 'You'}${hh.you.age ? `, ${hh.you.age}` : ''}${hh.hasPartner ? ` and ${hh.partner.name || 'partner'}${hh.partner.age ? `, ${hh.partner.age}` : ''}` : ''}`, `${hh.dependants.length} dependant${hh.dependants.length === 1 ? '' : 's'} · ${hh.state}`] },
     { step: 1, title: 'Income', lines: [`${money((hh.you.salary ?? 0) + (hh.hasPartner ? hh.partner.salary ?? 0 : 0))} household salary`, `${money(hh.otherIncome ?? 0)} other income`] },
     { step: 2, title: 'Spending and debts', lines: [`${p.finances.housing === 'rent' ? `Renting, ${money(p.finances.rentMonthly ?? 0)} a month` : p.finances.housing === 'own' ? 'Owns their home' : 'Not paying rent or a mortgage'}`, `${money(livingCosts(p))} a month living costs`, `${p.finances.debts.length} other debt${p.finances.debts.length === 1 ? '' : 's'} · ${money(pos.otherDebt)}`] },
-    { step: 3, title: 'Cash and super', lines: [`${money(pos.cash)} cash`, `${money(pos.superBal)} super`] },
+    { step: 3, title: 'Cash and super', lines: [`${money(pos.cash)} cash${p.finances.cashOffset ? `, ${money(p.finances.cashOffset)} in offset` : ''}`, `${money(pos.superBal)} super`] },
     { step: 4, title: 'Properties', lines: p.properties.length ? p.properties.map((x) => `${x.address}, ${x.suburb}`) : ['None yet'] },
     { step: 5, title: 'Shares and crypto', lines: [`${p.holdings.length} holdings · ${money(pos.shares.value)}`] },
     { step: 6, title: 'Goals', lines: [`Stop work at ${p.goals.retirementAge} on ${money(p.goals.passiveIncome)} a year`, `${p.goals.targetProperties} properties`] },
@@ -452,7 +461,7 @@ function Review({ go }: { go: (n: number) => void }) {
       {missing.length > 0 && <p className="text-sm text-clay">Your plan will be more accurate with {missing.join(', ')}.</p>}
       <div className="flex items-center justify-between border-t border-line pt-6">
         <button className="btn-ghost" onClick={() => go(6)}><Icon name="back" className="h-4 w-4" />Back</button>
-        <button className="btn-primary px-6 py-3 text-base" onClick={() => update((d) => { d.onboarded = true; })}>Build my plan<Icon name="arrow" className="h-4 w-4" /></button>
+        <button className="btn-primary px-6 py-3 text-base" onClick={() => update((d) => { d.onboarded = true; d.firstLookSeen = false; })}>Build my plan<Icon name="arrow" className="h-4 w-4" /></button>
       </div>
     </div>
   );

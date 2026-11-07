@@ -26,6 +26,7 @@ export interface Debt {
   balance: number | null;
   monthlyRepayment: number | null;
   limit: number | null; // credit cards
+  rate?: number | null; // % p.a. for cards and loans
   owner?: 'you' | 'partner'; // HECS
   voluntaryMonthly?: number | null; // HECS extra repayments
 }
@@ -36,6 +37,8 @@ export interface Loan {
   balance: number | null;
   rate: number | null; // % p.a.
   type: 'io' | 'pi';
+  rateType?: 'variable' | 'fixed';
+  fixedUntil?: string; // yyyy-mm
   yearsLeft: number | null;
   offset: number | null;
 }
@@ -98,7 +101,9 @@ export interface Finances {
   livingMode: 'total' | 'breakdown';
   livingBreakdown: Record<string, number | null>;
   livingMonthly: number | null;
-  cash: number | null;
+  cash: number | null; // total cash savings
+  cashOffset?: number | null; // part of the total sitting in offset accounts
+  cashSavings?: number | null; // part of the total in cash and normal savings
   offsetIsCash: boolean;
   buffer: number | null;
   debts: Debt[];
@@ -127,6 +132,8 @@ export interface Profile {
   holdings: Holding[];
   goals: Goals;
   assumptions: Assumptions;
+  rateWatch?: { cashRate: number; date: string }; // RBA cash rate the variable loan rates were last confirmed against
+  firstLookSeen?: boolean;
   updatedAt: string;
 }
 

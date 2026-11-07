@@ -5,18 +5,18 @@ import { wiseFacts, wiseInsights, type Insight } from '../lib/insights';
 import { equitySpot, loadBriefing, propertyPulse, type Briefing } from '../lib/briefings';
 import { Icon, Segmented } from './ui';
 
-const KIND: Record<Insight['kind'], { label: string; cls: string }> = {
+export const KIND: Record<Insight['kind'], { label: string; cls: string }> = {
   opportunity: { label: 'Opportunity', cls: 'bg-gum/15 text-gum' },
   watch: { label: 'Worth a look', cls: 'bg-clay/15 text-clay' },
   milestone: { label: 'Milestone', cls: 'bg-brass/15 text-brass' },
   goal: { label: 'Your goal', cls: 'bg-sky/15 text-sky' },
 };
-const ASK = { broker: 'Ask your mortgage broker', adviser: 'Ask a licensed financial adviser', accountant: 'Ask your accountant' };
+export const ASK = { broker: 'Ask your mortgage broker', adviser: 'Ask a licensed financial adviser', accountant: 'Ask your accountant' };
 
 const liveMode = (import.meta as any).env?.VITE_STORAGE === 'api';
 const wiseMemo = new Map<string, Promise<{ summary: string; ideas: { title: string; body: string }[] } | null>>();
 
-function useWiseTake(profile: Profile, quotes: Quotes, insights: Insight[]) {
+export function useWiseTake(profile: Profile, quotes: Quotes, insights: Insight[], mode?: 'first-look') {
   const ready = profile.holdings.length === 0 || Object.keys(quotes).length > 0;
   const body = useMemo(() => (ready ? JSON.stringify(wiseFacts(profile, quotes, insights)) : ''), [profile, quotes, insights, ready]);
   const [take, setTake] = useState<{ summary: string; ideas: { title: string; body: string }[] } | null | 'loading'>(liveMode ? 'loading' : null);
@@ -24,11 +24,12 @@ function useWiseTake(profile: Profile, quotes: Quotes, insights: Insight[]) {
     if (!liveMode || !body) return;
     let on = true;
     const t = setTimeout(() => {
-      if (!wiseMemo.has(body)) wiseMemo.set(body, fetch('/api/wise', { method: 'POST', headers: { 'content-type': 'application/json' }, body }).then((r) => (r.ok ? r.json() : null)).catch(() => null));
-      wiseMemo.get(body)!.then((v) => on && setTake(v));
+      const k = (mode ?? '') + body;
+      if (!wiseMemo.has(k)) wiseMemo.set(k, fetch(`/api/wise${mode ? `?mode=${mode}` : ''}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body }).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+      wiseMemo.get(k)!.then((v) => on && setTake(v));
     }, 800); // wait for typing to settle before asking for a new write-up
     return () => { on = false; clearTimeout(t); };
-  }, [body]);
+  }, [body, mode]);
   return take;
 }
 

@@ -6,6 +6,7 @@ import type { Quotes } from '../lib/calc';
 import { WealthChart, toReal, wealthSeries } from '../components/Charts';
 import { Segmented } from '../components/ui';
 import { NewsPanel, WisePanel } from '../components/Assistants';
+import { RateWatch } from '../components/RateWatch';
 
 export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => void }) {
   const p = useApp((s) => s.profile)!;
@@ -23,6 +24,8 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
         <p className="text-muted">{greet}, {p.household.you.name || 'there'}</p>
         <h1 className="font-display text-3xl font-semibold sm:text-4xl">Here’s where you stand</h1>
       </div>
+
+      <RateWatch />
 
       <section className="panel overflow-hidden">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">

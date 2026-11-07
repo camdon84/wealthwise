@@ -42,12 +42,15 @@ const financeDefaults = (): Pick<Finances, 'housing' | 'rentMonthly' | 'mortgage
 export function normalize(p: Profile): Profile {
   p.finances = { ...financeDefaults(), ...p.finances };
   p.finances.livingBreakdown ??= {};
+  for (const d of p.finances.debts) if (d.rate === undefined && d.kind !== 'hecs') d.rate = DEBT_RATE[d.kind] ?? null;
+  for (const pr of p.properties) for (const l of pr.loans) l.rateType ??= 'variable';
   p.mode = 'thorough';
   return p;
 }
 
-export const emptyLoan = (): Loan => ({ id: uid(), lender: '', balance: null, rate: null, type: 'pi', yearsLeft: 25, offset: null });
-export const emptyDebt = (): Debt => ({ id: uid(), kind: 'car', label: '', balance: null, monthlyRepayment: null, limit: null });
+export const emptyLoan = (): Loan => ({ id: uid(), lender: '', balance: null, rate: null, type: 'pi', rateType: 'variable', yearsLeft: 25, offset: null });
+export const DEBT_RATE: Record<string, number> = { car: 9.5, personal: 12.5, 'credit-card': 20.99, other: 10 };
+export const emptyDebt = (): Debt => ({ id: uid(), kind: 'car', label: '', balance: null, monthlyRepayment: null, limit: null, rate: DEBT_RATE.car });
 
 export const emptyProperty = (): Property => ({
   id: uid(), address: '', suburb: '', state: 'QLD', postcode: '', use: 'investment', kind: 'house', structure: 'personal',
@@ -75,6 +78,8 @@ export function blankProfile(name: string): Profile {
   };
 }
 
+function futureMonth(m: number) { const d = new Date(); d.setMonth(d.getMonth() + m); return d.toISOString().slice(0, 7); }
+
 const h = (code: string, exchange: Holding['exchange'], name: string, units: number, avgCost: number, firstBought: string, kind: Holding['kind']): Holding =>
   ({ id: uid(), code, exchange, name, units, avgCost, firstBought, kind });
 
@@ -91,10 +96,11 @@ export function demoProfile(): Profile {
   p.finances = {
     housing: 'own', rentMonthly: null, mortgageMonthly: null, mortgageSharePct: 100, livingMode: 'breakdown',
     livingBreakdown: { groceries: 1400, energy: 260, water: 90, internet: 120, subscriptions: 85, petrol: 420, transport: 60, carInsurance: 140, carRunning: 110, health: 380, homeInsurance: 210, school: 650, kids: 180, eatingOut: 600, clothing: 250, medical: 120, pets: 90, other: 235 },
-    livingMonthly: 5400, cash: 38000, offsetIsCash: true, buffer: 20000,
+    livingMonthly: 5400, cash: 38000, cashOffset: 30000, cashSavings: 8000, offsetIsCash: true, buffer: 20000,
     debts: [
-      { id: uid(), kind: 'car', label: 'Car loan', balance: 21000, monthlyRepayment: 640, limit: null },
-      { id: uid(), kind: 'credit-card', label: 'Credit card', balance: 1800, monthlyRepayment: null, limit: 12000 },
+      { id: uid(), kind: 'car', label: 'Car loan', balance: 21000, monthlyRepayment: 640, limit: null, rate: 9.49 },
+      { id: uid(), kind: 'credit-card', label: 'Credit card', balance: 6400, monthlyRepayment: null, limit: 12000, rate: 20.99 },
+      { id: uid(), kind: 'personal', label: 'Personal loan', balance: 9500, monthlyRepayment: 420, limit: null, rate: 13.9 },
       { id: uid(), kind: 'hecs', label: 'HECS / HELP', balance: 18000, monthlyRepayment: null, limit: null, owner: 'partner', voluntaryMonthly: 0 },
     ],
   };
@@ -127,7 +133,7 @@ export function demoProfile(): Profile {
         { id: uid(), source: 'realestate.com.au', value: 630000, date: today },
         { id: uid(), source: 'RP Data', value: 652000, date: today },
       ],
-      loans: [{ id: uid(), lender: 'ING', balance: 408000, rate: 6.39, type: 'io', yearsLeft: 27, offset: 0 }],
+      loans: [{ id: uid(), lender: 'ING', balance: 408000, rate: 5.89, type: 'io', rateType: 'fixed', fixedUntil: futureMonth(4), yearsLeft: 27, offset: 0 }],
     },
   ];
   p.properties = props;
@@ -140,6 +146,8 @@ export function demoProfile(): Profile {
     h('NDQ', 'ASX', 'Betashares Nasdaq 100 ETF', 150, 38.7, '2023-01-17', 'etf'),
     h('BTC', 'CRYPTO', 'Bitcoin', 0.12, 61000, '2023-03-02', 'crypto'),
   ];
+  p.rateWatch = { cashRate: 4.6, date: '2026-09-30' }; // demo: last confirmed before the RBA's November rise
+  p.firstLookSeen = true;
   p.goals = {
     retirementAge: 58, passiveIncome: 130000, targetProperties: 5, risk: 4,
     events: [{ id: uid(), label: 'Kitchen renovation', year: new Date().getFullYear() + 1, amount: 45000 }],
