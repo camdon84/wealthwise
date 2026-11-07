@@ -87,3 +87,8 @@ export const useApp = create<State>((set, get) => ({
 }));
 
 export const storageKind = adapter.kind;
+
+/** One-off navigation intent, e.g. "open the plan's property portfolio with this property expanded". */
+export const useNavIntent = create<{ planTab: string | null; focusProperty: string | null; set(v: { planTab?: string | null; focusProperty?: string | null }): void }>((set) => ({
+  planTab: null, focusProperty: null, set: (v) => set(v),
+}));

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApp } from '../lib/store';
+import { useApp, useNavIntent } from '../lib/store';
 import { propertyStats } from '../lib/calc';
 import { money, monthYear, pct } from '../lib/format';
 import { emptyProperty, uid } from '../lib/defaults';
@@ -130,7 +130,10 @@ function PropertyDetail({ property: pr, onClose, onEdit }: { property: Property;
         <div className="flex items-end justify-between gap-4">
           <div><p className="text-sm text-muted">Estimated value</p><p className="font-display text-4xl font-semibold">{money(s.val.value)}</p>
             <p className="text-sm text-muted">{s.val.basis === 'sources' ? `Average of ${s.val.sources} source${s.val.sources > 1 ? 's' : ''} · range ${money(s.val.low, { compact: true })} to ${money(s.val.high, { compact: true })}` : 'Purchase price grown at your growth assumption. Add an estimate below.'}</p></div>
-          <a className="btn-quiet shrink-0" href={reaUrl(pr)} target="_blank" rel="noreferrer">Open on realestate.com.au</a>
+          <div className="flex shrink-0 flex-col gap-2">
+            <a className="btn-quiet" href={reaUrl(pr)} target="_blank" rel="noreferrer">Open on realestate.com.au</a>
+            <button className="btn-quiet" onClick={() => { useNavIntent.getState().set({ planTab: 'timeline', focusProperty: pr.id }); onClose(); location.hash = 'plan'; }}><Icon name="plan" className="h-4 w-4" />Plan for this property</button>
+          </div>
         </div>
         <ul className="mt-5 space-y-2">
           {latest.map((v) => {

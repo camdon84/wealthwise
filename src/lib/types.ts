@@ -86,6 +86,8 @@ export interface Property {
   annualCosts: number | null; // rates, insurance, strata, maintenance
   bedrooms: number | null;
   yearBuilt: number | null;
+  planIo5?: boolean; // plan: interest-only for the next 5 years
+  planPayOff?: boolean; // plan: paid off by retirement (otherwise an investment is sold at retirement, a home loan is cleared from super)
 }
 
 export interface Holding {
@@ -157,6 +159,7 @@ export interface Profile {
   firstLookSeen?: boolean;
   documents?: DocRecord[];
   eofy?: { fy: string; done: string[] }; // end-of-financial-year update checklist
+  cryptoGrowth?: number | null; // the user's own guess, only used on the Crypto page
 
   updatedAt: string;
 }
@@ -166,4 +169,11 @@ export interface Session { userId: string; email: string; name: string; demo?: b
 export type DocKind = 'valuation' | 'super' | 'loan' | 'rental' | 'payslip' | 'trades' | 'other';
 export interface DocRecord { id: string; name: string; kind: DocKind; uploadedAt: string; summary: string; applied: string[] }
 
-export interface PlannedPurchase { id: string; label: string; price: number; yieldPct: number; rate: number; growth: number; notBefore?: number | null }
+export interface PlannedPurchase {
+  id: string; label: string; price: number; yieldPct: number; rate: number; growth: number;
+  notBefore?: number | null; // legacy, no longer used
+  buyBy?: number | null; // buy before this year; null = as soon as possible
+  ioFirst5?: boolean; // interest-only for the first 5 years, then principal and interest
+  payOff?: boolean; // paid off by retirement; otherwise sold at retirement
+  depositPct?: number; costsPct?: number; holdingPct?: number; mgmtPct?: number;
+}

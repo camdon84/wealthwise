@@ -26,11 +26,12 @@ function Tip({ active, payload, label, rows, real }: any) {
   );
 }
 
+// Cash sits at the bottom of the stack, next to property equity: buying a property moves money from one to the other, so the layers above stay smooth.
 export const wealthSeries = [
+  { key: 'cash' as const, label: 'Cash', color: C.cash },
   { key: 'propertyEquity' as const, label: 'Property equity', color: C.equity },
   { key: 'shares' as const, label: 'Shares', color: C.shares },
   { key: 'super' as const, label: 'Super', color: C.super },
-  { key: 'cash' as const, label: 'Cash', color: C.cash },
 ];
 
 export function toReal(points: YearPoint[], inflation: number): YearPoint[] {

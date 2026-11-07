@@ -60,6 +60,7 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
           <div><p className="text-xs text-muted">Today</p><p className={`font-display text-xl font-semibold ${st.dayMove >= 0 ? 'text-gum' : 'text-clay'}`}>{money(st.dayMove, { sign: true })}</p></div>
           <div><p className="text-xs text-muted">Cost base</p><p className="font-display text-xl font-semibold">{money(st.cost)}</p></div>
         </div>
+        {crypto && st.value > 0 && <CryptoGuess value={st.value} />}
         {st.value > 0 && (
           <div className="mt-6">
             <div className="flex h-2.5 overflow-hidden rounded-full">{byKind.map(([k, v]) => <div key={k} style={{ width: `${(v / st.value) * 100}%`, background: KIND_COLOR[k as Holding['kind']] }} />)}</div>
@@ -141,6 +142,26 @@ function TradeForm({ onDone, crypto }: { onDone: () => void; crypto?: boolean })
       </div>
       {error && <p role="alert" className="text-sm text-clay">{error}</p>}
       <button className="btn-primary" onClick={save}>{side === 'buy' ? 'Save purchase' : 'Save sale'}</button>
+    </div>
+  );
+}
+
+/** The user's own growth guess for crypto. Shown here only: never fed into the plan or projections. */
+function CryptoGuess({ value }: { value: number }) {
+  const p = useApp((s) => s.profile)!;
+  const update = useApp((s) => s.update);
+  const g = p.cryptoGrowth ?? null;
+  const age = p.household.you.age ?? 35;
+  const years = Math.max(0, p.goals.retirementAge - age);
+  const future = g != null ? value * Math.pow(1 + g / 100, years) : null;
+  const real = future != null ? future / Math.pow(1 + p.assumptions.inflation / 100, years) : null;
+  return (
+    <div className="mt-6 flex flex-wrap items-end gap-x-8 gap-y-3 rounded-xl bg-raised p-4 ring-1 ring-line">
+      <div className="w-44"><Field label="My expected growth">{(id) => <NumInput id={id} value={g} onChange={(v) => update((d) => { d.cryptoGrowth = v; })} step={1} suffix="% / yr" placeholder="e.g. 15" />}</Field></div>
+      {future != null ? (
+        <div><p className="text-xs text-muted">Expected value at {p.goals.retirementAge}</p><p className="font-display text-2xl font-semibold">{money(future, { compact: true })}</p><p className="text-xs text-muted">about {money(real!, { compact: true })} in today’s money</p></div>
+      ) : <p className="pb-2 text-sm text-muted">Enter a growth rate to see what your crypto could be worth at {p.goals.retirementAge}.</p>}
+      <p className="basis-full text-[11px] text-muted">Your own estimate, shown here only. It isn’t used in your plan, projections or Your Wise Future.</p>
     </div>
   );
 }

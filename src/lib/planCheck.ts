@@ -1,0 +1,133 @@
+import { position, project, type Projection, type Quotes } from './calc';
+import { money } from './format';
+import type { Profile } from './types';
+
+/**
+ * Checks whether the plan holds together, and if it doesn't, tests changes against the same
+ * projection so every recommendation is one that actually fixes the problem on these numbers.
+ */
+export interface PlanCheck { works: boolean; problems: string[]; fixes: string[]; good: string[]; proj: Projection }
+
+const clone = (p: Profile): Profile => JSON.parse(JSON.stringify(p));
+const m = (v: number) => money(v, { compact: true });
+const round = (v: number, step: number) => Math.floor(v / step) * step;
+
+function propsOk(p: Profile, r: Projection) {
+  const reached = p.properties.length + r.purchases.length >= p.goals.targetProperties;
+  const deadlines = (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).every((pp, k) => !pp.buyBy || (r.purchases[k] && r.purchases[k].year < pp.buyBy));
+  return reached && deadlines;
+}
+const lastsOk = (r: Projection) => r.runsOutAge == null;
+const cashOk = (r: Projection) => r.shortfallYear == null;
+
+/** Largest value in [lo, hi] for which test passes, assuming it passes at lo and gets harder as the value rises. */
+function bisect(lo: number, hi: number, test: (v: number) => boolean, steps = 12) {
+  if (!test(lo)) return null;
+  for (let i = 0; i < steps; i++) { const mid = (lo + hi) / 2; if (test(mid)) lo = mid; else hi = mid; }
+  return lo;
+}
+
+export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
+  const r = project(p, quotes);
+  const g = p.goals;
+  const owned = p.properties.length;
+  const life = g.lifeExpectancy ?? 90;
+  const retireAge = g.retirementAge;
+  const planned = (p.plannedPurchases ?? []).slice(0, Math.max(0, g.targetProperties - owned));
+  const run = (mod: (x: Profile) => void) => { const x = clone(p); mod(x); return project(x, quotes); };
+  const problems: string[] = [];
+  const fixes: string[] = [];
+  const good: string[] = [];
+
+  // 1. Savings running out while still working (usually repayments to pay loans off fast)
+  if (!cashOk(r)) {
+    problems.push(`Your savings run out in ${r.shortfallYear}, while you’re still working: loan repayments and living costs would be more than you earn.`);
+    const sellInstead = run((x) => { x.plannedPurchases?.forEach((pp) => { pp.payOff = false; }); x.properties.forEach((pr) => { if (pr.use === 'investment') pr.planPayOff = false; }); });
+    if (cashOk(sellInstead)) fixes.push('Don’t pay the investment properties off by retirement. Paying them off that quickly needs bigger repayments than your income covers; selling them when you stop work avoids that.');
+    const io = run((x) => { x.plannedPurchases?.forEach((pp) => { pp.ioFirst5 = true; }); });
+    if (cashOk(io) && fixes.length === 0) fixes.push('Use interest-only loans for the first 5 years on new purchases, so repayments stay lower while you build up.');
+    if (g.shareMonthly !== 0 && r.shareMonthly > 0) { const noShares = run((x) => { x.goals.shareMonthly = 0; }); if (cashOk(noShares)) fixes.push(`Pause the ${m(r.shareMonthly)} a month share plan until the loans are under control.`); }
+  }
+
+  // 2. Properties: not all bought, or not by the year wanted
+  const reached = owned + r.purchases.length;
+  if (reached < g.targetProperties) {
+    const why = r.block?.reason === 'servicing' ? 'Borrowing power is what holds it back: a lender wouldn’t lend enough on your income.' : r.block?.reason === 'deposit' ? 'There isn’t enough equity and savings for the next deposit.' : '';
+    problems.push(`You’d own ${reached} of the ${g.targetProperties} properties you want by ${retireAge}. ${why}`.trim());
+  }
+  planned.forEach((pp, k) => {
+    if (!pp.buyBy) return;
+    const got = r.purchases[k];
+    if (!got || got.year >= pp.buyBy) problems.push(`${pp.label || `Property ${owned + k + 1}`}: you want it before ${pp.buyBy}, but ${got ? `the earliest it fits is ${got.year}` : 'it doesn’t fit before you stop work'}.`);
+  });
+  if (!propsOk(p, r)) {
+    // Cheaper properties
+    const scale = bisect(0.3, 1, (f) => propsOk(p, run((x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= f; }); })));
+    if (scale != null && scale < 0.97) {
+      const prices = [...new Set(planned.map((pp) => m(round(pp.price * scale, 5000))))];
+      fixes.push(`Choose cheaper properties: about ${prices.length === 1 ? `${prices[0]} each` : prices.join(', then ')} in today’s money would fit.`);
+    }
+    // Smaller share goal frees savings for deposits
+    if (r.shareMonthly > 0) {
+      const target = g.sharesTarget ?? 0;
+      const ok0 = propsOk(p, run((x) => { x.goals.shareMonthly = 0; }));
+      if (ok0) {
+        const best = g.shareMonthly == null && target > 0
+          ? bisect(0, target, (t) => propsOk(p, run((x) => { x.goals.sharesTarget = t; })))
+          : null;
+        fixes.push(best != null && best > 50000
+          ? `Lower your share portfolio goal to about ${m(round(best, 50000))}, so more of your savings go to property deposits.`
+          : 'Pause the share plan while you buy, so your savings go to property deposits first.');
+      }
+    }
+    // Fewer properties
+    if (reached < g.targetProperties && reached > owned) fixes.push(`Aim for ${reached} properties instead of ${g.targetProperties}.`);
+    else if (reached < g.targetProperties && reached === owned) fixes.push(`Hold off on adding properties for now: on these numbers none fits before ${retireAge}.`);
+    // Move the deadline
+    planned.forEach((pp, k) => {
+      const got = r.purchases[k];
+      if (pp.buyBy && got && got.year >= pp.buyBy) fixes.push(`Change ${pp.label || `property ${owned + k + 1}`} to “Before ${got.year + 1}”.`);
+    });
+    // Retiring later gives more years to buy
+    if (reached < g.targetProperties) for (let d = 1; d <= 6 && g.retirementAge + d <= 70; d++) {
+      if (owned + run((x) => { x.goals.retirementAge += d; }).purchases.length >= g.targetProperties) { fixes.push(`Keep working to ${g.retirementAge + d} to fit in all ${g.targetProperties} properties.`); break; }
+    }
+  }
+
+  // 3. Money lasting through retirement
+  if (!lastsOk(r)) {
+    problems.push(`At ${m(g.passiveIncome)} a year, your money runs out at ${r.runsOutAge}, well before ${life}.`);
+    const maxIncome = bisect(0, g.passiveIncome, (v) => lastsOk(run((x) => { x.goals.passiveIncome = v; })), 14);
+    if (maxIncome != null && maxIncome > 10000) fixes.push(`Lower your yearly income after retirement to about ${m(round(maxIncome, 5000))}. That lasts to ${life}.`);
+    for (let d = 1; d <= 8 && g.retirementAge + d <= 72; d++) {
+      if (lastsOk(run((x) => { x.goals.retirementAge += d; }))) { fixes.push(`Or keep working to ${g.retirementAge + d}: more years of saving and fewer years to fund.`); break; }
+    }
+    if (g.targetProperties > owned && lastsOk(run((x) => { x.goals.targetProperties = Math.max(owned, x.goals.targetProperties - 1); }))) fixes.push(`Or aim for ${g.targetProperties - 1} properties: the last purchase costs more than it adds by retirement.`);
+  }
+
+  // 4. Shares short of goal with a custom amount
+  const years = Math.max(1, retireAge - (p.household.you.age ?? 35));
+  const sharesReal = r.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years); // before any retirement sale money is added
+  if ((g.sharesTarget ?? 0) > 0 && sharesReal < (g.sharesTarget ?? 0) * 0.97) {
+    problems.push(`Investing ${m(r.shareMonthly)} a month, your shares reach about ${m(sharesReal)} by ${retireAge}, short of your ${m(g.sharesTarget ?? 0)} goal.`);
+    fixes.push(`Invest about ${money(r.requiredShareMonthly)} a month (choose “What’s needed for my goal” in Shares), or lower your share goal to about ${m(round(sharesReal, 50000))}.`);
+  }
+
+  // What's working
+  if (g.targetProperties > owned && propsOk(p, r)) good.push(`You reach ${g.targetProperties} properties, buying in ${r.purchases.map((x) => x.year).join(', ')}.`);
+  if ((g.sharesTarget ?? 0) > 0 && sharesReal >= (g.sharesTarget ?? 0) * 0.97) good.push(`Investing ${m(r.shareMonthly)} a month, your shares reach about ${m(sharesReal)} by ${retireAge}.`);
+  if (lastsOk(r)) {
+    const last = r.points[r.points.length - 1];
+    const left = last ? Math.max(0, last.netWorth) / Math.pow(1 + p.assumptions.inflation / 100, r.points.length - 1) : 0;
+    good.push(`Living on ${m(g.passiveIncome)} a year from ${retireAge}, your money lasts past ${life}, with about ${m(left)} in today’s money to spare.`);
+    // Room for more?
+    if (propsOk(p, r) && cashOk(r) && g.targetProperties < 10) {
+      const more = run((x) => { x.goals.targetProperties += 1; });
+      const extra = more.purchases[r.purchases.length];
+      if (extra && extra.year <= r.retireYear - 3 && lastsOk(more) && cashOk(more)) good.push(`There’s room for one more: property ${g.targetProperties + 1} would fit around ${extra.year}. Raise “Properties owned by retirement” to add it.`);
+    }
+  }
+  if (cashOk(r) && position(p, quotes).monthlySurplus < 0) problems.push('You’re spending more than you earn each month right now. Check your living costs in My details.');
+
+  return { works: problems.length === 0, problems, fixes: [...new Set(fixes)], good, proj: r };
+}

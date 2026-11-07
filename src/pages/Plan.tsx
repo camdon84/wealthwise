@@ -1,20 +1,22 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useApp } from '../lib/store';
-import { position, project, propertyStats, requiredShareMonthly, type Quotes } from '../lib/calc';
-import { goalAnalysis, wiseInsights } from '../lib/insights';
+import { useEffect, useMemo, useState } from 'react';
+import { useApp, useNavIntent } from '../lib/store';
+import { pmt, position, project, propertyStats, requiredShareMonthly, type Quotes } from '../lib/calc';
+import { planCheck } from '../lib/planCheck';
+import { PlanCheckBox } from '../components/PlanCheck';
+import { wiseInsights } from '../lib/insights';
 import { money } from '../lib/format';
 import { plannedPurchase } from '../lib/defaults';
 import { useCashRate } from '../lib/rates';
-import type { Assumptions } from '../lib/types';
+import type { Assumptions, PlannedPurchase, Property } from '../lib/types';
 import { MiniLine, SeriesToggles, chartColors as C, WealthChart, toReal } from '../components/Charts';
 import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { useWiseTake } from '../components/Assistants';
-import { Field, Icon, MoneyInput, NumInput, Segmented, Select } from '../components/ui';
+import { Field, Icon, MoneyInput, NumInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
 
 type Tab = 'goals' | 'assumptions' | 'timeline' | 'shares' | 'projections';
 
 export function Plan({ quotes }: { quotes: Quotes }) {
-  const [tab, setTab] = useState<Tab>('goals');
+  const [tab, setTab] = useState<Tab>(() => { const t = useNavIntent.getState().planTab as Tab | null; useNavIntent.getState().set({ planTab: null }); return t ?? 'goals'; });
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -43,7 +45,7 @@ function Goals({ quotes }: { quotes: Quotes }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const g = p.goals;
-  const ga = useMemo(() => goalAnalysis(p, quotes), [p, quotes]);
+  const check = useMemo(() => planCheck(p, quotes), [p, quotes]);
   const insights = useMemo(() => wiseInsights(p, quotes), [p, quotes]);
   const take = useWiseTake(p, quotes, insights, 'goals');
   return (
@@ -61,14 +63,7 @@ function Goals({ quotes }: { quotes: Quotes }) {
 
       <section className="panel p-5 sm:p-6">
         <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brass text-ground"><Icon name="spark" /></span><h2 className="font-display text-xl font-semibold">How your goals fit together</h2></div>
-        <ul className="mt-5 space-y-3">
-          {ga.lines.map((l, i) => (
-            <li key={i} className="flex gap-3 text-[15px] leading-relaxed">
-              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${l.tone === 'good' ? 'bg-gum' : 'bg-clay'}`} aria-hidden="true" />
-              <span>{l.text}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-5"><PlanCheckBox check={check} compact /></div>
         {take && take !== 'loading' && (
           <div className="mt-5 rounded-xl bg-raised p-4 ring-1 ring-line">
             <p className="text-xs font-medium text-muted">Wise suggests</p>
@@ -126,75 +121,138 @@ function AssumptionsTab() {
   );
 }
 
-/* ---------- Property timeline ---------- */
+/* ---------- Property portfolio ---------- */
 function Timeline({ quotes }: { quotes: Quotes }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const need = Math.max(0, p.goals.targetProperties - p.properties.length);
   useEffect(() => {
     const have = p.plannedPurchases?.length ?? 0;
-    if (have !== need) update((d) => {
+    if (have < need) update((d) => {
       d.plannedPurchases ??= [];
       while (d.plannedPurchases.length < need) d.plannedPurchases.push(plannedPurchase(d.properties.length + d.plannedPurchases.length + 1, d.assumptions));
-      d.plannedPurchases.length = need;
     });
   }, [need, p.plannedPurchases?.length, update]);
   const proj = useMemo(() => project(p, quotes), [p, quotes]);
+  const [open, setOpen] = useState<string | null>(() => { const f = useNavIntent.getState().focusProperty; useNavIntent.getState().set({ focusProperty: null }); return f; });
+  const toggle = (id: string) => setOpen((o) => (o === id ? null : id));
   const startYear = new Date().getFullYear();
   const startAge = p.household.you.age ?? 35;
+  const retireAge = p.goals.retirementAge;
   const plans = (p.plannedPurchases ?? []).slice(0, need);
   return (
     <div className="space-y-6">
       <section className="panel p-5 sm:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div><h2 className="font-display text-xl font-semibold">Your property portfolio</h2><p className="text-sm text-muted">From what you own now to {p.goals.targetProperties} properties by {p.goals.retirementAge}. Change the target in Goals.</p></div>
-        </div>
-        <ol className="relative mt-8 space-y-0 border-l-2 border-line pl-8">
-          {p.properties.map((pr, i) => {
-            const s = propertyStats(pr, p.assumptions.lvr);
-            return (
-              <li key={pr.id} className="relative pb-8">
-                <span className="absolute -left-[41px] flex h-6 w-6 items-center justify-center rounded-full bg-gum text-[11px] font-semibold text-surface">{i + 1}</span>
-                <p className="text-xs text-muted">Owned · bought {pr.purchaseDate ? pr.purchaseDate.slice(0, 4) : ''}</p>
-                <p className="font-medium">{pr.address}, {pr.suburb}</p>
-                <p className="text-sm text-muted">Worth about {money(s.val.value, { compact: true })} · {money(s.equity, { compact: true })} equity</p>
-              </li>
-            );
-          })}
-          {plans.map((plan, k) => {
-            const bought = proj.purchases[k];
-            const n = p.properties.length + k + 1;
-            const set = (patch: Partial<typeof plan>) => update((d) => { Object.assign(d.plannedPurchases![k], patch); });
-            const firstMissing = k === proj.purchases.length;
-            return (
-              <li key={plan.id} className="relative pb-8 last:pb-0">
-                <span className={`absolute -left-[41px] flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${bought ? 'bg-brass text-ground' : 'border-2 border-dashed border-clay/60 bg-surface text-clay'}`}>{n}</span>
-                <div className="rounded-xl border border-line bg-raised/50 p-4">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="font-display text-lg font-semibold">Property {n}</p>
-                    {bought
-                      ? <p className="text-sm"><span className="font-semibold">{bought.year}</span> <span className="text-muted">· age {startAge + (bought.year - startYear)} · about {money(bought.price, { compact: true })} by then</span></p>
-                      : <p className="text-sm font-medium text-clay">Doesn’t fit before {p.goals.retirementAge}</p>}
-                  </div>
-                  {!bought && firstMissing && proj.block && (
-                    <p className="mt-1 text-sm text-muted">{proj.block.reason === 'servicing' ? `Held back by borrowing power: lenders would want about ${money(proj.block.monthlyShort, { compact: true })} a month more income. Try a cheaper price or a higher yield.` : proj.block.reason === 'deposit' ? `Needs about ${money(proj.block.deposit, { compact: true })} for the deposit and costs; you’d have ${money(proj.block.available, { compact: true })}.` : 'You’ve set it not to happen before a later year.'}</p>
-                  )}
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    <Field label="Price in today’s money" className="lg:col-span-2">{(id) => <MoneyInput id={id} value={plan.price} onChange={(v) => set({ price: v ?? 0 })} />}</Field>
-                    <Field label="Rental yield">{(id) => <NumInput id={id} value={plan.yieldPct} onChange={(v) => set({ yieldPct: v ?? 0 })} step={0.1} suffix="%" />}</Field>
-                    <Field label="Price growth">{(id) => <NumInput id={id} value={plan.growth} onChange={(v) => set({ growth: v ?? 0 })} step={0.5} suffix="% / yr" />}</Field>
-                    <Field label="When">{(id) => <Select id={id} value={String(plan.notBefore ?? '')} onChange={(v) => set({ notBefore: v ? Number(v) : null })}
-                      options={[{ value: '', label: 'As soon as possible' }, ...Array.from({ length: Math.max(1, p.goals.retirementAge - startAge) }, (_, j) => startYear + 1 + j).map((y) => ({ value: String(y), label: `Not before ${y}` }))]} />}</Field>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
+        <div><h2 className="font-display text-xl font-semibold">Your property portfolio</h2><p className="text-sm text-muted">From what you own now to {p.goals.targetProperties} properties by {retireAge}. Open a property to set its loan plan. Change the number in Goals.</p></div>
+        <ol className="relative mt-8 space-y-4 border-l-2 border-line pl-8">
+          {p.properties.map((pr, i) => (
+            <OwnedRow key={pr.id} pr={pr} n={i + 1} open={open === pr.id} onToggle={() => toggle(pr.id)} retireAge={retireAge} startAge={startAge} />
+          ))}
+          {plans.map((plan, k) => (
+            <PlannedRow key={plan.id} plan={plan} k={k} n={p.properties.length + k + 1} open={open === plan.id} onToggle={() => toggle(plan.id)}
+              bought={proj.purchases[k]} firstMissing={k === proj.purchases.length} block={proj.block} startYear={startYear} startAge={startAge} retireAge={retireAge} />
+          ))}
         </ol>
         {need === 0 && <p className="mt-4 text-sm text-muted">You already own your target number of properties. Raise the target in Goals to plan the next one.</p>}
-        <p className="mt-6 text-[11px] text-muted">A purchase happens in the first year your equity and savings cover a 20% deposit plus about 5% in costs, and estimated borrowing power covers the loan. The price grows at the rate you set until then.</p>
+        <p className="mt-6 text-[11px] text-muted">A purchase happens in the first year your equity and savings cover the deposit and buying costs, and estimated borrowing power covers the loan. Prices grow at the rate you set until then. At retirement, an investment property that isn’t set to be paid off and still has a loan is sold; a home loan still owing is paid out from savings, then super once you can reach it at 60.</p>
       </section>
     </div>
+  );
+}
+
+function RowShell({ n, tone, title, sub, right, chips, open, onToggle, children }: { n: number; tone: 'owned' | 'planned' | 'missing'; title: string; sub: string; right?: React.ReactNode; chips: string[]; open: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <li className="relative">
+      <span className={`absolute -left-[41px] top-4 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${tone === 'owned' ? 'bg-gum text-surface' : tone === 'planned' ? 'bg-brass text-ground' : 'border-2 border-dashed border-clay/60 bg-surface text-clay'}`}>{n}</span>
+      <div className={`rounded-xl border ${open ? 'border-brass/50 bg-raised/60' : 'border-line bg-raised/30'}`}>
+        <button className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left" aria-expanded={open} onClick={onToggle}>
+          <div className="min-w-0">
+            <p className="font-display text-lg font-semibold">{title}</p>
+            <p className="text-sm text-muted">{sub}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">{chips.map((c) => <span key={c} className="rounded-full bg-surface px-2.5 py-0.5 text-xs ring-1 ring-line">{c}</span>)}</div>
+          </div>
+          <div className="flex items-center gap-3">{right}<Icon name="back" className={`h-4 w-4 text-muted transition-transform ${open ? 'rotate-90' : '-rotate-90'}`} /></div>
+        </button>
+        {open && <div className="border-t border-line p-4">{children}</div>}
+      </div>
+    </li>
+  );
+}
+
+function OwnedRow({ pr, n, open, onToggle, retireAge, startAge }: { pr: Property; n: number; open: boolean; onToggle: () => void; retireAge: number; startAge: number }) {
+  const p = useApp((s) => s.profile)!;
+  const update = useApp((s) => s.update);
+  const s = propertyStats(pr, p.assumptions.lvr);
+  const set = (patch: Partial<Property>) => update((d) => { Object.assign(d.properties.find((x) => x.id === pr.id)!, patch); });
+  const home = pr.use === 'home';
+  const io5 = !!pr.planIo5;
+  const payOff = !!pr.planPayOff;
+  const years = Math.max(1, retireAge - startAge - (io5 ? 5 : 0));
+  const payOffMonthly = s.debt > 0 ? pmt(s.avgRate || p.assumptions.newLoanRate, years, s.debt) : 0;
+  const chips = [home ? 'Home' : 'Investment', s.debt > 0 ? (io5 ? 'Interest-only for 5 years' : 'Principal and interest') : 'No loan', s.debt > 0 ? (payOff ? `Paid off by ${retireAge}` : home ? `Loan cleared from super at retirement` : `Sold at ${retireAge} if a loan is left`) : 'Owned outright'];
+  return (
+    <RowShell n={n} tone="owned" title={pr.address || 'Property'} sub={`Owned · worth about ${money(s.val.value, { compact: true })} · ${money(s.debt, { compact: true })} owing · ${money(s.equity, { compact: true })} equity`} chips={chips} open={open} onToggle={onToggle}>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="space-y-2 text-sm">
+          <p className="font-medium">Current loans</p>
+          {pr.loans.length === 0 ? <p className="text-muted">No loans on this property.</p> : pr.loans.map((l) => (
+            <p key={l.id} className="text-muted">{l.lender || 'Lender'} · {money(l.balance ?? 0)} at {l.rate ?? '?'}% · {l.type === 'io' ? 'interest-only' : 'principal and interest'} · {l.yearsLeft ?? 25} years left</p>
+          ))}
+          <p className="text-muted">{pr.use === 'investment' ? `Rent ${money(pr.weeklyRent ?? 0)} a week · ` : ''}growth {pr.growthRate}% a year</p>
+          <button className="btn-quiet mt-2" onClick={() => { location.hash = 'properties'; }}><Icon name="property" className="h-4 w-4" />Edit property details</button>
+        </div>
+        {s.debt > 0 ? (
+          <div className="space-y-4">
+            <Toggle checked={io5} onChange={(v) => set({ planIo5: v })} label="Interest-only for the next 5 years?" description="Lower repayments now; principal and interest after that." />
+            <Toggle checked={payOff} onChange={(v) => set({ planPayOff: v })} label={`Pay this property off by ${retireAge}?`}
+              description={payOff
+                ? `Repayments become principal and interest, sized to clear the loan by ${retireAge}: about ${money(payOffMonthly)} a month${io5 ? ' once the interest-only years end' : ''}.`
+                : home ? `Any home loan still owing at ${retireAge} is paid out from your savings, then your super once you can reach it (60).` : `If a loan is still owing at ${retireAge}, we assume you sell it then and the money goes towards your retirement.`} />
+          </div>
+        ) : <p className="text-sm text-muted">No loan to plan for. It’s kept in retirement for its rent, and only sold if your plan runs short.</p>}
+      </div>
+    </RowShell>
+  );
+}
+
+function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, startYear, startAge, retireAge }: {
+  plan: PlannedPurchase; k: number; n: number; open: boolean; onToggle: () => void; bought?: { year: number; price: number }; firstMissing: boolean;
+  block: ReturnType<typeof project>['block']; startYear: number; startAge: number; retireAge: number;
+}) {
+  const update = useApp((s) => s.update);
+  const set = (patch: Partial<PlannedPurchase>) => update((d) => { Object.assign(d.plannedPurchases![k], patch); });
+  const late = plan.buyBy && bought && bought.year >= plan.buyBy;
+  const io5 = plan.ioFirst5 !== false;
+  const weeklyRent = (plan.price * plan.yieldPct) / 100 / 52;
+  const chips = [plan.buyBy ? `Before ${plan.buyBy}` : 'As soon as possible', io5 ? 'Interest-only for 5 years' : 'Principal and interest', plan.payOff ? `Paid off by ${retireAge}` : `Sold at ${retireAge} if a loan is left`];
+  const right = bought
+    ? <p className={`text-right text-sm ${late ? 'text-clay' : ''}`}><span className="font-semibold">{bought.year}</span><br /><span className="text-muted">age {startAge + (bought.year - startYear)} · {money(bought.price, { compact: true })} then</span></p>
+    : <p className="text-sm font-medium text-clay">Doesn’t fit before {retireAge}</p>;
+  return (
+    <RowShell n={n} tone={bought && !late ? 'planned' : 'missing'} title={plan.label || `Property ${n}`} sub={`Planned · ${money(plan.price, { compact: true })} in today’s money · ${plan.yieldPct}% yield, about ${money(weeklyRent)} a week rent`} right={right} chips={chips} open={open} onToggle={onToggle}>
+      {!bought && firstMissing && block && (
+        <p className="mb-3 text-sm text-clay">{block.reason === 'servicing' ? `Held back by borrowing power: lenders would want about ${money(block.monthlyShort, { compact: true })} a month more income. Try a cheaper price or a higher yield.` : `Needs about ${money(block.deposit, { compact: true })} for the deposit and costs; you’d have ${money(block.available, { compact: true })}.`}</p>
+      )}
+      {late && <p className="mb-3 text-sm text-clay">You want this before {plan.buyBy}, but the earliest it fits is {bought!.year}.</p>}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="Name (optional)">{(id) => <TextInput id={id} value={plan.label} onChange={(v) => set({ label: v })} placeholder={`Property ${n}`} />}</Field>
+        <Field label="Price in today’s money">{(id) => <MoneyInput id={id} value={plan.price} onChange={(v) => set({ price: v ?? 0 })} />}</Field>
+        <Field label="When">{(id) => <Select id={id} value={String(plan.buyBy ?? '')} onChange={(v) => set({ buyBy: v ? Number(v) : null })}
+          options={[{ value: '', label: 'As soon as possible' }, ...Array.from({ length: Math.max(1, retireAge - startAge) }, (_, j) => startYear + 1 + j).map((y) => ({ value: String(y), label: `Before ${y}` }))]} />}</Field>
+        <Field label="Interest rate">{(id) => <NumInput id={id} value={plan.rate} onChange={(v) => set({ rate: v ?? 0 })} step={0.05} suffix="%" />}</Field>
+        <Field label="Rental yield" hint={`About ${money(weeklyRent)} a week`}>{(id) => <NumInput id={id} value={plan.yieldPct} onChange={(v) => set({ yieldPct: v ?? 0 })} step={0.1} suffix="%" />}</Field>
+        <Field label="Price growth">{(id) => <NumInput id={id} value={plan.growth} onChange={(v) => set({ growth: v ?? 0 })} step={0.5} suffix="% / yr" />}</Field>
+        <Field label="Deposit" hint="20% avoids mortgage insurance">{(id) => <NumInput id={id} value={plan.depositPct ?? 20} onChange={(v) => set({ depositPct: v ?? 20 })} step={1} suffix="%" />}</Field>
+        <Field label="Stamp duty and buying costs">{(id) => <NumInput id={id} value={plan.costsPct ?? 5} onChange={(v) => set({ costsPct: v ?? 5 })} step={0.5} suffix="%" />}</Field>
+        <Field label="Rates, insurance, upkeep" hint="Of the price, each year">{(id) => <NumInput id={id} value={plan.holdingPct ?? 1.2} onChange={(v) => set({ holdingPct: v ?? 1.2 })} step={0.1} suffix="%" />}</Field>
+        <Field label="Property management" hint="Of the rent">{(id) => <NumInput id={id} value={plan.mgmtPct ?? 7} onChange={(v) => set({ mgmtPct: v ?? 7 })} step={0.5} suffix="%" />}</Field>
+      </div>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <Toggle checked={io5} onChange={(v) => set({ ioFirst5: v })} label="Interest-only for the first 5 years?" description="Lower repayments while you build up; principal and interest after that." />
+        <Toggle checked={!!plan.payOff} onChange={(v) => set({ payOff: v })} label={`Pay this property off by ${retireAge}?`}
+          description={plan.payOff ? `Repayments are sized to clear the loan by ${retireAge}, so it’s kept for rent in retirement. Expect much higher repayments, especially if it’s bought late.` : `If a loan is still owing at ${retireAge}, we assume you sell it then and the money goes towards your retirement.`} />
+      </div>
+    </RowShell>
   );
 }
 
@@ -209,9 +267,8 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
   const auto = p.goals.shareMonthly == null;
   const startAge = p.household.you.age ?? 35;
   const years = Math.max(1, p.goals.retirementAge - startAge);
-  const atRetire = proj.points.find((x) => x.year === proj.retireYear);
-  const realAtRetire = atRetire ? atRetire.shares / Math.pow(1 + p.assumptions.inflation / 100, years) : 0;
-  const pts = proj.points.filter((x) => x.age <= p.goals.retirementAge).map((x, i) => ({ ...x, sharesReal: x.shares / Math.pow(1 + p.assumptions.inflation / 100, i) }));
+  const realAtRetire = proj.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years);
+  const pts = proj.points.filter((x) => x.age <= p.goals.retirementAge).map((x, i) => ({ ...x, sharesReal: (x.age === p.goals.retirementAge ? proj.sharesAtRetire : x.shares) / Math.pow(1 + p.assumptions.inflation / 100, i) }));
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <section className="panel p-5 sm:p-6">
@@ -253,7 +310,8 @@ const EVENT_STYLE: Record<string, { icon: string; cls: string }> = {
 
 function Projections({ quotes }: { quotes: Quotes }) {
   const p = useApp((s) => s.profile)!;
-  const proj = useMemo(() => project(p, quotes), [p, quotes]);
+  const check = useMemo(() => planCheck(p, quotes), [p, quotes]);
+  const proj = check.proj;
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
   const [hidden, setHidden] = useState<string[]>([]);
   const pts = proj.points;
@@ -274,6 +332,8 @@ function Projections({ quotes }: { quotes: Quotes }) {
         </div>
       </section>
 
+      <PlanCheckBox check={check} />
+
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">What happens, year by year</h2>
         <p className="mt-1 text-sm text-muted">Worked out from your figures, goals and assumptions. Change any of them and this updates.</p>
@@ -289,36 +349,10 @@ function Projections({ quotes }: { quotes: Quotes }) {
             );
           })}
         </ol>
-        <p className="mt-5 text-[11px] text-muted">In retirement the plan pays your yearly income from rent first, then savings, then super (from 60), then by selling shares, then by selling investment properties newest first. Your home is kept. Sale figures allow for selling costs and capital gains tax at an estimated rate. Estimates only, not financial advice.</p>
+        <p className="mt-5 text-[11px] text-muted">In retirement your yearly income is paid from super first (it opens at 60; a minimum amount must come out each year, from 4% rising with age), then rent and savings, then by selling shares, then by selling investment properties newest first. Money not needed straight away is invested in shares. Your home is kept. Super contributions are 12% of salary, capped at $32,500 a year, less 15% tax. Sale figures allow for selling costs and capital gains tax at an estimated rate. Estimates only, not financial advice.</p>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ChartCard title="Spending in retirement" note="The income you want (dashed) against what your plan can actually pay, in today’s money. Before retirement it shows what your investments could pay.">
-          <MiniLine points={pts} retireYear={proj.retireYear} series={[{ key: 'spendFundedReal', label: 'Can pay', color: C.equity }, { key: 'spendGoalReal', label: 'Your goal', color: C.brass, dash: true }]} />
-        </ChartCard>
-        <ChartCard title="Property value and debt" note="The gap between the lines is your property equity. Drops show properties being sold in retirement.">
-          <MiniLine points={pts} retireYear={proj.retireYear} series={[{ key: 'propertyValue', label: 'Value', color: C.equity }, { key: 'propertyDebt', label: 'Debt', color: C.clay }]} />
-        </ChartCard>
-        <ChartCard title="Borrowing capacity" note="What a lender might lend you each year, tested at your new-loan rate plus 3%. It dips after each purchase.">
-          <MiniLine points={pts} retireYear={proj.retireYear} series={[{ key: 'borrowing', label: 'Capacity', color: C.shares }]} />
-        </ChartCard>
-        <ChartCard title="Left over each month" note="Take-home pay and rent, minus living costs, dependants, repayments and your share plan. In retirement, rent minus your yearly spending.">
-          <MiniLine points={pts} retireYear={proj.retireYear} series={[{ key: 'monthlySavings', label: 'Monthly surplus', color: C.brass }]} />
-        </ChartCard>
-        <ChartCard title="If rates move 2%" note="Yearly loan repayments at today’s rates, and if rates rise or fall by 2 percentage points." wide>
-          <MiniLine points={pts} retireYear={proj.retireYear} series={[{ key: 'repayUp2', label: 'Rates +2%', color: C.clay, dash: true }, { key: 'repayBase', label: 'Current rates', color: C.ink }, { key: 'repayDown2', label: 'Rates −2%', color: C.equity, dash: true }]} />
-        </ChartCard>
-      </div>
     </div>
   );
 }
 
-function ChartCard({ title, note, children, wide }: { title: string; note: string; children: ReactNode; wide?: boolean }) {
-  return (
-    <section className={`panel p-5 ${wide ? 'lg:col-span-2' : ''}`}>
-      <h3 className="font-display text-lg font-semibold">{title}</h3>
-      <p className="text-xs text-muted">{note}</p>
-      <div className="mt-3 -ml-2">{children}</div>
-    </section>
-  );
-}

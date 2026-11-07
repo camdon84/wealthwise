@@ -48,6 +48,8 @@ export function normalize(p: Profile): Profile {
   p.goals.lifeExpectancy ??= 90;
   p.household.dependantsDetail ??= p.household.dependants.map((age, i) => emptyDependant(i, age));
   p.plannedPurchases ??= [];
+  for (const pp of p.plannedPurchases) { pp.ioFirst5 ??= true; pp.payOff ??= false; pp.depositPct ??= 20; pp.costsPct ??= 5; pp.holdingPct ??= 1.2; pp.mgmtPct ??= 7; if (pp.buyBy === undefined) pp.buyBy = null; }
+  for (const pr of p.properties) { pr.planIo5 ??= pr.loans.length > 0 && pr.loans.every((l) => l.type === 'io'); pr.planPayOff ??= pr.use === 'home'; }
   return p;
 }
 
@@ -55,7 +57,7 @@ export const emptyDependant = (i: number, age: number | null = null): import('./
   ({ id: uid(), name: `Dependant ${i + 1}`, age, monthlyCosts: null, childcareMonthly: null, activitiesMonthly: null, schoolFeesYearly: null, supportUntil: 18 });
 
 export const plannedPurchase = (n: number, a: Assumptions) =>
-  ({ id: uid(), label: `Property ${n}`, price: a.newPurchasePrice, yieldPct: a.newPurchaseYield, rate: a.newLoanRate, growth: 5, notBefore: null });
+  ({ id: uid(), label: `Property ${n}`, price: a.newPurchasePrice, yieldPct: a.newPurchaseYield, rate: a.newLoanRate, growth: 5, buyBy: null, ioFirst5: true, payOff: false, depositPct: 20, costsPct: 5, holdingPct: 1.2, mgmtPct: 7 });
 
 export const emptyLoan = (): Loan => ({ id: uid(), lender: '', balance: null, rate: null, type: 'pi', rateType: 'variable', yearsLeft: 25, offset: null });
 export const DEBT_RATE: Record<string, number> = { car: 9.5, personal: 12.5, 'credit-card': 20.99, other: 10 };

@@ -248,7 +248,7 @@ export function goalAnalysis(p: Profile, quotes: Quotes) {
   const deflate = Math.pow(1 + a.inflation / 100, years);
   const owned = p.properties.length;
   const projectedProps = owned + proj.purchases.filter((x) => x.year <= proj.retireYear).length;
-  const sharesAtRetireReal = (atRetire?.shares ?? 0) / deflate;
+  const sharesAtRetireReal = proj.sharesAtRetire / deflate;
   const target = p.goals.sharesTarget ?? 0;
   const requiredYearly = proj.requiredShareMonthly * 12;
   const spareYearly = Math.max(0, pos.monthlySurplus * 12);
