@@ -181,7 +181,7 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
   const insights = useMemo(() => wiseInsights(p, quotes), [p, quotes]);
   const take = useWiseTake(p, quotes, insights, 'goals');
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">What you want</h2>
         <div className="mt-5"><WealthFocusPicker value={g.wealthFocus} onChange={(v) => update((d) => { d.goals.wealthFocus = v; })} /></div>
