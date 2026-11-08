@@ -1,3 +1,4 @@
+import { notWorkIdea } from '../lib/insights';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
 import { applySnapshot, newForecast, PlanProvider, snapshot, useForecast, usePlanMode, usePlanProfile, usePlanUpdate, type PlanCtx } from '../lib/planContext';
@@ -217,7 +218,7 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
           <div className="mt-5 rounded-xl bg-raised p-4 ring-1 ring-line">
             <p className="text-xs font-medium text-muted">Wise suggests</p>
             <p className="mt-1 leading-relaxed">{take.summary}</p>
-            {take.ideas.length > 0 && <ul className="mt-2 space-y-1.5 text-sm">{take.ideas.map((i) => <li key={i.title}><span className="font-medium">{i.title}.</span> <span className="text-muted">{i.body}</span></li>)}</ul>}
+            {take.ideas.filter(notWorkIdea).length > 0 && <ul className="mt-2 space-y-1.5 text-sm">{take.ideas.filter(notWorkIdea).map((i) => <li key={i.title}><span className="font-medium">{i.title}.</span> <span className="text-muted">{i.body}</span></li>)}</ul>}
           </div>
         )}
         {take === 'loading' && <div className="mt-5 space-y-2"><div className="h-3 w-3/4 animate-pulse rounded bg-line" /><div className="h-3 w-full animate-pulse rounded bg-line" /></div>}

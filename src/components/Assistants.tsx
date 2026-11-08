@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Profile } from '../lib/types';
 import type { Quotes } from '../lib/calc';
-import { insightKey, rankInsights, wiseFacts, wiseInsights, type Insight } from '../lib/insights';
+import { insightKey, notWorkIdea, rankInsights, wiseFacts, wiseInsights, type Insight } from '../lib/insights';
 import { equitySpot, loadBriefing, propertyPulse, type Briefing } from '../lib/briefings';
 import { Icon, Segmented } from './ui';
 import { useApp, useNavIntent } from '../lib/store';
@@ -104,7 +104,7 @@ export function WisePanel({ profile, quotes, go }: { profile: Profile; quotes: Q
               <p className="text-[15px] leading-relaxed">{take.summary}</p>
               {take.ideas.length > 0 && (
                 <ul className="mt-3 space-y-2">
-                  {take.ideas.map((i) => <li key={i.title} className="text-sm"><span className="font-medium">{i.title}.</span> <span className="text-muted">{i.body}</span></li>)}
+                  {take.ideas.filter(notWorkIdea).map((i) => <li key={i.title} className="text-sm"><span className="font-medium">{i.title}.</span> <span className="text-muted">{i.body}</span></li>)}
                 </ul>
               )}
               <p className="mt-3 text-[11px] text-muted">Written by AI from the figures above.</p>

@@ -1,3 +1,4 @@
+import { notWorkIdea } from '../lib/insights';
 import { useMemo } from 'react';
 import { useApp } from '../lib/store';
 import { position, type Quotes } from '../lib/calc';
@@ -40,7 +41,7 @@ export function FirstLook({ quotes }: { quotes: Quotes }) {
           ) : (
             <div className="mt-4">
               <p className="text-lg leading-relaxed">{take.summary}</p>
-              {take.ideas.length > 0 && <ul className="mt-4 space-y-2">{take.ideas.map((i) => <li key={i.title}><span className="font-medium">{i.title}.</span> <span className="text-muted">{i.body}</span></li>)}</ul>}
+              {take.ideas.filter(notWorkIdea).length > 0 && <ul className="mt-4 space-y-2">{take.ideas.filter(notWorkIdea).map((i) => <li key={i.title}><span className="font-medium">{i.title}.</span> <span className="text-muted">{i.body}</span></li>)}</ul>}
             </div>
           )}
 

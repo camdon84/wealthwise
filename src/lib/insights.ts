@@ -331,3 +331,7 @@ export function goalAnalysis(p: Profile, quotes: Quotes) {
     : { tone: 'warn', text: `Living on ${money(p.goals.passiveIncome, { compact: true })} a year from ${p.goals.retirementAge}, your money runs out at ${proj.runsOutAge}, even after selling shares and investment properties. A lower yearly income, a later stop-work age or a bigger share plan would stretch it.` });
   return { owned, projectedProps, sharesAtRetireReal, requiredYearly, spareYearly, incomeReal, lines, proj };
 }
+
+/** Ideas WealthWise never gives: more work in any form, or structures and strategies the app can't model yet (trusts, SMSFs, salary sacrifice…). Hides any the AI slips through, including ones saved earlier. */
+const WORK_IDEA = /\btrusts?\b|company structure|\bsmsf\b|self[- ]managed super|ownership structure|bucket company|salary sacrific|extra (super )?contribution|concessional contribution|debt recycl|insurance|refinanc|rentvest|part[- ]?time|consult|side[- ]?(hustle|business|gig|income)|second job|freelanc|gig work|(keep|continue|start) working|work(ing)? (longer|after|past|beyond|into)|delay(ing)? (your )?retire|retir(e|ing) later|postpone (your )?retire|return to work|extra (hours|shifts)|overtime|pay rise|ask for a raise/i;
+export const notWorkIdea = (i: { title?: string; body?: string }) => !WORK_IDEA.test(`${i.title ?? ''} ${i.body ?? ''}`);

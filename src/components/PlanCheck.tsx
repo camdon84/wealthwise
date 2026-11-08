@@ -4,6 +4,7 @@ import { usePlanMode, usePlanProfile, usePlanUpdate } from '../lib/planContext';
 import { useApp } from '../lib/store';
 import { useEffect, useState } from 'react';
 import type { PlanIdea } from '../lib/planCheck';
+import { notWorkIdea } from '../lib/insights';
 import { uid } from '../lib/defaults';
 import { afterTax } from '../lib/calc';
 import { money } from '../lib/format';
@@ -112,7 +113,7 @@ function PlanIdeas({ check }: { check: PlanCheck }) {
   // At most 6 at a time: Wise's newest first, then tested ideas, keeping one liquidation idea if there is one
   const MAX = 6;
   const allTested = check.ideas.filter((t) => !hidden(ideaKey(t.text)));
-  const ai = (st?.ai ?? []).filter((x) => !hidden(`ai:${x.id}`)).slice(0, 3);
+  const ai = (st?.ai ?? []).filter((x) => !hidden(`ai:${x.id}`) && notWorkIdea(x)).slice(0, 3);
   let tested = allTested.slice(0, Math.max(0, MAX - ai.length));
   const liq = allTested.find((t) => t.liquidation);
   if (liq && !tested.includes(liq)) tested = [...tested.slice(0, Math.max(0, tested.length - 1)), liq];
@@ -131,7 +132,7 @@ function PlanIdeas({ check }: { check: PlanCheck }) {
         ideasAlreadyShown: [...check.ideas.map((x) => x.text), ...(st?.ai ?? []).map((x) => x.title)],
       };
       const r = await fetch(`/api/wise?mode=ideas&fresh=${t}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(facts) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-      fresh = (r?.ideas ?? []).map((i: { title: string; body: string }, k: number) => ({ id: `${t}-${k}`, title: i.title, body: i.body, at: t }));
+      fresh = (r?.ideas ?? []).filter(notWorkIdea).map((i: { title: string; body: string }, k: number) => ({ id: `${t}-${k}`, title: i.title, body: i.body, at: t }));
       if (!fresh.length) setNote('Wise couldn’t come up with anything new just now. Try again in a moment.');
     } else setNote('In the live app, Wise also writes new ideas for your plan here.');
     update((d) => {

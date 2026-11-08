@@ -49,8 +49,8 @@ export function PropertyEditor({ value, onChange, thorough }: { value: Property;
 
       {thorough && (
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Owned by">{(id) => <Select id={id} value={value.structure} onChange={(v) => set({ structure: v })} options={[
-            { value: 'personal', label: 'Me personally' }, { value: 'joint', label: 'Jointly' }, { value: 'trust', label: 'Family trust' }, { value: 'company', label: 'Company' }, { value: 'smsf', label: 'SMSF' }]} />}</Field>
+          <Field label="Owned by">{(id) => <Select id={id} value={value.structure === 'joint' ? 'joint' : 'personal'} onChange={(v) => set({ structure: v })} options={[
+            { value: 'personal', label: 'Me personally' }, { value: 'joint', label: 'Jointly' }]} />}</Field>
           <Field label="Yearly holding costs" hint="Rates, insurance, strata, maintenance">{(id) => <MoneyInput id={id} value={value.annualCosts} onChange={(v) => set({ annualCosts: v })} suffix="/ year" />}</Field>
           <Field label="Growth assumption">{(id) => <NumInput id={id} value={value.growthRate} onChange={(v) => set({ growthRate: v ?? 0 })} step={0.5} suffix="% p.a." />}</Field>
           {value.use === 'investment' && <>
