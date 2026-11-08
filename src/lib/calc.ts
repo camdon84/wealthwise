@@ -407,8 +407,10 @@ export function project(p: Profile, quotes: Quotes): Projection {
         offsetSaving = Math.min(Math.max(0, cash), debtTotal) * avgRate / 100;
       } else {
         const mtr = mtrOf(working ? youSal + n(p.household.otherIncome) : 0);
-        const capNow = cp.accessMax != null ? Math.max(buffer, n(cp.accessMax)) * infl(i) : Infinity;
-        const acc = Math.max(0, Math.min(cash, capNow));
+        // The emergency fund sits outside the cash plan (in a high-interest account); the split applies to cash above it, up to the cap
+        const emergency = Math.min(Math.max(0, cash), buffer * infl(i));
+        const capNow = cp.accessMax != null ? n(cp.accessMax) * infl(i) : Infinity;
+        const acc = Math.max(0, Math.min(cash - emergency, capNow));
         const targets = sims.filter((s) => s.debt > 0 && (cp.offsetProperties.length === 0 || cp.offsetProperties.includes(s.pid ?? '')));
         const offDebt = targets.reduce((t, s) => t + s.debt, 0);
         const wantOff = acc * cp.split.offset / 100;
@@ -416,7 +418,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         const hisaAmt = acc * cp.split.hisa / 100 + (wantOff - offAmt); // offset money with no loan left to offset earns high interest
         const everyAmt = Math.max(0, acc - offAmt - hisaAmt);
         const offSave = offDebt ? targets.reduce((t, s) => t + (offAmt * s.debt / offDebt) * (s.rate / 100) * (s.invest ? 1 - mtr : 1), 0) : 0;
-        offsetSaving = offSave + (hisaAmt * cp.hisaRate / 100 + everyAmt * cp.everydayRate / 100) * (1 - mtr);
+        offsetSaving = offSave + ((hisaAmt + emergency) * cp.hisaRate / 100 + everyAmt * cp.everydayRate / 100) * (1 - mtr);
       }
 
       const nextSalary = (who: 'you' | 'partner', cur: number) => {
@@ -523,10 +525,10 @@ export function project(p: Profile, quotes: Quotes): Projection {
         if (cash < 0 && shortfallYear == null) shortfallYear = year;
         // Cash plan: anything above the most they want accessible goes into shares
         if (cp?.sweep && cp.accessMax != null) {
-          const capNow = Math.max(buffer, n(cp.accessMax)) * infl(i);
+          const capNow = (buffer + n(cp.accessMax)) * infl(i); // emergency fund + what they want within reach
           if (cash > capNow + 100) {
             const ex = cash - capNow; cash -= ex; sweepBal += ex; sweepCost += ex;
-            if (!sweepSaid) { sweepSaid = true; say(year, 'shares', `Your cash passes the ${fmt(n(cp.accessMax))} you want to keep within reach (today’s money), so the extra starts going into shares. They’re sold down when a property needs the deposit.`); }
+            if (!sweepSaid) { sweepSaid = true; say(year, 'shares', `Your cash passes your emergency fund plus the ${fmt(n(cp.accessMax))} you want to keep within reach (today’s money), so the extra starts going into shares. They’re sold down when a property needs the deposit.`); }
           }
         }
       } else {

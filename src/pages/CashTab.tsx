@@ -30,7 +30,7 @@ function preset(p: Profile, risk: Risk, hisaRate: number, prev?: CashPlan): Cash
   const homeIds = choices.filter((c) => c.home).map((c) => c.id);
   return {
     active: true, risk,
-    accessMax: risk === 'conservative' ? null : risk === 'balanced' ? round10k(buffer + nextDeposit * 0.5) : round10k(buffer + 20000),
+    accessMax: risk === 'conservative' ? null : risk === 'balanced' ? round10k(nextDeposit * 0.5) : 20000, // on top of the emergency fund
     split, offsetProperties: prev?.offsetProperties?.length ? prev.offsetProperties : homeIds.length ? homeIds : choices.map((c) => c.id),
     hisaRate: prev?.hisaRate ?? hisaRate, everydayRate: prev?.everydayRate ?? 0, sweep: risk !== 'conservative',
   };
@@ -127,7 +127,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
         <section className="panel p-5 sm:p-6">
           <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-gum text-surface"><Icon name="check" className="h-5 w-5" /></span><h3 className="font-display text-lg font-semibold">Your cash plan</h3></div>
           <ul className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <li className="rounded-xl bg-raised p-4 ring-1 ring-line"><p className="text-xs text-muted">Within reach</p><p className="font-display text-lg font-semibold">{saved.accessMax == null ? 'No limit' : `Up to ${money(Math.max(saved.accessMax, buffer))}`}</p><p className="text-xs text-muted">Including your {money(buffer)} emergency fund · today’s money</p></li>
+            <li className="rounded-xl bg-raised p-4 ring-1 ring-line"><p className="text-xs text-muted">Within reach</p><p className="font-display text-lg font-semibold">{saved.accessMax == null ? 'No limit' : `Up to ${money(saved.accessMax)}`}</p><p className="text-xs text-muted">On top of your {money(buffer)} emergency fund · today’s money</p></li>
             <li className="rounded-xl bg-raised p-4 ring-1 ring-line"><p className="text-xs text-muted">Where it sits</p><p className="font-display text-lg font-semibold">{saved.split.offset}% offset · {saved.split.hisa}% high interest · {saved.split.everyday}% everyday</p>{saved.split.offset > 0 && <p className="text-xs text-muted">Offset against {choices.filter((c) => saved.offsetProperties.includes(c.id)).map((c) => c.label).join(', ') || 'your loans'}</p>}</li>
             <li className="rounded-xl bg-raised p-4 ring-1 ring-line sm:col-span-2"><p className="text-xs text-muted">Above that</p><p className="font-medium">{saved.sweep && saved.accessMax != null ? 'Goes into shares, and is sold down to cover the deposit when you buy your next property, after capital gains tax. It shows on the Shares tab.' : 'Stays in cash.'}</p></li>
           </ul>
@@ -150,7 +150,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
                 {([
                   ['conservative', 'Keep it safe', 'All of it stays in cash: offset and high-interest accounts. No market ups and downs.'],
                   ['balanced', 'Balanced', 'Keep enough within reach for about half your next deposit. The rest goes into shares and is sold when you buy.'],
-                  ['growth', 'Put it to work', 'Keep little more than your emergency fund in cash. Everything else goes into shares until a deposit is needed.'],
+                  ['growth', 'Put it to work', 'Keep your emergency fund and a little more in cash. Everything else goes into shares until a deposit is needed.'],
                 ] as [Risk, string, string][]).map(([k, t, d]) => (
                   <button key={k} onClick={() => setDraft(preset(p, k, hisaNow, draft))} className={`rounded-xl p-4 text-left ring-1 transition-colors ${draft.risk === k ? 'bg-brass/10 ring-2 ring-brass' : 'ring-line hover:ring-brass/50'}`}>
                     <p className="font-semibold">{t}</p><p className="mt-1 text-sm text-muted">{d}</p>
@@ -163,19 +163,18 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
           {step === 1 && (
             <div className="mt-5 max-w-xl">
               <h3 className="font-display text-lg font-semibold">Your emergency fund stays as cash, always</h3>
-              <p className="mt-2 leading-relaxed">You’ve set <strong>{money(buffer)}</strong> as the emergency cash buffer you want to keep. Nothing in this plan touches it. To change it, go to My Details, under Cash, Superannuation and Debts.</p>
+              <p className="mt-2 leading-relaxed">You’ve set <strong>{money(buffer)}</strong> as the emergency cash buffer you want to keep. It sits outside these calculations (we assume a high-interest account), and nothing in this plan touches it. To change it, go to My Details, under Cash, Superannuation and Debts.</p>
             </div>
           )}
 
           {step === 2 && (
             <div className="mt-5 max-w-xl">
               <h3 className="font-display text-lg font-semibold">What’s the most you want within reach?</h3>
-              <p className="mt-1 text-sm text-muted">Across your offset, high-interest and everyday accounts, including your emergency fund. Anything above this can go into shares.</p>
+              <p className="mt-1 text-sm text-muted">Across your offset, high-interest and everyday accounts, not including your emergency fund (that stays outside these calculations). Anything above this can go into shares.</p>
               <div className="mt-4 flex flex-wrap items-end gap-3">
                 <div className="w-56"><Field label="Most I want within reach">{(id) => <MoneyInput id={id} value={draft.accessMax} onChange={(v) => set({ accessMax: v, sweep: v != null && draft.sweep })} placeholder="No limit" />}</Field></div>
                 <button className="btn-ghost mb-1 text-sm" onClick={() => set({ accessMax: null, sweep: false })}>No limit, keep it all as cash</button>
               </div>
-              {draft.accessMax != null && draft.accessMax < buffer && <p className="mt-2 text-sm text-brass">That’s less than your emergency fund, so we’ll keep {money(buffer)} within reach.</p>}
             </div>
           )}
 
@@ -218,7 +217,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
             <div className="mt-5 max-w-2xl">
               <h3 className="font-display text-lg font-semibold">Put the rest into shares?</h3>
               {draft.accessMax == null ? <p className="mt-2 leading-relaxed">You chose to keep it all as cash, so nothing goes into shares. Go back to step 3 to set a limit if you’d like to.</p> : (<>
-                <p className="mt-2 leading-relaxed">Anything above <strong>{money(Math.max(buffer, draft.accessMax))}</strong> (today’s money) goes into shares. When you buy your next property, we sell enough to cover the deposit, after capital gains tax, and show it as a liquidation event on your charts. This sits in its own part of the Shares tab, and only changes from here.</p>
+                <p className="mt-2 leading-relaxed">Anything above <strong>{money(draft.accessMax)}</strong>, plus your {money(buffer)} emergency fund (today’s money), goes into shares. When you buy your next property, we sell enough to cover the deposit, after capital gains tax, and show it as a liquidation event on your charts. This sits in its own part of the Shares tab, and only changes from here.</p>
                 <label className="mt-4 flex cursor-pointer items-center gap-3"><input type="checkbox" className="h-4 w-4 accent-[rgb(var(--brass))]" checked={draft.sweep} onChange={(e) => set({ sweep: e.target.checked })} /><span className="font-medium">Yes, invest the extra in shares</span></label>
               </>)}
             </div>

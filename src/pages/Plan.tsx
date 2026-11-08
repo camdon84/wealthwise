@@ -651,7 +651,7 @@ function CashShares({ p, proj, onCash }: { p: Profile; proj: ReturnType<typeof p
     <div className="mt-6 rounded-xl border border-dashed border-line p-4">
       <div className="flex items-center justify-between gap-3"><p className="font-semibold">Spare cash invested</p><span className="chip bg-raised text-muted ring-1 ring-line"><Icon name="lock" className="h-3 w-3" />Set in the Cash tab</span></div>
       {cp?.sweep && cp.accessMax != null ? (<>
-        <p className="mt-1 text-sm text-muted">Cash above {money(Math.max(cp.accessMax, p.finances.buffer || 0))} (today’s money) goes into shares, and is sold to cover deposits.</p>
+        <p className="mt-1 text-sm text-muted">Cash above {money(cp.accessMax)}, plus your emergency fund (today’s money), goes into shares, and is sold to cover deposits.</p>
         <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
           <div><p className="text-xs text-muted">Most invested</p><p className="font-display text-lg font-semibold">{money(peak.v, { compact: true })}</p><p className="text-xs text-muted">{peak.year ? `around ${peak.year}, today’s money` : '—'}</p></div>
           <div><p className="text-xs text-muted">Sold for deposits</p><p className="font-display text-lg font-semibold">{sales.length ? `${sales.length} ${sales.length === 1 ? 'time' : 'times'}` : 'Not yet'}</p><p className="text-xs text-muted">{proj.cashSharesTax > 0 ? `about ${money(proj.cashSharesTax, { compact: true })} in tax` : ''}</p></div>
