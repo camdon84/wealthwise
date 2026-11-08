@@ -83,7 +83,7 @@ export function WealthChart({ points, retireYear, height = 320, real, hidden = [
   const step = Math.pow(10, Math.floor(Math.log10(top)));
   const yMax = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].map((m) => m * step).find((v) => v >= top) ?? top;
   // Where a marker sits: property buys and sales on the property equity line, liquidations on the top line,
-  // and a loan paid off along the top edge, like a timeline marker (a car or personal loan isn't one of the lines)
+  // and a loan paid off on the cash line (repayments come out of cash)
   const upTo = (p: YearPoint, key: string) => { let t = 0; for (const s of shown) { t += Math.max(0, p[s.key] as number); if (s.key === key) break; } return t; };
   const equityTop = (p: YearPoint) => (shown.some((s) => s.key === 'propertyEquity') ? upTo(p, 'propertyEquity') : shown.filter((s) => s.key === 'cash').reduce((t, s) => t + Math.max(0, p[s.key] as number), 0));
   const stackTop = (p: YearPoint) => shown.reduce((t, s) => t + Math.max(0, p[s.key] as number), 0);
@@ -98,7 +98,7 @@ export function WealthChart({ points, retireYear, height = 320, real, hidden = [
         <YAxis {...axis} width={56} domain={[0, yMax]} allowDataOverflow ticks={[0, yMax / 4, yMax / 2, (yMax * 3) / 4, yMax]} tickFormatter={(v) => money(v, { compact: true })} />
         <Tooltip content={<Tip rows={shown} rowsAll={all.length} real={real} />} cursor={{ stroke: C.muted, strokeDasharray: '3 3' }} />
         {shown.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} strokeWidth={1.5} fill={`url(#g-${s.key})`} isAnimationActive={false} />)}
-        <ReferenceLine x={retireYear} stroke={C.brass} strokeDasharray="4 4" label={{ value: 'Stop work', position: 'insideTopRight', fill: C.brass, fontSize: 11 }} />
+        <ReferenceLine x={retireYear} stroke={C.brass} strokeDasharray="4 4" label={{ value: 'Retirement', position: 'insideTopRight', fill: C.brass, fontSize: 11 }} />
         {runsOutYear != null && <ReferenceLine x={runsOutYear} stroke={C.clay} strokeWidth={1.5} label={{ value: 'Money runs out', position: 'insideTopLeft', fill: C.clay, fontSize: 11 }} />}
         {points.filter((p) => p.bought).map((p) => (
           <ReferenceDot key={p.year} x={p.year} y={equityTop(p)} r={5} fill="rgb(var(--surface))" stroke={C.brass} strokeWidth={2}
@@ -109,7 +109,7 @@ export function WealthChart({ points, retireYear, height = 320, real, hidden = [
             label={{ value: p.sold!.length > 1 ? `Sell ×${p.sold!.length}` : 'Sell', position: 'top', fill: C.clay, fontSize: 10 }} />
         ))}
         {points.filter((p) => p.paidOff).map((p, k) => (
-          <ReferenceDot key={`d${p.year}`} x={p.year} y={yMax} r={4.5} fill={C.equity} stroke="rgb(var(--surface))" strokeWidth={1.5} ifOverflow="visible" label={k === 0 ? { value: 'Loan paid off', position: 'bottom', fill: C.equity, fontSize: 10 } : undefined} />
+          <ReferenceDot key={`d${p.year}`} x={p.year} y={shown.some((x) => x.key === 'cash') ? upTo(p, 'cash') : 0} r={4.5} fill={C.equity} stroke="rgb(var(--surface))" strokeWidth={1.5} ifOverflow="visible" label={k === 0 ? { value: 'Loan paid off', position: 'top', fill: C.equity, fontSize: 10 } : undefined} />
         ))}
         {points.filter((p) => p.liquidated).map((p) => (
           <ReferenceDot key={`l${p.year}`} x={p.year} y={stackTop(p)} r={8} fill={C.clay} stroke="rgb(var(--surface))" strokeWidth={1.5}
@@ -127,7 +127,7 @@ export function MarkerKey({ points }: { points: YearPoint[] }) {
     <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
       <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: C.brass }} />Property bought</li>
       {points.some((p) => p.sold) && <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: C.clay }} />Property sold</li>}
-      {debts.length > 0 && <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: C.equity }} />Loan paid off (along the top): {debts.join(' · ')}</li>}
+      {debts.length > 0 && <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: C.equity }} />Loan paid off (on the cash line): {debts.join(' · ')}</li>}
       {points.some((p) => p.liquidated) && <li className="flex items-center gap-1.5"><span className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: C.clay }}>$</span>Liquidation event</li>}
     </ul>
   );
@@ -204,7 +204,7 @@ export function CashFlowChart({ points, retireYear, height = 320, real }: { poin
         {flowSeries.map((s) => <Bar key={s.key} dataKey={s.key} stackId="in" fill={s.color} fillOpacity={0.8} isAnimationActive={false} />)}
         <Line type="monotone" dataKey="spending" stroke={C.clay} strokeWidth={2} dot={false} isAnimationActive={false} />
         {tall.map((t) => <ReferenceDot key={t.year} x={t.year} y={cap} r={0} label={{ value: `↑ ${money(t.total, { compact: true })}`, position: 'right', fill: C.ink, fontSize: 10, fontWeight: 600 }} />)}
-        <ReferenceLine x={retireYear} stroke={C.brass} strokeDasharray="4 4" label={{ value: 'Stop work', position: 'insideBottomLeft', fill: C.brass, fontSize: 11 }} />
+        <ReferenceLine x={retireYear} stroke={C.brass} strokeDasharray="4 4" label={{ value: 'Retirement', position: 'insideBottomLeft', fill: C.brass, fontSize: 11 }} />
       </ComposedChart>
     </ResponsiveContainer>
   );
