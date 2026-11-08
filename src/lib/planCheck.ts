@@ -1,6 +1,6 @@
-import { holdingsStats, incomeTax, position, project, type Projection, type Quotes } from './calc';
+import { holdingsStats, incomeTax, position, project, propertyStats, type Projection, type Quotes } from './calc';
 import { money } from './format';
-import type { Profile } from './types';
+import type { Liquidation, Profile } from './types';
 
 /**
  * Checks whether the plan holds together, and if it doesn't, tests changes against the same
@@ -253,3 +253,42 @@ export function saleAfterTax(p: Profile, quotes: Quotes, kind: 'crypto' | 'share
   return { gross, tax, net: gross - tax };
 }
 
+
+/** Today's value of the share or crypto portfolio. */
+export function holdingValue(p: Profile, quotes: Quotes, kind: 'crypto' | 'shares') {
+  return holdingsStats(p.holdings, quotes).rows.filter((r) => isCryptoHolding(r.h) === (kind === 'crypto')).reduce((t, r) => t + r.value, 0);
+}
+
+/** A property's estimated value in a given year, at its own growth rate. */
+export function propertyValueIn(p: Profile, propertyId: string, year: number) {
+  const pr = p.properties.find((x) => x.id === propertyId);
+  if (!pr) return 0;
+  const now = propertyStats(pr, p.assumptions.lvr).val.value;
+  return now * Math.pow(1 + pr.growthRate / 100, Math.max(0, year - new Date().getFullYear()));
+}
+
+/**
+ * What a liquidation event leaves you with. Shares and crypto at today's prices; a property at its sale price
+ * less agent fees and selling costs, the loan (today's balance) and capital gains tax (none on your home).
+ */
+export function liquidationEstimate(p: Profile, quotes: Quotes, lq: Liquidation) {
+  const income = (p.household.you.salary ?? 0) + (p.household.otherIncome ?? 0);
+  if (lq.asset === 'property') {
+    const pr = p.properties.find((x) => x.id === lq.propertyId);
+    if (!pr) return null;
+    const st = propertyStats(pr, p.assumptions.lvr);
+    const gross = lq.salePrice ?? Math.round(propertyValueIn(p, pr.id, lq.year) / 1000) * 1000;
+    const costs = gross * (lq.sellCostPct ?? 2.5) / 100;
+    const base = (pr.purchasePrice ?? 0) || st.val.value;
+    const gain = Math.max(0, gross - costs - base);
+    const home = pr.use === 'home';
+    const tax = home ? 0 : Math.max(0, incomeTax(income + gain * 0.5) - incomeTax(income));
+    const debt = st.debt;
+    return { holding: st.val.value, gross, costs, debt, tax, net: gross - costs - debt - tax, home, gain };
+  }
+  const holding = holdingValue(p, quotes, lq.asset);
+  if (holding <= 0) return { holding: 0, gross: 0, costs: 0, debt: 0, tax: 0, net: 0, home: false, gain: 0 };
+  const amount = lq.amount ?? holding * Math.min(1, (lq.pct ?? 0) / 100);
+  const sale = saleAfterTax(p, quotes, lq.asset, Math.min(1, amount / holding));
+  return { holding, gross: sale?.gross ?? 0, costs: 0, debt: 0, tax: sale?.tax ?? 0, net: sale?.net ?? 0, home: false, gain: 0 };
+}

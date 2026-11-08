@@ -440,19 +440,36 @@ export function project(p: Profile, quotes: Quotes): Projection {
         cash += gft.amount; giftIn += gft.amount;
         say(year, 'gift', `${gft.kind === 'inheritance' ? 'Inheritance' : 'Gift'}${gft.from ? ` from ${gft.from}` : ''}: ${fmt(gft.amount)}${gft.note ? ` (${gft.note})` : ''}, added to your savings.`);
       }
-      // Liquidation events: sell part of the crypto or shares, after capital gains tax at your marginal rate
-      for (const lq of p.liquidations ?? []) if (Math.max(lq.year, y0 + 1) === year && lq.pct > 0) {
-        const f = Math.min(1, lq.pct / 100);
+      // Liquidation events: sell some crypto or shares (after capital gains tax at your marginal rate), or sell a property
+      for (const lq of p.liquidations ?? []) if (Math.max(lq.year, y0 + 1) === year) {
+        const income = youSal + n(p.household.otherIncome);
+        if (lq.asset === 'property') {
+          const idx = sims.findIndex((x) => x.pid === lq.propertyId);
+          if (idx < 0) continue;
+          const s = sims[idx];
+          const price = lq.salePrice ?? s.value;
+          const costs = price * (lq.sellCostPct ?? SELL_COSTS * 100) / 100;
+          const gain = Math.max(0, price - costs - s.cost);
+          const tax = s.home ? 0 : Math.max(0, incomeTax(income + gain * 0.5) - incomeTax(income)); // main residence is CGT-free
+          const net = price - costs - s.debt - tax;
+          sims.splice(idx, 1);
+          cash += net; liqIn += net; liquidated += Math.max(1, net);
+          say(year, 'liquidate', `Liquidation event: sell ${s.name} for about ${fmt(price)}. After ${fmt(costs)} in agent fees and selling costs, ${fmt(s.debt)} to pay out the loan${tax ? ` and an estimated ${fmt(tax)} in capital gains tax` : ''}, ${fmt(net)} goes into your savings.`);
+          continue;
+        }
+        const bal = lq.asset === 'crypto' ? (cryptoIn ? cryptoBal : cryptoOut) : shares;
+        if (bal < 1) continue;
+        const f = lq.amount != null ? Math.min(1, lq.amount / bal) : Math.min(1, (lq.pct ?? 0) / 100);
+        if (f <= 0) continue;
         let gross = 0, gain = 0;
         if (lq.asset === 'crypto') {
           if (cryptoIn) { gross = cryptoBal * f; gain = Math.max(0, cryptoBal - cryptoCost) * f; cryptoBal -= gross; cryptoCost *= 1 - f; }
           else { gross = cryptoOut * f; gain = Math.max(0, cryptoOut - cryptoOutCost) * f; cryptoOut -= gross; cryptoOutCost *= 1 - f; }
         } else { gross = shares * f; gain = Math.max(0, shares - shareCost) * f; shares -= gross; shareCost *= 1 - f; }
         if (gross < 1) continue;
-        const income = youSal + n(p.household.otherIncome);
         const tax = Math.max(0, incomeTax(income + gain * 0.5) - incomeTax(income));
         cash += gross - tax; liqIn += gross - tax; liquidated += gross - tax;
-        say(year, 'liquidate', `Liquidation event: sell ${lq.pct}% of your ${lq.asset} for about ${fmt(gross)}. After an estimated ${fmt(tax)} in capital gains tax, ${fmt(gross - tax)} goes into your savings.`);
+        say(year, 'liquidate', `Liquidation event: sell ${fmt(gross)} of your ${lq.asset}. After an estimated ${fmt(tax)} in capital gains tax, ${fmt(gross - tax)} goes into your savings.`);
       }
 
       const sellShares = (need: number) => {

@@ -208,7 +208,16 @@ export interface Renovation {
 }
 
 /** A planned sale of part of the crypto or share portfolio, to free up cash. */
-export interface Liquidation { id: string; year: number; asset: 'crypto' | 'shares'; pct: number; note?: string }
+/**
+ * A planned sale. Shares and crypto: amount is the dollars to sell in that year (older events used pct of the holding).
+ * Property: sells the whole property; salePrice (that year's dollars) defaults to its projected value, sellCostPct to 2.5%.
+ */
+export interface Liquidation {
+  id: string; year: number; asset: 'crypto' | 'shares' | 'property';
+  pct?: number; amount?: number | null;
+  propertyId?: string; salePrice?: number | null; sellCostPct?: number | null;
+  note?: string;
+}
 /** Money expected from family: a gift or an inheritance. Amount is in the dollars of that year. */
 export interface Gift { id: string; year: number; amount: number; from: string; kind: 'gift' | 'inheritance'; note?: string }
 

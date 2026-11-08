@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
 import { applySnapshot, newForecast, PlanProvider, snapshot, useForecast, usePlanMode, usePlanProfile, usePlanUpdate, type PlanCtx } from '../lib/planContext';
 import { CHILD_COST_YEAR, RETIRE_CASH_MIN, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, type Quotes } from '../lib/calc';
-import { maxShareMonthly, planCheck, saleAfterTax } from '../lib/planCheck';
+import { holdingValue, liquidationEstimate, maxShareMonthly, planCheck, propertyValueIn } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { wiseInsights } from '../lib/insights';
 import { money } from '../lib/format';
@@ -187,11 +187,11 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
           <LinkedValue label="Properties owned by retirement" value={`${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}`} hint="Update your property goal on the Property portfolio tab." tabLabel="Property portfolio" onGo={() => go('timeline')} />
           <LinkedValue label="Share portfolio value at retirement" value={g.sharesTarget ? `${money(g.sharesTarget)}` : 'No goal set'} hint="Update your share plan on the Shares tab." tabLabel="Shares" onGo={() => go('shares')} />
           <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working, in today’s money. The plan sells shares and properties if it needs to.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
-          <div><Field label="Cash to keep on hand in retirement" hint="The least you want in the bank at any time once you stop work, in today’s money. It replaces your emergency cash buffer from then on. We use $50,000 if you leave it blank.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder="50000" />}</Field>
+          <div><Field label="Cash to keep on hand in retirement" hint="The least you want in the bank at any time once you stop work, in today’s money. This replaces the emergency cash buffer you set in My Details once you retire. We recommend at least $50,000, but you can set it to $0 and your Wise Future will use that.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder="50000" />}</Field>
             {g.retireCash != null && g.retireCash < RETIRE_CASH_MIN && <p role="status" className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-sm">We recommend keeping at least {money(RETIRE_CASH_MIN)} in cash once you’ve retired, for repairs, health costs and surprises without having to sell anything.</p>}</div>
           <div className="sm:col-span-2">
             <p className="field-label">Planning to have children?</p>
-            <p className="-mt-1 mb-2 text-xs text-muted">Add the year you expect each one. We allow the Australian average cost of raising a child, about {money(CHILD_COST_YEAR)} a year from birth to 18 in today’s money. Leave it blank if you’re not planning any. Children you already have go in Dependants.</p>
+            <p className="-mt-1 mb-2 text-xs text-muted">Add the year you expect each one. We allow the Australian average cost of raising a child, about {money(CHILD_COST_YEAR)} a year from birth to 18 in today’s money. Leave it blank if you’re not planning any. Children you already have go in My Details, under Dependants.</p>
             <div className="space-y-2">
               {(g.plannedChildren ?? []).map((c, k) => (
                 <div key={c.id} className="flex items-center gap-2">
@@ -500,35 +500,83 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
   const y0 = new Date().getFullYear();
   const lastYear = y0 + Math.max(1, (p.goals.lifeExpectancy ?? 90) - (p.household.you.age ?? 35));
   const set = (id: string, patch: Partial<Liquidation>) => update((d) => { Object.assign(d.liquidations!.find((x) => x.id === id)!, patch); });
-  const hasCrypto = p.holdings.some((h) => h.kind === 'crypto' || h.exchange === 'CRYPTO');
-  const hasShares = p.holdings.some((h) => !(h.kind === 'crypto' || h.exchange === 'CRYPTO'));
+  const sharesNow = holdingValue(p, quotes, 'shares');
+  const cryptoNow = holdingValue(p, quotes, 'crypto');
+  const round1k = (v: number) => Math.round(v / 1000) * 1000;
+  const what = [
+    ...(sharesNow > 0 ? [{ value: 'shares', label: 'Shares' }] : []),
+    ...(cryptoNow > 0 ? [{ value: 'crypto', label: 'Crypto' }] : []),
+    ...p.properties.map((pr) => ({ value: `property:${pr.id}`, label: pr.address || 'A property' })),
+  ];
+  const pick = (lq: Liquidation, v: string) => {
+    if (v.startsWith('property:')) set(lq.id, { asset: 'property', propertyId: v.slice(9), salePrice: null, sellCostPct: null, amount: null, pct: undefined });
+    else { const k = v as 'shares' | 'crypto'; set(lq.id, { asset: k, propertyId: undefined, salePrice: null, amount: round1k((k === 'shares' ? sharesNow : cryptoNow) / 2), pct: undefined }); }
+  };
+  const add = () => update((d) => {
+    const first = what[0]?.value ?? 'shares';
+    const lq: Liquidation = first.startsWith('property:') ? { id: uid(), year: y0, asset: 'property', propertyId: first.slice(9) } : { id: uid(), year: y0, asset: first as 'shares' | 'crypto', amount: round1k((first === 'shares' ? sharesNow : cryptoNow) / 2) };
+    (d.liquidations ??= []).push(lq);
+  });
+  const row = (label: string, v: number, cls = '') => <div className={`flex justify-between gap-4 py-1 ${cls}`}><span>{label}</span><span className="tabular-nums">{money(v)}</span></div>;
   return (
     <section className="panel p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 className="font-display text-xl font-semibold">Liquidation events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Planned sales of part of your crypto or shares, to free up cash for a deposit or anything else. The money goes into your savings after an estimate of capital gains tax. They show on your charts as a red $.</p></div>
-        <button className="btn-primary" disabled={!hasCrypto && !hasShares} onClick={() => update((d) => { (d.liquidations ??= []).push({ id: uid(), year: y0, asset: hasCrypto ? 'crypto' : 'shares', pct: 50 }); })}><Icon name="plus" className="h-4 w-4" />Add a liquidation event</button>
+        <div><h2 className="font-display text-xl font-semibold">Liquidation events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Planned sales of shares, crypto or a property you own, to free up cash for a deposit or anything else. The money goes into your savings after selling costs, any loan and an estimate of capital gains tax. They show on your charts as a red $.</p></div>
+        <button className="btn-primary" disabled={what.length === 0} onClick={add}><Icon name="plus" className="h-4 w-4" />Add a liquidation event</button>
       </div>
       {list.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No liquidation events yet. Add one here, or from a suggestion in Your Wise Future.</p> : (
         <ul className="mt-6 space-y-3">
           {list.map((lq) => {
-            const est = saleAfterTax(p, quotes, lq.asset, lq.pct / 100);
+            const est = liquidationEstimate(p, quotes, lq);
+            const isProp = lq.asset === 'property';
+            const pr = isProp ? p.properties.find((x) => x.id === lq.propertyId) : undefined;
+            const holding = lq.asset === 'shares' ? sharesNow : lq.asset === 'crypto' ? cryptoNow : 0;
+            const amount = lq.amount ?? (lq.pct != null ? round1k(holding * Math.min(1, lq.pct / 100)) : null);
+            const estPrice = isProp && pr ? round1k(propertyValueIn(p, pr.id, lq.year)) : 0;
+            const value = isProp ? `property:${lq.propertyId}` : lq.asset;
             return (
               <li key={lq.id} className="rounded-xl border border-line p-4">
                 <div className="flex flex-wrap items-end gap-3">
                   <span className="mb-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-clay font-display font-bold text-white">$</span>
-                  <div className="w-44"><Field label="Year">{(id) => <Select id={id} value={String(lq.year)} onChange={(v) => set(lq.id, { year: Number(v) })} options={Array.from({ length: lastYear - y0 + 1 }, (_, j) => y0 + j).map((y) => ({ value: String(y), label: y === y0 ? `This year (${y})` : String(y) }))} />}</Field></div>
-                  <div className="w-36"><Field label="Sell">{(id) => <Select id={id} value={lq.asset} onChange={(v) => set(lq.id, { asset: v as Liquidation['asset'] })} options={[{ value: 'crypto', label: 'Crypto' }, { value: 'shares', label: 'Shares' }]} />}</Field></div>
-                  <div className="w-36"><Field label="How much">{(id) => <Select id={id} value={String(lq.pct)} onChange={(v) => set(lq.id, { pct: Number(v) })} options={[10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 100].map((v) => ({ value: String(v), label: v === 100 ? 'All of it' : `${v}%` }))} />}</Field></div>
-                  <div className="min-w-[12rem] flex-1"><Field label="Note (optional)">{(id) => <TextInput id={id} value={lq.note ?? ''} onChange={(v) => set(lq.id, { note: v })} placeholder="e.g. Deposit for property 2" />}</Field></div>
+                  <div className="w-40"><Field label="Year">{(id) => <Select id={id} value={String(lq.year)} onChange={(v) => set(lq.id, { year: Number(v) })} options={Array.from({ length: lastYear - y0 + 1 }, (_, j) => y0 + j).map((y) => ({ value: String(y), label: y === y0 ? `This year (${y})` : String(y) }))} />}</Field></div>
+                  <div className="w-56"><Field label="Sell">{(id) => <Select id={id} value={what.some((w) => w.value === value) ? value : (what[0]?.value ?? value)} onChange={(v) => pick(lq, v)} options={what.length ? what : [{ value, label: lq.asset }]} />}</Field></div>
+                  {isProp ? (<>
+                    <div className="w-44"><Field label={`Sale price in ${lq.year}`}>{(id) => <MoneyInput id={id} value={lq.salePrice ?? estPrice} onChange={(v) => set(lq.id, { salePrice: v })} />}</Field></div>
+                    <div className="w-48"><Field label="Agent and selling costs">{(id) => <NumInput id={id} value={lq.sellCostPct ?? 2.5} onChange={(v) => set(lq.id, { sellCostPct: v })} step={0.1} min={0} max={10} suffix="%" />}</Field></div>
+                  </>) : (
+                    <div className="w-44"><Field label="Amount to sell">{(id) => <MoneyInput id={id} value={amount} onChange={(v) => set(lq.id, { amount: v, pct: undefined })} />}</Field></div>
+                  )}
+                  <div className="min-w-[10rem] flex-1"><Field label="Note (optional)">{(id) => <TextInput id={id} value={lq.note ?? ''} onChange={(v) => set(lq.id, { note: v })} placeholder="e.g. Deposit for property 2" />}</Field></div>
                   <button className="btn-ghost mb-0.5 p-2" aria-label="Remove liquidation event" onClick={() => update((d) => { d.liquidations = d.liquidations!.filter((x) => x.id !== lq.id); })}><Icon name="trash" className="h-4 w-4" /></button>
                 </div>
-                <p className="mt-3 text-sm text-muted">{est ? `At today’s prices: about ${money(est.gross, { compact: true })}, less about ${money(est.tax, { compact: true })} capital gains tax, leaves ${money(est.net, { compact: true })}. The plan uses the value in ${lq.year}.` : `You don’t hold any ${lq.asset} right now.`}</p>
+                <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+                  <div className="text-sm text-muted">
+                    {isProp && pr ? (<>
+                      <p>{pr.address} is worth about <span className="font-semibold text-ink">{money(est?.holding ?? 0)}</span> today{lq.year > y0 ? <>, and about {money(estPrice)} by {lq.year} at {pr.growthRate}% a year</> : null}.</p>
+                      {lq.salePrice != null && <button className="mt-1 text-xs underline" onClick={() => set(lq.id, { salePrice: null })}>Use the estimate ({money(estPrice)})</button>}
+                      <p className="mt-1">{est?.home ? 'This is your home, so no capital gains tax applies.' : 'Capital gains tax is worked out on the gain over what you paid, after selling costs, with the 50% discount.'}</p>
+                    </>) : (<>
+                      <p>Your {lq.asset === 'shares' ? 'share portfolio' : 'crypto'} is worth <span className="font-semibold text-ink">{money(holding)}</span> today.</p>
+                      {holding > 0 && <div className="mt-1 flex gap-2 text-xs">{[0.25, 0.5, 1].map((f) => <button key={f} className="rounded-md px-2 py-0.5 ring-1 ring-line hover:text-ink" onClick={() => set(lq.id, { amount: round1k(holding * f), pct: undefined })}>{f === 1 ? 'All' : f === 0.5 ? 'Half' : 'A quarter'}</button>)}</div>}
+                      {amount != null && amount > holding && holding > 0 && <p className="mt-1 text-xs text-clay">That’s more than you hold today. The plan sells what you have in {lq.year}, up to this amount.</p>}
+                    </>)}
+                  </div>
+                  {est && (est.gross > 0 || isProp) && (
+                    <div className="rounded-lg bg-raised p-3 text-sm ring-1 ring-line">
+                      {row(isProp ? 'Sale price' : 'Sell (today’s prices)', est.gross)}
+                      {isProp && row('Agent fees and selling costs', -est.costs, 'text-muted')}
+                      {isProp && est.debt > 0 && row('Loan paid out (today’s balance)', -est.debt, 'text-muted')}
+                      {row('Capital gains tax (estimate)', -est.tax, 'text-muted')}
+                      {row('Into your savings', est.net, 'mt-1 border-t border-line pt-2 font-semibold')}
+                    </div>
+                  )}
+                </div>
               </li>
             );
           })}
         </ul>
       )}
-      <p className="mt-5 text-[11px] text-muted">Capital gains tax is estimated at your marginal rate with the 50% discount for anything held over 12 months. Crypto left out of your plan is valued at today’s price. An accountant can help you time a sale. General information, not financial advice.</p>
+      <p className="mt-5 text-[11px] text-muted">Capital gains tax is estimated at your marginal rate with the 50% discount for anything held over 12 months; your home is exempt. Your plan uses the values in the year of the sale, so the figures there may differ from these. An accountant can help you time a sale. General information, not financial advice.</p>
     </section>
   );
 }
