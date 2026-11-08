@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Area, AreaChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { rangeSince, useHistory, type Range } from '../lib/history';
-import { price as fmtPrice, pct } from '../lib/format';
-import { Segmented } from './ui';
+import { getHistory, rangeSince, useHistory, type Range } from '../lib/history';
+import { money, price as fmtPrice, pct } from '../lib/format';
+import { Icon, Segmented } from './ui';
 import type { Holding } from '../lib/types';
+import type { Quotes } from '../lib/calc';
 
 const fmtDate = (t: number, long = false) => new Date(t).toLocaleDateString('en-AU', long ? { day: 'numeric', month: 'short', year: 'numeric' } : { month: 'short', year: '2-digit' });
 const MARKETS = ['IDX:AXJO', 'IDX:GSPC', 'IDX:IXIC', 'IDX:AUDUSD'];
@@ -35,7 +36,7 @@ function MarketCard({ id, range }: { id: string; range: Range }) {
     <div className="rounded-xl border border-line bg-raised/50 p-4">
       <div className="flex items-baseline justify-between"><p className="text-sm font-medium">{s.name}</p><p className={`text-sm font-medium ${ch >= 0 ? 'text-gum' : 'text-clay'}`}>{pct(ch, 1, true)}</p></div>
       <p className="font-display text-2xl font-semibold">{last.toLocaleString('en-AU', { minimumFractionDigits: dp, maximumFractionDigits: dp })}</p>
-      <div className="mt-2 h-16">
+      <div className="mt-2 h-28">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={s.points} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
             <defs><linearGradient id={`m-${id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity={0.35} /><stop offset="1" stopColor={color} stopOpacity={0} /></linearGradient></defs>
@@ -93,3 +94,113 @@ export function HoldingChart({ h, currentPrice }: { h: Holding; currentPrice: nu
   );
 }
 const live = (import.meta as any).env?.VITE_STORAGE === 'api';
+
+/* ---------- Top-of-page carousel: markets, then your portfolio over time ---------- */
+export function SharesCarousel({ holdings, quotes }: { holdings: Holding[]; quotes: Quotes }) {
+  const slides = holdings.length ? ['Markets', 'Your portfolio over time'] : ['Markets'];
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touched = useRef(0);
+  useEffect(() => {
+    if (slides.length < 2 || paused) return;
+    const t = setInterval(() => { if (Date.now() - touched.current > 30000) setI((x) => (x + 1) % slides.length); }, 15000);
+    return () => clearInterval(t);
+  }, [slides.length, paused]);
+  const go = (d: number) => { touched.current = Date.now(); setI((x) => (x + d + slides.length) % slides.length); };
+  return (
+    <section className="panel overflow-hidden" aria-roledescription="carousel" aria-label="Markets and your portfolio" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <div className="flex items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+        <h2 className="font-display text-xl font-semibold">{slides[i]}</h2>
+        {slides.length > 1 && (
+          <div className="flex items-center gap-2">
+            <button className="btn-quiet h-9 w-9 justify-center p-0" aria-label="Previous" onClick={() => go(-1)}><Icon name="back" className="h-4 w-4" /></button>
+            <div className="flex gap-1.5">{slides.map((s, k) => <button key={s} aria-label={s} aria-current={k === i} onClick={() => { touched.current = Date.now(); setI(k); }} className={`h-2 rounded-full transition-all ${k === i ? 'w-5 bg-brass' : 'w-2 bg-line'}`} />)}</div>
+            <button className="btn-quiet h-9 w-9 justify-center p-0" aria-label="Next" onClick={() => go(1)}><Icon name="back" className="h-4 w-4 rotate-180" /></button>
+          </div>
+        )}
+      </div>
+      <div className="relative overflow-hidden">
+        <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${i * 100}%)` }}>
+          <div className="w-full shrink-0 p-5 pt-3 sm:p-6 sm:pt-3" aria-hidden={i !== 0}><MarketsBody /></div>
+          {slides.length > 1 && <div className="w-full shrink-0 p-5 pt-3 sm:p-6 sm:pt-3" aria-hidden={i !== 1}><PortfolioHistory holdings={holdings} quotes={quotes} /></div>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MarketsBody() {
+  const [range, setRange] = useState<Range>('1y');
+  return (<>
+    <div className="flex justify-end"><Segmented size="sm" label="Time range" value={range} onChange={setRange} options={RANGE_OPTS} /></div>
+    <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{MARKETS.map((k) => <MarketCard key={k} id={k} range={range} />)}</div>
+  </>);
+}
+
+/** Portfolio value over time: each holding's units at each day's price, from when you first bought it, against what you put in. */
+function PortfolioHistory({ holdings, quotes }: { holdings: Holding[]; quotes: Quotes }) {
+  const earliest = holdings.map((h) => h.firstBought).filter(Boolean).sort()[0] ?? '';
+  const [range, setRange] = useState<Range>(rangeSince(earliest));
+  const [data, setData] = useState<{ t: number; value: number; invested: number }[] | 'loading' | null>('loading');
+  const sig = holdings.map((h) => `${h.exchange}:${h.code}:${h.units}:${h.avgCost}:${h.firstBought}`).join('|');
+  useEffect(() => {
+    let on = true;
+    setData('loading');
+    Promise.all(holdings.map((h) => {
+      const q = quotes[`${h.exchange}:${h.code}`]?.price;
+      return getHistory(`${h.exchange}:${h.code}`, range, q ?? h.avgCost);
+    })).then((all) => {
+      if (!on) return;
+      const base = all.filter(Boolean).sort((a, b) => b!.points.length - a!.points.length)[0];
+      if (!base) { setData(null); return; }
+      const fx = (cur: string | undefined) => (cur && cur !== 'AUD' ? quotes[`FX:${cur}`]?.price ?? 1 : 1);
+      const rows = base.points.map(({ t }) => {
+        let value = 0, invested = 0;
+        holdings.forEach((h, k) => {
+          const from = h.firstBought ? new Date(h.firstBought).getTime() : 0;
+          if (t < from) return;
+          const s = all[k];
+          let price = h.avgCost;
+          if (s) { let best = s.points[0]; for (const pt of s.points) { if (pt.t <= t) best = pt; else break; } price = best.c * fx(s.currency || h.currency); }
+          value += price * h.units;
+          invested += h.avgCost * h.units * fx(h.currency);
+        });
+        return { t, value, invested };
+      }).filter((r) => r.value > 0 || r.invested > 0);
+      setData(rows.length ? rows : null);
+    });
+    return () => { on = false; };
+  }, [sig, range]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (data === 'loading') return <div className="h-64 animate-pulse rounded-xl bg-line/40" />;
+  if (!data) return <p className="py-16 text-center text-sm text-muted">No price history available right now.</p>;
+  const last = data[data.length - 1], first = data[0];
+  const gain = last.value - last.invested;
+  const color = gain >= 0 ? 'rgb(var(--gum))' : 'rgb(var(--clay))';
+  return (<>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap gap-x-8 gap-y-2">
+        <div><p className="text-xs text-muted">Value now</p><p className="font-display text-2xl font-semibold">{money(last.value)}</p></div>
+        <div><p className="text-xs text-muted">Put in</p><p className="font-display text-2xl font-semibold">{money(last.invested)}</p></div>
+        <div><p className="text-xs text-muted">Gain</p><p className={`font-display text-2xl font-semibold ${gain >= 0 ? 'text-gum' : 'text-clay'}`}>{money(gain, { sign: true })}</p></div>
+      </div>
+      <Segmented size="sm" label="Time range" value={range} onChange={setRange} options={[...RANGE_OPTS, { value: '10y', label: '10Y' }]} />
+    </div>
+    <div className="mt-3 h-56 -ml-2">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+          <defs><linearGradient id="pf-v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity={0.35} /><stop offset="1" stopColor={color} stopOpacity={0.02} /></linearGradient></defs>
+          <XAxis dataKey="t" type="number" domain={['dataMin', 'dataMax']} scale="time" tickFormatter={(t) => fmtDate(t)} tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={40} />
+          <YAxis domain={['auto', 'auto']} tickFormatter={(v) => money(v, { compact: true })} tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickLine={false} axisLine={false} width={56} />
+          <Tooltip content={({ active, payload }: any) => active && payload?.length ? (
+            <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow">
+              <p className="font-medium">{fmtDate(payload[0].payload.t, true)}</p>
+              <p>Value {money(payload[0].payload.value)}</p><p className="text-muted">Put in {money(payload[0].payload.invested)}</p>
+            </div>) : null} />
+          <Area type="stepAfter" dataKey="invested" stroke="rgb(var(--muted))" strokeDasharray="4 4" strokeWidth={1.2} fill="none" isAnimationActive={false} />
+          <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill="url(#pf-v)" isAnimationActive={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+    <p className="mt-1 text-[11px] text-muted">Your current holdings at each day’s closing price, from when you first bought each one{first ? ` (from ${fmtDate(first.t, true)})` : ''}. Dashed line: what you put in. Shares bought or sold in between aren’t tracked separately.</p>
+  </>);
+}

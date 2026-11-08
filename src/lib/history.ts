@@ -22,6 +22,14 @@ function demo(key: string, range: Range, end: number): Series {
   return { key, name: NAMES[key] ?? key.split(':')[1], currency: key.startsWith('IDX:') ? '' : 'AUD', points: vals.map((c, i) => ({ t: now - (n - i) * step * 864e5, c })) };
 }
 
+/** One-off fetch (cached), for combining several series. */
+export function getHistory(key: string, range: Range, demoEnd?: number): Promise<Series | null> {
+  if (!live) return Promise.resolve(demo(key, range, demoEnd ?? LEVELS[key] ?? 100));
+  const k = `${key}|${range}`;
+  if (!memo.has(k)) memo.set(k, fetch(`/api/history?key=${encodeURIComponent(key)}&range=${range}`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+  return memo.get(k)!;
+}
+
 export function useHistory(key: string | null, range: Range, demoEnd?: number) {
   const [data, setData] = useState<Series | null | 'loading'>('loading');
   useEffect(() => {

@@ -8,7 +8,7 @@ import type { Holding } from '../lib/types';
 import { CsvImport } from '../components/CsvImport';
 import { Field, Icon, MoneyInput, NumInput, PriceInput, Segmented, Select, TextInput } from '../components/ui';
 import { Sheet } from './Properties';
-import { HoldingChart, MarketStrip } from '../components/PriceCharts';
+import { HoldingChart, SharesCarousel } from '../components/PriceCharts';
 
 const KIND_COLOR: Record<Holding['kind'], string> = { etf: 'rgb(var(--sky))', share: 'rgb(var(--gum))', crypto: 'rgb(var(--brass))', fund: 'rgb(var(--sage))' };
 const KIND_LABEL: Record<Holding['kind'], string> = { etf: 'ETFs', share: 'Shares', crypto: 'Crypto', fund: 'Funds' };
@@ -53,7 +53,7 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
             ? `Your crypto is included in your plan as a simple figure: today’s value growing at your own estimate of ${p.cryptoGrowth}% a year. Cryptocurrency is volatile, so treat that part of the plan as a rough guide.`
             : 'As cryptocurrency is a volatile asset, we cannot measure its future performance. Your crypto counts towards your net worth today, but it’s left out of your plan, projections and Your Wise Future unless you choose to include it below.'}</p>
         </div>
-      ) : <MarketStrip />}
+      ) : <SharesCarousel holdings={mine} quotes={quotes} />}
 
       <section className="panel p-5 sm:p-6">
         <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
