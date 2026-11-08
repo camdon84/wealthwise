@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { project, recommendedBuffer, type Quotes } from '../lib/calc';
-import { money } from '../lib/format';
+import { CGT_2027_NOTE, money } from '../lib/format';
 import { usePlanProfile, usePlanUpdate } from '../lib/planContext';
 import { useSavingsRates } from '../lib/rates';
 import type { CashPlan, Profile } from '../lib/types';
@@ -30,12 +30,12 @@ function starting(p: Profile, hisaRate: number): CashPlan {
 const OPTIONS: { key: keyof Split; label: string; text: (rate: string) => string }[] = [
   { key: 'offset', label: 'Offset accounts', text: () => 'Your cash sits against a loan, so you pay less interest. It works best on your home loan, where there’s no tax deduction to lose.' },
   { key: 'hisa', label: 'High-interest savings', text: (r) => `Earns interest, currently about ${r} on average. The interest is taxed.` },
-  { key: 'everyday', label: 'Savings with immediate access', text: () => 'Your everyday account, for spending and anything urgent. Usually earns close to nothing.' },
+  { key: 'everyday', label: 'Savings account', text: () => 'Your everyday savings account, for spending and anything urgent. Usually earns close to nothing.' },
 ];
 
 /**
  * Cash Reserves: where the cash a plan builds up (mostly for deposits) sits while it builds.
- * Offset, high-interest or immediate-access savings. Shares are deliberately not part of this.
+ * Offset, high-interest savings or a savings account. Shares are deliberately not part of this.
  */
 export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares' | 'timeline') => void }) {
   const p = usePlanProfile();
@@ -108,7 +108,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
               })}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="High-interest rate" hint={rates?.asOf ? `Average for ${new Date(`${rates.asOf}T00:00:00`).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}` : undefined}>{(id) => <NumInput id={id} value={draft.hisaRate} onChange={(v) => set({ hisaRate: v ?? 0 })} step={0.05} min={0} max={10} suffix="%" />}</Field>
-                <Field label="Immediate access rate">{(id) => <NumInput id={id} value={draft.everydayRate} onChange={(v) => set({ everydayRate: v ?? 0 })} step={0.05} min={0} max={10} suffix="%" />}</Field>
+                <Field label="Savings account rate">{(id) => <NumInput id={id} value={draft.everydayRate} onChange={(v) => set({ everydayRate: v ?? 0 })} step={0.05} min={0} max={10} suffix="%" />}</Field>
               </div>
             </div>
             <div>
@@ -157,6 +157,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
       <section className="rounded-2xl border border-line bg-raised/60 p-5 sm:p-6">
         <p className="font-semibold">What about shares?</p>
         <p className="mt-1 text-sm leading-relaxed text-muted">As your cash reserves build up, you may want to adjust the investment strategy for your share portfolio, as shares may see higher returns. However, this can be riskier. If you invest money you’re setting aside for a deposit into shares, you’ll need to allow for capital gains tax when you sell them, and when you’re ready to buy your next property, you’ll need to sell enough to cover the deposit, even if the market is down. That money would be separate from your long-term share portfolio plan.</p>
+        <p className="mt-2 text-xs text-muted">{CGT_2027_NOTE}</p>
         <button className="btn-quiet mt-3 py-1.5" onClick={() => onGo('shares')}>Go to your share plan</button>
       </section>
       <p className="text-[11px] text-muted">High-interest rate: Canstar average published by the Reserve Bank of Australia. General information, not financial advice.</p>

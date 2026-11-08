@@ -8,7 +8,7 @@ import { PlanCheckBox } from '../components/PlanCheck';
 import { CashTab } from './CashTab';
 import { WealthFocusPicker } from '../components/WealthFocus';
 import { wiseInsights } from '../lib/insights';
-import { money } from '../lib/format';
+import { CGT_2027_NOTE, money } from '../lib/format';
 import { plannedPurchase, uid } from '../lib/defaults';
 import { useCashRate } from '../lib/rates';
 import type { Assumptions, Forecast, Gift, Liquidation, PlanSnapshot, PlannedPurchase, Profile, Property } from '../lib/types';
@@ -582,6 +582,7 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
         </ul>
       )}
       <p className="mt-5 text-[11px] text-muted">Capital gains tax is estimated at your marginal rate with the 50% discount for anything held over 12 months; your home is exempt. Your plan uses the values in the year of the sale, so the figures there may differ from these. An accountant can help you time a sale. General information, not financial advice.</p>
+      <p className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-[11px] text-ink ring-1 ring-brass/30">{CGT_2027_NOTE}</p>
     </section>
   );
 }
@@ -864,7 +865,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
             );
           })}
         </ol>
-        <p className="mt-5 text-[11px] text-muted">In retirement your yearly income is paid from super first (it opens at 60; a minimum amount must come out each year, from 4% rising with age), then rent and savings, then by selling shares, then by selling investment properties newest first. Money not needed straight away is invested in shares. Your home is kept. Super contributions are 12% of salary, capped at $32,500 a year, less 15% tax. Sale figures allow for selling costs and capital gains tax at an estimated rate. Estimates only, not financial advice.</p>
+        <p className="mt-5 text-[11px] text-muted">In retirement your yearly income is paid from super first (it opens at 60; a minimum amount must come out each year, from 4% rising with age), then rent and savings, then by selling shares, then by selling investment properties newest first. Money not needed straight away is invested in shares. Your home is kept. Super contributions are 12% of salary, capped at $32,500 a year, less 15% tax. Sale figures allow for selling costs and capital gains tax at an estimated rate. {CGT_2027_NOTE} Estimates only, not financial advice.</p>
       </section>
 
     </div>
