@@ -1,4 +1,3 @@
-import { notWorkIdea } from '../lib/insights';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
 import { applySnapshot, newForecast, PlanProvider, snapshot, useForecast, usePlanMode, usePlanProfile, usePlanUpdate, type PlanCtx } from '../lib/planContext';
@@ -213,15 +212,7 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
 
       <section className="panel p-5 sm:p-6">
         <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brass text-ground"><Icon name="spark" /></span><h2 className="font-display text-xl font-semibold">How your goals fit together</h2></div>
-        <div className="mt-5"><PlanCheckBox check={check} compact /></div>
-        {take && take !== 'loading' && (
-          <div className="mt-5 rounded-xl bg-raised p-4 ring-1 ring-line">
-            <p className="text-xs font-medium text-muted">Wise suggests</p>
-            <p className="mt-1 leading-relaxed">{take.summary}</p>
-            {take.ideas.filter(notWorkIdea).length > 0 && <ul className="mt-2 space-y-1.5 text-sm">{take.ideas.filter(notWorkIdea).map((i) => <li key={i.title}><span className="font-medium">{i.title}.</span> <span className="text-muted">{i.body}</span></li>)}</ul>}
-          </div>
-        )}
-        {take === 'loading' && <div className="mt-5 space-y-2"><div className="h-3 w-3/4 animate-pulse rounded bg-line" /><div className="h-3 w-full animate-pulse rounded bg-line" /></div>}
+        <div className="mt-5"><PlanCheckBox check={check} compact take={take} /></div>
         <p className="mt-4 text-[11px] text-muted">Estimates from your figures and assumptions. General information, not financial advice.</p>
       </section>
     </div>
@@ -816,6 +807,8 @@ const EVENT_STYLE: Record<string, { icon: string; cls: string }> = {
 function Projections({ quotes }: { quotes: Quotes }) {
   const p = usePlanProfile();
   const check = useMemo(() => planCheck(p, quotes), [p, quotes]);
+  const takeInsights = useMemo(() => wiseInsights(p, quotes), [p, quotes]);
+  const take = useWiseTake(p, quotes, takeInsights, 'goals'); // same request as the Goals tab
   const proj = check.proj;
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
   const [hidden, setHidden] = useState<string[]>([]);
@@ -849,7 +842,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
         </div>
       </section>
 
-      <PlanCheckBox check={check} />
+      <PlanCheckBox check={check} take={take} />
 
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">What happens, year by year</h2>

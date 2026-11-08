@@ -32,8 +32,17 @@ function RetireIncomeNotice() {
 }
 
 /** "Does this plan work?" box, shared by the Goals tab and Your Wise Future. */
-export function PlanCheckBox(props: { check: PlanCheck; compact?: boolean }) {
+type Take = { summary: string; ideas: { title: string; body: string }[] } | null | 'loading';
+
+export function PlanCheckBox(props: { check: PlanCheck; compact?: boolean; take?: Take }) {
   return <><RetireIncomeNotice />{props.check.works && <LockNudge />}<PlanCheckResult {...props} /></>;
+}
+
+/** Wise's one-paragraph read of the plan, under the dot points. */
+function WiseRead({ take }: { take?: Take }) {
+  if (take === 'loading') return <div className="mt-3 space-y-2" aria-label="Wise is reading your plan"><div className="h-3 w-3/4 animate-pulse rounded bg-line" /><div className="h-3 w-2/3 animate-pulse rounded bg-line" /></div>;
+  if (!take?.summary || !notWorkIdea({ body: take.summary })) return null;
+  return <p className="mt-3 border-t border-line/70 pt-3 text-[15px] leading-relaxed"><span className="mr-1.5 rounded bg-brass/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brass">Wise</span>{take.summary}</p>;
 }
 
 /** Once the plan works and nothing is flagged, suggest locking it in. Live plan only. */
@@ -51,7 +60,7 @@ function LockNudge() {
   );
 }
 
-function PlanCheckResult({ check, compact }: { check: PlanCheck; compact?: boolean }) {
+function PlanCheckResult({ check, compact, take }: { check: PlanCheck; compact?: boolean; take?: Take }) {
   if (check.works) {
     return (
       <section className={compact ? 'rounded-2xl border border-gum/40 bg-gum/10 p-4' : 'panel border-l-4 border-l-gum p-5 sm:p-6'} aria-label="Plan check">
@@ -62,7 +71,8 @@ function PlanCheckResult({ check, compact }: { check: PlanCheck; compact?: boole
         <ul className="mt-3 space-y-2 text-[15px] leading-relaxed">
           {check.good.map((t) => <li key={t} className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-gum" aria-hidden="true" />{t}</li>)}
         </ul>
-      <PlanIdeas check={check} />
+        <WiseRead take={take} />
+      <PlanIdeas check={check} take={take} />
       </section>
     );
   }
@@ -75,6 +85,7 @@ function PlanCheckResult({ check, compact }: { check: PlanCheck; compact?: boole
       <ul className="mt-4 space-y-2 text-[15px] leading-relaxed">
         {check.problems.map((t) => <li key={t} className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-clay" aria-hidden="true" />{t}</li>)}
       </ul>
+      <WiseRead take={take} />
       {check.fixes.length > 0 && (
         <div className="mt-4 rounded-xl bg-raised p-4 ring-1 ring-line">
           <p className="text-sm font-semibold">We’d recommend</p>
@@ -84,7 +95,7 @@ function PlanCheckResult({ check, compact }: { check: PlanCheck; compact?: boole
           <p className="mt-3 text-[11px] text-muted">Each suggestion was tested against your numbers. Change it in Goals, Property Portfolio or Shares and this updates.</p>
         </div>
       )}
-      <PlanIdeas check={check} />
+      <PlanIdeas check={check} take={take} />
       {check.good.length > 0 && (
         <ul className="mt-4 space-y-1.5 text-sm text-muted">
           {check.good.map((t) => <li key={t} className="flex gap-3"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gum" aria-hidden="true" />{t}</li>)}
@@ -101,7 +112,7 @@ let autoAsked = false; // one automatic refresh per visit
 const ideaKey = (t: string) => t.replace(/[\d$,.%]+/g, '#').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /** "Have you thought about these options?": tested ideas plus Wise's AI ideas, each dismissable for 6 months. */
-function PlanIdeas({ check }: { check: PlanCheck }) {
+function PlanIdeas({ check, take }: { check: PlanCheck; take?: Take }) {
   const p = usePlanProfile();
   const planUpdate = usePlanUpdate();
   const update = useApp((s) => s.update); // dismissals are a preference, not part of the plan, so they work when it's locked
@@ -113,7 +124,10 @@ function PlanIdeas({ check }: { check: PlanCheck }) {
   // At most 6 at a time: Wise's newest first, then tested ideas, keeping one liquidation idea if there is one
   const MAX = 6;
   const allTested = check.ideas.filter((t) => !hidden(ideaKey(t.text)));
-  const ai = (st?.ai ?? []).filter((x) => !hidden(`ai:${x.id}`) && notWorkIdea(x)).slice(0, 3);
+  // Wise's ideas: the ones written for this plan as it stands, then any asked for with the button
+  const fromTake = take && take !== 'loading' ? take.ideas.map((x) => ({ id: `take-${ideaKey(x.title)}`, title: x.title, body: x.body, at: 0 })) : [];
+  const ai = [...fromTake, ...(st?.ai ?? [])].filter((x, k, all) => all.findIndex((y) => ideaKey(y.title) === ideaKey(x.title)) === k)
+    .filter((x) => !hidden(`ai:${x.id}`) && notWorkIdea(x)).slice(0, 3);
   let tested = allTested.slice(0, Math.max(0, MAX - ai.length));
   const liq = allTested.find((t) => t.liquidation);
   if (liq && !tested.includes(liq)) tested = [...tested.slice(0, Math.max(0, tested.length - 1)), liq];

@@ -464,7 +464,7 @@ Reply with JSON only: {"summary":"2-3 sentences, max 60 words","ideas":[{"title"
 /* ---------- CPI: the ABS consumer price index, as republished by the RBA (table G1, quarterly) ----------
  * Returns the quarterly index levels so the app can index a locked plan by exactly what prices did since it was set. */
 /** Ideas WealthWise never gives: more work in any form, or structures and strategies the app can't model yet. A backstop for the AI's instructions. */
-const WORK_IDEA = /\btrusts?\b|company structure|\bsmsf\b|self[- ]managed super|ownership structure|bucket company|salary sacrific|extra (super )?contribution|concessional contribution|debt recycl|insurance|refinanc|rentvest|part[- ]?time|consult|side[- ]?(hustle|business|gig|income)|second job|freelanc|gig work|(keep|continue|start) working|work(ing)? (longer|after|past|beyond|into)|delay(ing)? (your )?retire|retir(e|ing) later|postpone (your )?retire|return to work|extra (hours|shifts)|overtime|pay rise|ask for a raise/i;
+const WORK_IDEA = /\btrusts?\b|company structure|\bsmsf\b|self[- ]managed super|ownership structure|bucket company|salary sacrific|extra (super )?contribution|concessional contribution|debt recycl|insurance|refinanc|rentvest|part[- ]?time|consult|side[- ]?(hustle|business|gig|income)|second job|freelanc|gig work|(keep|continue|start) working|work(ing)? (longer|after|past|beyond|into)|delay(ing)? (your )?retire|retir(e|ing) later|later retire|(older|higher|later) (retirement )?age|postpone (your )?retire|return to work|extra (hours|shifts)|overtime|pay rise|ask for a raise/i;
 const noWork = (i: { title?: string; body?: string }) => !WORK_IDEA.test(`${i.title ?? ''} ${i.body ?? ''}`);
 
 /** Latin-1 bytes to text (the RBA's CSVs aren't UTF-8). */
