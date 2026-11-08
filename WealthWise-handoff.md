@@ -94,9 +94,12 @@ This is one of the most important things.
 - **Claude preview artifact.** A copy of the app runs as a Claude artifact on demo data:
   - slug `426277df-a86e-4fce-b44a-40e1f0c7bdee`
   - URL https://claude.ai/artifact/9CTFY1vT9D9F4XH3Yo8him
-  - latest version `1794178809-b121`
+  - latest version `1794180002-3c07`
   - Build it with `npx vite build --mode preview --outDir dist-preview`.
   - Publish with mode `replace`, including `index.html`, `assets/index-*.js`, `assets/index-*.css` and `samples/{loan,super,valuation}-sample.pdf`.
+- **Admin portal:** https://wealthwise-admin.cam-donley.workers.dev (separate Worker `wealthwise-admin`, same D1 database).
+  - Code in `admin/` (`admin/index.ts`, `admin/wrangler.jsonc`). Its own Workers Builds trigger ("Admin portal") deploys it on pushes to `main` that touch `admin/*`, `worker/shared.ts` or `package.json`. Manual: `npm run deploy:admin`.
+  - Admins live in the `admins` table (separate from app users) with their own sessions. Cameron's admin login is cam.donley@gmail.com. **No admin password is kept in the repo.** To add or change an admin, hash the password with PBKDF2-SHA256, 100,000 rounds and a random 16-byte salt (same as `hashPassword()` in `worker/shared.ts`), then insert into `admins` through the D1 API.
 - **Demo account:** log in with "Explore the demo account". The demo's CPI baseline is set one year back, so the inflation pop-up shows.
 
 ---
@@ -116,6 +119,8 @@ This is one of the most important things.
 | Charts | `src/components/Charts.tsx` (WealthChart, CashFlowChart, MarkerKey, SeriesToggles, toReal, `useNarrow`); `src/components/ChartControls.tsx` (ChartToolbar, DollarsToggle); `src/components/PriceCharts.tsx` |
 | Pages | `Overview`, `Plan` (all Wise Plan tabs and Your Wise Future), `CashTab`, `Properties`, `Investments`, `MyDetails`, `WiseActions`, `Documents`, `Account` |
 | Onboarding | `src/onboarding/Onboarding.tsx` |
+| Admin portal | `admin/index.ts` (server-rendered pages, no build step); `worker/shared.ts` (password hashing and admin tables, shared by both workers) |
+| Example users | `scripts/demo-users.ts` (Michelle and Melissa Donley; prints their profiles as JSON) |
 | Shared UI | `src/components/ui.tsx` (Segmented with `size="xs"`, `stretch` and `scroll`, MoneyInput, icons) |
 | Wording constants | `src/lib/format.ts` (`money()`, `CGT_2027_NOTE`) |
 | Plan mode | `src/lib/planContext.tsx`: `usePlanProfile`, `usePlanUpdate` and `usePlanMode` respect lock and Forecast mode. Use raw `useApp(s=>s.update)` for preference and state fields (ideas, actions, insights) so they still work when the plan is locked. |
@@ -193,6 +198,14 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
   - Cash flow chart colours: "From selling shares or crypto" is blue, "From selling property" is `#c0784a`, and "Gifts and inheritances" is purple.
   - Retirement metrics: on phones the fifth tile (Cash on hand) spans both columns.
 
+### Admin portal
+- **Sign in:** admins only, rate-limited (5 tries in 15 minutes), 12-hour sessions, SameSite=Strict cookie, not indexed by search engines.
+- **Users:** stats (users, joined in the last 30 days, finished setup, signed in this week), search, and a table with name, email, age and state, properties, setup status, joined and last sign-in.
+- **User page:** account, household, properties, goals and an admin activity log.
+- **View as user:** a one-time token that lasts 15 minutes (`view_tokens`) opens the app at `#view=<token>`. The app loads that account through `/api/view`, shows a blue "Viewing X's account. Read only" banner with Exit, blocks typing in fields and never saves (`update()` does nothing while viewing). Only for accounts that have finished setup.
+- **Send password reset:** placeholder only. It logs the request and shows a "Demo only" notice; nothing is sent and no password changes.
+- **Example users:** Michelle Donley (70, stops work at 75, a unit in Bargara and a house in Bundaberg West, about $500k super and $100k shares) and Melissa Donley (40, with Costa, buying an $850k established first home in Brisbane in 2027 with the 5% Deposit Scheme, two children planned). Emails are @example.com with random passwords; open them with View as user. No crypto.
+
 ### Wise Actions page
 In the sidebar under Wise Plan, with a badge that counts items needing attention.
 
@@ -255,7 +268,9 @@ These rules are enforced in the prompts and also by filters in `worker/index.ts`
 5. Add suburb data (see below).
 6. Set up a custom domain.
 
-Done in November 2026: AI ideas no longer suggest purchases after retirement, and the "keep working to X" fixes are gone.
+Done in November 2026: AI ideas no longer suggest purchases after retirement, and the "keep working to X" fixes are gone. Admin portal built.
+
+Admin portal next steps (not started): real password reset emails (for example Cloudflare Email Sending), a way to change an admin password from the portal, and more admins.
 
 ### Suburb data research (done; nothing built yet)
 - **Free official sources, open licence, quarterly:**
