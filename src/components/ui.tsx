@@ -54,7 +54,7 @@ export function Select<T extends string>({ id, value, onChange, options }: { id?
   );
 }
 
-export function Segmented<T extends string>({ value, onChange, options, size = 'md', label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; size?: 'xs' | 'sm' | 'md'; label?: string }) {
+export function Segmented<T extends string>({ value, onChange, options, size = 'md', label, stretch }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; size?: 'xs' | 'sm' | 'md'; label?: string; stretch?: boolean }) {
   if (size === 'xs') return (
     <div role="radiogroup" aria-label={label} className="inline-flex rounded-full border border-line/70 p-0.5">
       {options.map((o) => (
@@ -66,10 +66,10 @@ export function Segmented<T extends string>({ value, onChange, options, size = '
     </div>
   );
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl border border-line bg-raised p-1">
+    <div role="radiogroup" aria-label={label} className={`${stretch ? 'flex min-w-0 flex-1' : 'inline-flex'} rounded-xl border border-line bg-raised p-1`}>
       {options.map((o) => (
         <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}
-          className={`rounded-lg ${size === 'sm' ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors ${value === o.value ? 'bg-surface text-ink shadow-sm ring-1 ring-line' : 'text-muted hover:text-ink'}`}>
+          className={`${stretch ? 'flex-1 whitespace-nowrap' : ''} rounded-lg ${size === 'sm' ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors ${value === o.value ? 'bg-surface text-ink shadow-sm ring-1 ring-line' : 'text-muted hover:text-ink'}`}>
           {o.label}
         </button>
       ))}

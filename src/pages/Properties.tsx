@@ -55,7 +55,7 @@ export function Properties() {
           {p.properties.map((pr) => {
             const s = propertyStats(pr, lvr);
             return (
-              <div key={pr.id} className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-stretch">
+              <div key={pr.id} className="grid gap-5 lg:grid-cols-2 lg:items-stretch">
               <button onClick={() => setSelected(pr.id)} className="panel flex h-full w-full flex-col overflow-hidden text-left transition-colors hover:border-brass/60">
                 <PropertyPhoto property={pr} className="h-44 w-full shrink-0" />
                 <div className="flex-1 p-5 sm:p-6">
