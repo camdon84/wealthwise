@@ -107,7 +107,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
               <CartesianGrid vertical={false} stroke="rgb(var(--line))" strokeDasharray="2 4" />
               <XAxis dataKey="year" tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={28} />
               <YAxis tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickLine={false} axisLine={false} width={56} tickFormatter={(v) => money(v, { compact: true })} />
-              <Tooltip formatter={(v: number, k: string) => [money(v, { compact: true }), k === 'now' ? (saved ? 'Cash without a cash plan' : 'Cash as your plan stands') : k === 'plan' ? 'Cash with this plan' : 'Spare cash in shares']} contentStyle={{ background: 'rgb(var(--surface))', border: '1px solid rgb(var(--line))', borderRadius: 12, fontSize: 12 }} />
+              <Tooltip formatter={(v: number, k: string) => [money(v, { compact: true }), k === 'now' ? 'In the bank if you change nothing' : k === 'plan' ? (step === -1 ? 'In the bank with your cash plan' : 'In the bank with your answers') : 'Invested in shares']} contentStyle={{ background: 'rgb(var(--surface))', border: '1px solid rgb(var(--line))', borderRadius: 12, fontSize: 12 }} />
               <Area type="monotone" dataKey="now" stroke="rgb(var(--muted))" strokeDasharray="4 4" fill="none" isAnimationActive={false} />
               <Area type="monotone" dataKey="shares" stackId="w" stroke="rgb(var(--sky))" fill="rgb(var(--sky) / 0.25)" isAnimationActive={false} />
               <Area type="monotone" dataKey="plan" stackId="w" stroke="rgb(var(--brass))" fill="rgb(var(--brass) / 0.25)" isAnimationActive={false} />
@@ -116,9 +116,9 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
           </ResponsiveContainer>
         </div>
         <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
-          <li className="flex items-center gap-1.5"><span className="h-0 w-4 border-t-2 border-dashed border-muted" />Cash {saved ? 'without a cash plan' : 'as your plan stands'}</li>
-          <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brass/60" />Cash with {step === -1 ? 'your cash plan' : 'these answers'}</li>
-          <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-sky/60" />Spare cash in shares</li>
+          <li className="flex items-center gap-1.5"><span className="h-0 w-4 border-t-2 border-dashed border-muted" />Cash in the bank if you change nothing</li>
+          <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brass/60" />Cash in the bank {step === -1 ? 'with your cash plan' : 'with your answers below'}</li>
+          <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-sky/60" />Spare cash invested in shares</li>
         </ul>
         {!saved && <p className="mt-3 rounded-lg bg-raised px-3 py-2 text-xs text-muted ring-1 ring-line">Until you set this up, your plan assumes all your cash sits in offset accounts against every loan you have. That’s the best case, and most people don’t hold it that way.</p>}
       </section>
@@ -138,7 +138,15 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
           </div>
         </section>
       ) : (
-        <section className="panel p-5 sm:p-6" aria-label="Cash questions">
+        <section className="panel border-2 border-brass/50 p-5 sm:p-6" aria-label="Cash questions">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brass text-ground"><Icon name="spark" className="h-5 w-5" /></span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-brass">{saved ? 'Update your cash plan' : 'Start here'}</p>
+              <h3 className="font-display text-xl font-semibold">Plan how you want to put your cash to work</h3>
+              <p className="text-sm text-muted">Answer these 5 quick questions. The chart above and the comparison below update as you go, and nothing changes in your plan until you press “Use this cash plan”.</p>
+            </div>
+          </div>
           <ol className="flex flex-wrap gap-2 text-xs">
             {STEPS.map((s, k) => <li key={s}><button onClick={() => setStep(k)} className={`rounded-full px-3 py-1 font-medium ring-1 ${k === step ? 'bg-brass text-ground ring-brass' : k < step ? 'ring-brass/50 text-brass' : 'ring-line text-muted'}`}>{k + 1}. {s}</button></li>)}
           </ol>
