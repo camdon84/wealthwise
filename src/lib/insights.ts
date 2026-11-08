@@ -168,7 +168,7 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
   }
 
   // 6b. High-interest debts: savings and equity compared with what each debt costs
-  const debts = p.finances.debts.filter((d) => d.kind !== 'hecs' && (d.balance ?? 0) > 0 && (d.rate ?? 0) > 0).sort((x, y) => (y.rate ?? 0) - (x.rate ?? 0));
+  const debts = p.finances.debts.filter((d) => d.kind !== 'hecs' && d.kind !== 'credit-card' && (d.balance ?? 0) > 0 && (d.rate ?? 0) > 0).sort((x, y) => (y.rate ?? 0) - (x.rate ?? 0));
   const homeLoan = p.properties.find((pr) => pr.use === 'home')?.loans.find((l) => l.rate);
   const homeRate = homeLoan?.rate ?? null;
   let spareCash = Math.max(0, (p.finances.cash ?? 0) - (p.finances.buffer ?? 0));
@@ -196,7 +196,7 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
   }
   if (p.finances.debts.some((d) => d.kind === 'hecs' && (d.balance ?? 0) > 0) && debts.length) out.push({
     id: 'hecs-order', kind: 'watch', title: 'Pay down interest-bearing debts before extra HECS repayments',
-    body: 'HECS doesn’t charge interest, only yearly indexation, and repayments come out through the tax system. Extra money usually goes further on credit cards and loans first.',
+    body: 'HECS doesn’t charge interest, only yearly indexation, and repayments come out through the tax system. Extra money usually goes further on loans first.',
   });
 
   // 6c. Fixed rates ending soon
@@ -283,7 +283,7 @@ export function wiseFacts(p: Profile, quotes: Quotes, insights: Insight[]) {
       cash: r(pos.cash), super: r(pos.superBal, 5000), sharesValue: r(pos.shares.value, 5000),
       properties: pos.props.map(({ pr, s }) => ({ suburb: `${pr.suburb} ${pr.state}`, use: pr.use, value: r(s.val.value, 5000), equity: r(s.equity, 5000), ageYears: pr.yearBuilt ? year - pr.yearBuilt : null, cashflowPerYear: r(s.cashflow, 100) })),
     },
-    debts: p.finances.debts.filter((d) => (d.balance ?? 0) > 0).map((d) => ({ type: d.kind, owing: r(d.balance ?? 0, 100), ratePercent: d.kind === 'hecs' ? 'indexation only' : d.rate ?? null })),
+    debts: p.finances.debts.filter((d) => d.kind !== 'credit-card' && (d.balance ?? 0) > 0).map((d) => ({ type: d.kind, owing: r(d.balance ?? 0, 100), ratePercent: d.kind === 'hecs' ? 'indexation only' : d.rate ?? null })),
     homeLoanRatePercent: p.properties.find((x) => x.use === 'home')?.loans[0]?.rate ?? null,
     spareCashAboveEmergencyBuffer: r(Math.max(0, (p.finances.cash ?? 0) - (p.finances.buffer ?? 0)), 500),
     projection: { yearlySpendGoalTodayDollars: r(p.goals.passiveIncome), moneyRunsOutAtAge: proj.runsOutAge, moneyLastsPastLifeExpectancy: proj.runsOutAge == null, plannedPurchaseYears: proj.purchases.map((x) => x.year), shareInvestmentPerMonth: r(proj.shareMonthly), cryptoExcludedFromProjection: r(proj.cryptoExcluded) },

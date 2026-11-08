@@ -45,6 +45,7 @@ export function normalize(p: Profile): Profile {
   p.finances = { ...financeDefaults(), ...p.finances };
   p.finances.livingBreakdown ??= {};
   for (const d of p.finances.debts) if (d.rate === undefined && d.kind !== 'hecs') d.rate = DEBT_RATE[d.kind] ?? null;
+  for (const d of p.finances.debts) if (d.kind === 'credit-card') d.balance = 0; // cards: only the limit is kept
   for (const pr of p.properties) for (const l of pr.loans) l.rateType ??= 'variable';
   p.mode = 'thorough';
   p.goals.lifeExpectancy ??= 90;
@@ -121,7 +122,7 @@ export function demoProfile(): Profile {
     livingMonthly: 4570, cash: 53000, cashOffset: 45000, cashSavings: 8000, offsetIsCash: true, buffer: 20000,
     debts: [
       { id: uid(), kind: 'car', label: 'Car loan', balance: 21000, monthlyRepayment: 640, limit: null, rate: 9.49 },
-      { id: uid(), kind: 'credit-card', label: 'Credit card', balance: 6400, monthlyRepayment: null, limit: 12000, rate: 20.99 },
+      { id: uid(), kind: 'credit-card', label: 'Credit card', balance: 0, monthlyRepayment: null, limit: 12000, rate: 20.99 },
       { id: uid(), kind: 'personal', label: 'Personal loan', balance: 9500, monthlyRepayment: 420, limit: null, rate: 13.9 },
       { id: uid(), kind: 'hecs', label: 'HECS / HELP', balance: 18000, monthlyRepayment: null, limit: null, owner: 'partner', voluntaryMonthly: 0 },
     ],

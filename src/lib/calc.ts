@@ -190,7 +190,7 @@ export function position(p: Profile, quotes: Quotes) {
   const shares = holdingsStats(p.holdings, quotes);
   const superBal = n(p.household.you.superBalance) + (p.household.hasPartner ? n(p.household.partner.superBalance) : 0);
   const cash = n(p.finances.cash);
-  const otherDebt = p.finances.debts.reduce((a, d) => a + n(d.balance), 0);
+  const otherDebt = p.finances.debts.filter((d) => d.kind !== 'credit-card').reduce((a, d) => a + n(d.balance), 0); // cards: only the limit counts
   const assets = propValue + shares.value + superBal + cash;
   const liabilities = propDebt + otherDebt;
   const bc = borrowingCapacity(p);
@@ -304,9 +304,9 @@ export function project(p: Profile, quotes: Quotes): Projection {
   let hecsBal = hecsAnnual(p).balance;
   const buffer = n(p.finances.buffer) || recommendedBuffer(p);
   const retireBuffer = p.goals.retireCash != null ? n(p.goals.retireCash) : RETIRE_CASH_MIN;
-  // Car loans, personal loans and cards, one by one. Loans run off on their repayments; cards are cleared as soon as savings above the emergency fund allow.
+  // Car and personal loans, one by one, run off on their repayments. Credit cards aren't tracked as debt (balances move too much); only their limit counts, for borrowing.
   const DEBT_NAME: Record<string, string> = { car: 'car loan', personal: 'personal loan', 'credit-card': 'credit card', other: 'loan' };
-  const debtSims = p.finances.debts.filter((d) => d.kind !== 'hecs' && n(d.balance) > 0).map((d) => {
+  const debtSims = p.finances.debts.filter((d) => d.kind !== 'hecs' && d.kind !== 'credit-card' && n(d.balance) > 0).map((d) => {
     const rate = n(d.rate ?? FALLBACK_DEBT_RATE[d.kind] ?? 10) / 100;
     const monthly = n(d.monthlyRepayment) || pmt(rate * 100, 5, n(d.balance));
     const label = d.label?.trim(); return { name: !label || /^(credit card|car loan|personal loan|loan)$/i.test(label) ? (label?.toLowerCase() || DEBT_NAME[d.kind] || 'loan') : label, card: d.kind === 'credit-card', bal: n(d.balance), rate, monthly };
