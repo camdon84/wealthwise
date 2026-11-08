@@ -59,6 +59,8 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
   const ri = (r: typeof before) => Math.max(0, r.points.findIndex((x) => x.year === r.retireYear));
   const big = before.points.slice(0, ri(before)).map((x, i) => ({ year: x.year, cash: x.cash / inf(i) })).filter((x) => x.cash > Math.max(100000, buffer * 2));
   const peak = big.reduce((m, x) => Math.max(m, x.cash), 0);
+  // The year cash first reaches the limit (when the extra starts going into shares)
+  const capYear = withPlan.points.find((x) => x.cashShares > 1)?.year ?? null;
   const chart = before.points.slice(0, ri(before) + 1).map((x, i) => ({ year: x.year, now: Math.max(0, x.cash / inf(i)), plan: Math.max(0, withPlan.points[i]?.cash ?? 0) / inf(i), shares: (withPlan.points[i]?.cashShares ?? 0) / inf(i) }));
 
   // Scenarios: the same plan with the cash kept in different places
@@ -133,14 +135,14 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
         <section className="panel p-5 sm:p-6">
           <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-gum text-surface"><Icon name="check" className="h-5 w-5" /></span><h3 className="font-display text-lg font-semibold">Your cash plan</h3></div>
           <ul className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <li className="rounded-xl bg-raised p-4 ring-1 ring-line"><p className="text-xs text-muted">Within reach</p><p className="font-display text-lg font-semibold">{saved.accessMax == null ? 'No limit' : `Up to ${money(saved.accessMax)}`}</p><p className="text-xs text-muted">On top of your {money(buffer)} emergency fund · today’s money</p></li>
+            <li className="rounded-xl bg-raised p-4 ring-1 ring-line"><p className="text-xs text-muted">Within reach</p><p className="font-display text-lg font-semibold">{saved.accessMax == null ? 'No limit' : `Up to ${money(saved.accessMax)}${capYear ? ` by ${capYear}` : ''}`}</p><p className="text-xs text-muted">On top of your {money(buffer)} emergency fund · today’s money{saved.accessMax != null && !capYear ? ' · you don’t reach it before you retire' : ''}</p></li>
             <li className="rounded-xl bg-raised p-4 ring-1 ring-line"><p className="text-xs text-muted">Where it sits</p><p className="font-display text-lg font-semibold">{saved.split.offset}% offset · {saved.split.hisa}% high interest · {saved.split.everyday}% everyday</p>{saved.split.offset > 0 && <p className="text-xs text-muted">Offset against {choices.filter((c) => saved.offsetProperties.includes(c.id)).map((c) => c.label).join(', ') || 'your loans'}</p>}</li>
             <li className="rounded-xl bg-raised p-4 ring-1 ring-line sm:col-span-2"><p className="text-xs text-muted">Above that</p><p className="font-medium">{saved.sweep && saved.accessMax != null ? 'Goes into shares, and is sold down to cover the deposit when you buy your next property, after capital gains tax. It shows on the Shares tab.' : 'Stays in cash.'}</p></li>
           </ul>
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn-quiet" onClick={() => onGo('shares')}>See it on the Shares tab</button>
             <button className="btn-quiet" onClick={() => onGo('timeline')}>See your Property Portfolio</button>
-            <button className="btn-ghost text-sm" onClick={() => update((d) => { d.cashPlan = undefined; })}>Remove my cash plan</button>
+            <button className="btn-quiet" onClick={restart}>Review my cash plan</button>
           </div>
         </section>
       ) : (
@@ -240,6 +242,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
           <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
             <button className="btn-ghost" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>Back</button>
             <div className="flex gap-2">
+              {saved && <button className="btn-ghost text-sm" onClick={() => { update((d) => { d.cashPlan = undefined; }); setStep(0); }}>Remove my cash plan</button>}
               {saved && <button className="btn-quiet" onClick={() => { setDraft(saved); setStep(-1); }}>Cancel</button>}
               {step < STEPS.length - 1 ? <button className="btn-primary" onClick={() => setStep((s) => s + 1)}>Next</button> : <button className="btn-primary" onClick={save}><Icon name="check" className="h-4 w-4" />Use this cash plan</button>}
             </div>
