@@ -42,7 +42,9 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
   const shares = r10(Math.min(surplus, proj.shareMonthly));
   const rest = Math.max(0, surplus - shares);
   const split = cp ? cp.split : loanProps.length ? { offset: 100, hisa: 0, everyday: 0 } : { offset: 0, hisa: 100, everyday: 0 };
-  const flow: PayFlow = { takeHome, living, bills, shares, offset: r10(rest * split.offset / 100), hisa: r10(rest * split.hisa / 100), everyday: r10(rest * split.everyday / 100) };
+  // The 'savings account' share of Cash Reserves is everyday money, so it joins everyday spending
+  const offset = r10(rest * split.offset / 100), hisa = r10(rest * split.hisa / 100);
+  const flow: PayFlow = { takeHome, living: r10(living + Math.max(0, rest - offset - hisa)), bills, shares, offset, hisa, everyday: 0 };
 
   const out: WiseAction[] = [];
   const offsetTargets = cp ? loanProps.filter((pr) => cp.offsetProperties.includes(pr.id)) : loanProps.filter((pr) => pr.use === 'home').slice(0, 1);
@@ -50,13 +52,18 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
   // ---- Set up once
   out.push({
     key: 'hisa', group: 'setup', title: 'Open a high-interest savings account',
-    body: `${split.hisa > 0 ? `This is where ${split.hisa}% of the cash you’re building earns interest, and` : 'A good home for'} your emergency fund. Popular, widely compared options include ING Savings Maximiser, Macquarie Savings Account and Ubank Save, and the big four banks (CommBank, Westpac, NAB, ANZ) all have bonus-rate savings accounts too. Most pay the bonus rate only if you deposit a set amount each month, so pick one your automatic transfer will qualify for. Listed because they’re widely compared, not as a recommendation.`,
-    sig: 'hisa', links: [{ label: 'Compare rates on Canstar', url: 'https://www.canstar.com.au/savings-accounts/compare/best-savings-account-interest-rates/' }, { label: 'Compare on Finder', url: 'https://www.finder.com.au/savings-accounts/high-interest-savings-accounts' }],
+    body: `${split.hisa > 0 ? `This is where ${split.hisa}% of the cash you’re building earns interest.` : 'A good home for your emergency fund.'} Compare some of the banks to find the best rates.`,
+    sig: 'hisa',
   });
   out.push({
     key: 'emergency', group: 'setup', title: `Keep your ${money(buffer)} emergency fund in its own account`,
     body: `A separate account (a high-interest one works well) means it isn’t spent by accident and is there if something goes wrong.${pos.cash < buffer ? ` You have about ${money(pos.cash)} in cash today, so build it up first.` : ''}`,
     amount: money(buffer), sig: `emergency:${buffer}`,
+  });
+  if (flow.bills > 0) out.push({
+    key: 'bills-account', group: 'setup', title: 'Set up a separate account to pay all of your bills',
+    body: 'Loan repayments, rates, insurance, strata and other regular bills all come out of one account. Your pay tops it up automatically, so bills are covered and your spending money is clear.',
+    amount: pm(flow.bills), sig: `bills:${flow.bills}`,
   });
   for (const pr of offsetTargets) {
     const hasOffset = pr.loans.some((l) => (l.offset ?? 0) > 0);
@@ -89,13 +96,9 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
     body: 'Schedule it for the day after payday. Check it’s at least the monthly deposit your account needs for the bonus rate.',
     amount: pm(flow.hisa), sig: `hisa:${flow.hisa}`,
   });
-  if (flow.everyday > 0) out.push({
-    key: 'xfer-savings', group: 'payday', title: 'Automatic transfer to your savings account',
-    body: 'The part of your savings you want close at hand.', amount: pm(flow.everyday), sig: `everyday:${flow.everyday}`,
-  });
   if (p.finances.debts.some((d) => d.kind === 'credit-card')) out.push({
-    key: 'card-autopay', group: 'payday', title: 'Set your credit card to pay the full balance automatically',
-    body: 'Most banks let you choose “closing balance” for automatic payments. It means you never pay card interest or late fees, however much you use the card.',
+    key: 'card-autopay', group: 'payday', title: 'Set up regular monthly credit card repayments',
+    body: 'Cover the cost of what you’re spending on your credit card each month. Consider closing your card if you don’t need it, or repaying the full amount owed each month.',
     sig: 'card',
   });
   for (const d of p.finances.debts.filter((x) => (x.kind === 'car' || x.kind === 'personal' || x.kind === 'other') && (x.balance ?? 0) > 0)) {
@@ -114,7 +117,7 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
   const holding = p.properties.reduce((t, pr) => t + (pr.annualCosts ?? 0), 0);
   if (holding > 0) out.push({
     key: 'holding', group: 'payday', title: 'Put money aside for property bills',
-    body: 'Rates, insurance, strata and maintenance arrive in lumps. Moving this part of your bills into its own account each month means they’re already covered when they land.',
+    body: 'Rates, insurance, strata and maintenance arrive in lumps. This much of what goes into your bills account each month is for them, so they’re already covered when they land.',
     amount: pm(r10(holding / 12)), sig: `holding:${r10(holding / 12)}`,
   });
 

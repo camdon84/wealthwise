@@ -39,11 +39,10 @@ export function WiseActions({ quotes, go }: { quotes: Quotes; go: (r: string) =>
 
   const legs = [
     { label: 'Everyday spending', v: flow.living, cls: 'bg-muted/50' },
-    { label: 'Loan repayments and bills', v: flow.bills, cls: 'bg-clay/60' },
+    { label: 'Bills account (loans and bills)', v: flow.bills, cls: 'bg-clay/60' },
     { label: 'Shares', v: flow.shares, cls: 'bg-sky' },
     { label: 'Offset', v: flow.offset, cls: 'bg-gum' },
     { label: 'High-interest savings', v: flow.hisa, cls: 'bg-brass' },
-    { label: 'Savings account', v: flow.everyday, cls: 'bg-brass/50' },
   ].filter((x) => x.v > 0);
   const total = Math.max(1, legs.reduce((t, x) => t + x.v, 0));
 
@@ -127,7 +126,7 @@ export function WiseActions({ quotes, go }: { quotes: Quotes; go: (r: string) =>
           </section>
         );
       })}
-      <p className="text-[11px] text-muted">Banks and products are named because they’re widely compared, not as recommendations, and WealthWise isn’t paid by any of them. Check current rates and conditions with the provider. General information, not financial advice.</p>
+      <p className="text-[11px] text-muted">Check current rates and conditions with the provider. General information, not financial advice.</p>
     </div>
   );
 }
