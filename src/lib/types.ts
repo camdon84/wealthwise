@@ -179,6 +179,7 @@ export interface Profile {
   forecasts?: Forecast[]; // saved forecasts and previous live plans
   insightState?: InsightState;
   cashPlan?: CashPlan; // the Cash tab's answers
+  actionState?: { done?: Record<string, { at: string; sig: string }>; reviewedAt?: string }; // Wise Actions: what's been set up, and the last yearly review
   planIdeas?: { dismissed?: Record<string, number>; refreshedAt?: number; ai?: { id: string; title: string; body: string; at: number }[] }; // "Have you thought about these options?" on the plan
   cpiBase?: { period: string; index: number }; // CPI quarter the locked plan's figures are in (set when the plan is locked)
   cpiLog?: { period: string; annual: number; at: string; updated: string[]; kept: string[] }[]; // inflation updates offered // Wise Insights: what's been seen, dismissed and refreshed

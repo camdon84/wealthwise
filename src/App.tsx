@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { WiseActions } from './pages/WiseActions';
+import { actionsNeedingUpdate, reviewDue, wiseActions } from './lib/actions';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp } from './lib/store';
 import { useHashRoute, useQuotes } from './lib/hooks';
 import { Auth } from './pages/Auth';
@@ -20,6 +22,7 @@ const NAV = [
   { id: 'investments', label: 'Shares', icon: 'shares' },
   { id: 'crypto', label: 'Crypto', icon: 'coin' },
   { id: 'plan', label: 'Wise Plan', icon: 'plan' },
+  { id: 'actions', label: 'Wise Actions', icon: 'actions' },
   { id: 'renovate', label: 'Renovator Centre', icon: 'renovate' },
   { id: 'details', label: 'My Details', icon: 'details' },
   { id: 'documents', label: 'Upload your documents', icon: 'upload' },
@@ -43,6 +46,8 @@ function Shell() {
   const current = NAV.some((n) => n.id === route) ? route : 'overview';
   const profile = useApp((s) => s.profile)!;
   const due = eofyItems(profile).outstanding.length;
+  const acts = useMemo(() => wiseActions(profile, quotes).actions, [profile, quotes]);
+  const actionAlerts = actionsNeedingUpdate(profile, acts).length + (reviewDue(profile) ? 1 : 0);
   if (profile.firstLookSeen === false) return <FirstLook quotes={quotes} />;
 
   const nav = (
@@ -51,6 +56,7 @@ function Shell() {
         <button key={n.id} onClick={() => { go(n.id); setMenu(false); }} aria-current={current === n.id ? 'page' : undefined}
           className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${current === n.id ? 'bg-raised text-ink ring-1 ring-line' : 'text-muted hover:text-ink hover:bg-raised/60'}`}>
           <Icon name={n.icon} className="h-[18px] w-[18px]" />{n.label}
+          {n.id === 'actions' && actionAlerts > 0 && <span className="ml-auto rounded-full bg-clay px-1.5 text-[11px] font-semibold text-white" aria-label={`${actionAlerts} actions need attention`}>{actionAlerts}</span>}
           {n.id === 'documents' && due > 0 && <span className="ml-auto rounded-full bg-brass px-1.5 text-[11px] font-semibold text-ground" aria-label={`${due} end of year updates due`}>{due}</span>}
         </button>
       ))}
@@ -81,6 +87,7 @@ function Shell() {
           {current === 'investments' && <Investments quotes={quotes} asOf={asOf} />}
           {current === 'crypto' && <Investments key="crypto" quotes={quotes} asOf={asOf} mode="crypto" />}
           {current === 'plan' && <Plan quotes={quotes} />}
+          {current === 'actions' && <WiseActions quotes={quotes} go={go} />}
           {current === 'documents' && <Documents />}
           {current === 'renovate' && <Renovate />}
           {current === 'details' && <MyDetails />}

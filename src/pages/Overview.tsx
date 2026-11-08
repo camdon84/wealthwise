@@ -9,6 +9,7 @@ import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartContro
 import { NewsPanel, WisePanel } from '../components/Assistants';
 import { RateWatch } from '../components/RateWatch';
 import { InflationUpdate } from '../components/InflationUpdate';
+import { reviewDue } from '../lib/actions';
 
 export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => void }) {
   const p = useApp((s) => s.profile)!;
@@ -39,6 +40,13 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
 
       <RateWatch />
       <InflationUpdate />
+      {reviewDue(p) && (
+        <section className="flex flex-wrap items-center gap-4 rounded-2xl bg-brass/15 p-4 ring-1 ring-brass/50">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brass text-ground"><Icon name="calendar" className="h-5 w-5" /></span>
+          <div className="min-w-0 flex-1"><p className="font-semibold">It’s time for your yearly Wise review</p><p className="text-sm text-muted">Check your plan still fits, then update any automatic payments in Wise Actions.</p></div>
+          <button className="btn-primary" onClick={() => go('actions')}>Open Wise Actions</button>
+        </section>
+      )}
 
       <section className="panel overflow-hidden">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">

@@ -118,6 +118,8 @@ export function Icon({ name, className = 'h-5 w-5' }: { name: string; className?
     plus: <path d="M12 5v14M5 12h14" />,
     x: <path d="M6 6l12 12M18 6L6 18" />,
     check: <path d="M5 12l5 5L20 7" />,
+    actions: <><path d="M10 6h10M10 12h10M10 18h10" /><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17" /></>,
+    calendar: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></>,
     upload: <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />,
     arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
     back: <path d="M19 12H5M11 6l-6 6 6 6" />,
