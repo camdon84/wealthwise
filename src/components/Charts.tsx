@@ -89,7 +89,7 @@ export function WealthChart({ points, retireYear, height = 320, real, hidden = [
   const stackTop = (p: YearPoint) => shown.reduce((t, s) => t + Math.max(0, p[s.key] as number), 0);
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={points} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
+      <AreaChart data={points} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
         <defs>{wealthSeries.map((s) => (
           <linearGradient key={s.key} id={`g-${s.key}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={s.color} stopOpacity={0.55} /><stop offset="1" stopColor={s.color} stopOpacity={0.12} /></linearGradient>
         ))}</defs>
@@ -182,7 +182,7 @@ export function CashFlowChart({ points, retireYear, height = 320, real }: { poin
   const tall = data.map((d, k) => ({ year: d.year, total: totals[k] })).filter((x) => x.total > cap);
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={data} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
+      <ComposedChart data={data} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid vertical={false} stroke={C.grid} strokeDasharray="2 4" />
         <XAxis dataKey="year" {...axis} interval="preserveStartEnd" minTickGap={28} />
         <YAxis {...axis} width={56} domain={[0, cap]} allowDataOverflow ticks={[0, cap / 4, cap / 2, (cap * 3) / 4, cap]} tickFormatter={(v) => money(v, { compact: true })} />
