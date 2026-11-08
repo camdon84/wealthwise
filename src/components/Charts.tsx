@@ -127,7 +127,7 @@ export function MarkerKey({ points }: { points: YearPoint[] }) {
     <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
       <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: C.brass }} />Property bought</li>
       {points.some((p) => p.sold) && <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: C.clay }} />Property sold</li>}
-      {debts.length > 0 && <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: C.equity }} />Loan paid off (on the cash line): {debts.join(' · ')}</li>}
+      {debts.length > 0 && <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: C.equity }} />Loan paid off: {debts.join(' · ')}</li>}
       {points.some((p) => p.liquidated) && <li className="flex items-center gap-1.5"><span className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: C.clay }}>$</span>Liquidation event</li>}
     </ul>
   );
