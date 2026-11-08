@@ -176,7 +176,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
       {!saved && <p className="rounded-lg bg-raised px-4 py-3 text-xs text-muted ring-1 ring-line">Until you save this, your plan assumes all your cash sits in offset accounts against every loan you have. That’s the best case, and most people don’t hold it that way.</p>}
 
       <section className="rounded-2xl border border-line bg-raised/60 p-5 sm:p-6">
-        <p className="font-semibold">What about shares?</p>
+        <p className="font-semibold">What about investing this extra capital?</p>
         <p className="mt-1 text-sm leading-relaxed text-muted">As your cash reserves build up, you may want to adjust the investment strategy for your share portfolio, as shares may see higher returns. However, this can be riskier. If you invest money you’re setting aside for a deposit into shares, you’ll need to allow for capital gains tax when you sell them, and when you’re ready to buy your next property, you’ll need to sell enough to cover the deposit, even if the market is down. That money would be separate from your long-term share portfolio plan.</p>
         <p className="mt-2 text-xs text-muted">{CGT_2027_NOTE}</p>
         <button className="btn-quiet mt-3 py-1.5" onClick={() => onGo('shares')}>Go to your share plan</button>
