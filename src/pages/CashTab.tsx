@@ -85,6 +85,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
     });
   }, [p, quotes, plan, choices.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const worst = Math.min(...scen.map((s) => s.atRetire));
+  const wanted = Math.max(0, p.goals.targetProperties - p.properties.length); // purchases the plan needs
 
   const setSplit = (k: keyof Split, v: number) => setDraft((d) => {
     const [a, b] = (Object.keys(d.split) as (keyof Split)[]).filter((x) => x !== k);
@@ -262,7 +263,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
                   <td className="py-2.5 pr-3"><p>{s.label}</p><p className="text-xs font-normal text-muted">{s.note}</p></td>
                   <td className="px-3 py-2.5"><span className={`chip whitespace-nowrap ${RISK_CLS[s.risk]}`}>{s.risk}</span></td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{money(s.peakCash, { compact: true })}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{s.buys.join(', ') || '—'}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{s.buys.join(', ') || '—'}{s.buys.length < wanted && <span className="block text-xs text-clay">{wanted - s.buys.length === 1 ? `Property ${p.properties.length + s.buys.length + 1} doesn’t fit` : `${wanted - s.buys.length} properties don’t fit`} before you stop work</span>}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{s.tax > 0 ? money(s.tax, { compact: true }) : '—'}</td>
                   <td className="py-2.5 pl-3 text-right tabular-nums"><span className="font-semibold">{money(s.atRetire, { compact: true })}</span>{s.atRetire - worst > 1000 && <span className="block text-xs text-gum">+{money(s.atRetire - worst, { compact: true })}</span>}</td>
                 </tr>
