@@ -653,9 +653,55 @@ function GiftsTab() {
   );
 }
 
+/** Pop-up: the monthly share investment, year by year (or month by month), as it rises with inflation. */
+function ShareGrowth({ p, proj, onClose }: { p: Profile; proj: ReturnType<typeof project>; onClose: () => void }) {
+  const [view, setView] = useState<'year' | 'month'>('year');
+  const rows = proj.points.filter((x) => x.year < proj.retireYear).map((x) => ({ year: x.year, age: x.age, monthly: x.sharePlanned / 12 }));
+  // The projection starts next year: this year it's today's amount, unless the plan is waiting for a purchase
+  if (rows[0] && rows[0].monthly < 1 && (!p.goals.shareStartAfter || (rows[1]?.monthly ?? 0) > 0)) rows[0].monthly = proj.shareMonthly;
+  const firstMonth = new Date().getMonth(); // this year: from this month on
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const startAfter = p.goals.shareStartAfter ? p.properties.length + p.goals.shareStartAfter : 0;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="sg-h" onClick={onClose}>
+      <div className="paper flex max-h-[85vh] w-full max-w-xl flex-col rounded-2xl bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="sg-h" className="font-display text-xl font-semibold">Your monthly share investment over time</h2>
+            <p className="mt-1 text-sm text-muted">To stay on track for your goal, {money(proj.shareMonthly)} a month (in today’s money) rises each year with inflation, assumed at {p.assumptions.inflation}% a year. Each year the official inflation figure comes out, Wise checks it against this.</p>
+          </div>
+          <button className="btn-ghost p-2" aria-label="Close" onClick={onClose}><Icon name="x" className="h-4 w-4" /></button>
+        </div>
+        <div className="mt-4"><Segmented size="sm" label="View" value={view} onChange={setView} options={[{ value: 'year', label: 'By year' }, { value: 'month', label: 'By month' }]} /></div>
+        <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl ring-1 ring-line">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-raised text-xs text-muted"><tr><th className="px-4 py-2 text-left font-medium">{view === 'year' ? 'Year' : 'Month'}</th><th className="px-3 py-2 text-left font-medium">Age</th><th className="px-4 py-2 text-right font-medium">Each month</th>{view === 'year' && <th className="px-4 py-2 text-right font-medium">That year</th>}</tr></thead>
+            <tbody className="divide-y divide-line">
+              {view === 'year' ? rows.map((r, k) => (
+                <tr key={r.year} className={r.monthly < 1 ? 'text-muted' : ''}>
+                  <td className="px-4 py-2 tabular-nums">{r.year}</td><td className="px-3 py-2 tabular-nums">{r.age}</td>
+                  <td className="px-4 py-2 text-right font-semibold tabular-nums">{r.monthly < 1 ? (startAfter ? `Waiting for property ${startAfter}` : '—') : money(Math.round(r.monthly))}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{r.monthly < 1 ? '' : money(Math.round(r.monthly * (k === 0 ? 12 - firstMonth : 12)))}</td>
+                </tr>
+              )) : rows.flatMap((r, k) => MONTHS.map((mo, mi) => (k === 0 && mi < firstMonth) ? null : (
+                <tr key={`${r.year}-${mi}`} className={`${r.monthly < 1 ? 'text-muted' : ''} ${mi === 0 ? 'border-t-2 border-line' : ''}`}>
+                  <td className="px-4 py-1.5 tabular-nums">{mo} {r.year}</td><td className="px-3 py-1.5 tabular-nums">{r.age}</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums">{r.monthly < 1 ? (startAfter ? 'Waiting' : '—') : money(Math.round(r.monthly))}</td>
+                </tr>
+              )))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-[11px] text-muted">Amounts are what you’d actually invest each month in that year’s dollars, stepping up once a year. They stop when you retire at {p.goals.retirementAge}.</p>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Shares plan ---------- */
 function SharesPlan({ quotes }: { quotes: Quotes }) {
   const p = usePlanProfile();
+  const [growOpen, setGrowOpen] = useState(false);
   const update = usePlanUpdate();
   const proj = useMemo(() => project(p, quotes), [p, quotes]);
   const pos = useMemo(() => position(p, quotes), [p, quotes]);
@@ -695,6 +741,8 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
             update((d) => { d.goals.shareMonthly = v ?? 0; d.goals.sharesTarget = v ? Math.round(reach / 1000) * 1000 : null; });
           }} suffix="/ month" />}</Field>
         </div>
+        {proj.shareMonthly > 0 && <button className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-brass hover:underline" onClick={() => setGrowOpen(true)}><Icon name="calendar" className="h-4 w-4" />See how your monthly investment rises with inflation</button>}
+        {growOpen && <ShareGrowth p={p} proj={proj} onClose={() => setGrowOpen(false)} />}
         {(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).length > 0 && (
           <div className="mt-4 rounded-xl border border-line p-3">
             <label className="flex cursor-pointer items-start gap-3">
