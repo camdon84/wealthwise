@@ -165,9 +165,9 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
               <h3 className="font-display text-lg font-semibold">You need cash for your next property. How hard do you want the rest of it working?</h3>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 {([
-                  ['conservative', 'Keep it safe', 'All of it stays in cash: offset and high-interest accounts. No market ups and downs.'],
-                  ['balanced', 'Balanced', 'Keep enough within reach for about half your next deposit. The rest goes into shares and is sold when you buy.'],
-                  ['growth', 'Put it to work', 'Keep your emergency fund and a little more in cash. Everything else goes into shares until a deposit is needed.'],
+                  ['conservative', 'Keep it safe', 'All of my spare cash outside of my share investment plan is in an offset or high-interest account. I’m not exposed to market ups and downs.'],
+                  ['balanced', 'Balanced', 'I keep about half of my next deposit in cash. The rest of my spare cash goes into shares and is sold down when I buy.'],
+                  ['growth', 'Put it to work', 'I keep my emergency fund and a little more in cash. All my other spare cash goes into shares until I need a deposit.'],
                 ] as [Risk, string, string][]).map(([k, t, d]) => (
                   <button key={k} onClick={() => setDraft(preset(p, k, hisaNow, draft))} className={`rounded-xl p-4 text-left ring-1 transition-colors ${draft.risk === k ? 'bg-brass/10 ring-2 ring-brass' : 'ring-line hover:ring-brass/50'}`}>
                     <p className="font-semibold">{t}</p><p className="mt-1 text-sm text-muted">{d}</p>
