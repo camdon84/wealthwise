@@ -25,7 +25,7 @@ export function MarketStrip() {
   );
 }
 
-function MarketCard({ id, range }: { id: string; range: Range }) {
+function MarketCard({ id, range, fill }: { id: string; range: Range; fill?: boolean }) {
   const s = useHistory(id, range);
   if (s === 'loading' || !s) return <div className="h-36 rounded-xl border border-line bg-raised/50 p-4">{s === null ? <p className="text-sm text-muted">Unavailable right now</p> : <div className="h-full animate-pulse rounded bg-line/40" />}</div>;
   const first = s.points[0].c, last = s.points[s.points.length - 1].c;
@@ -33,10 +33,11 @@ function MarketCard({ id, range }: { id: string; range: Range }) {
   const color = ch >= 0 ? 'rgb(var(--gum))' : 'rgb(var(--clay))';
   const dp = id === 'IDX:AUDUSD' ? 4 : 0;
   return (
-    <div className="rounded-xl border border-line bg-raised/50 p-4">
+    <div className={`rounded-xl border border-line bg-raised/50 p-4 ${fill ? 'flex h-full flex-col' : ''}`}>
       <div className="flex items-baseline justify-between"><p className="text-sm font-medium">{s.name}</p><p className={`text-sm font-medium ${ch >= 0 ? 'text-gum' : 'text-clay'}`}>{pct(ch, 1, true)}</p></div>
       <p className="font-display text-2xl font-semibold">{last.toLocaleString('en-AU', { minimumFractionDigits: dp, maximumFractionDigits: dp })}</p>
-      <div className="mt-2 h-28">
+      <div className={`mt-2 ${fill ? 'relative min-h-28 flex-1' : 'h-28'}`}>
+        <div className={fill ? 'absolute inset-0' : 'h-full'}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={s.points} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
             <defs><linearGradient id={`m-${id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity={0.35} /><stop offset="1" stopColor={color} stopOpacity={0} /></linearGradient></defs>
@@ -45,6 +46,7 @@ function MarketCard({ id, range }: { id: string; range: Range }) {
             <Area type="monotone" dataKey="c" stroke={color} strokeWidth={1.5} fill={`url(#m-${id})`} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
@@ -97,20 +99,31 @@ const live = (import.meta as any).env?.VITE_STORAGE === 'api';
 
 /* ---------- Top-of-page carousel: markets, then your portfolio over time ---------- */
 export function SharesCarousel({ holdings, quotes }: { holdings: Holding[]; quotes: Quotes }) {
-  const slides = holdings.length ? ['Markets', 'Your portfolio over time'] : ['Markets'];
+  // Your portfolio first (when you have holdings), then Markets
+  const slides = holdings.length ? ['Your portfolio over time', 'Markets'] : ['Markets'];
+  const mkIdx = slides.indexOf('Markets');
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
   const touched = useRef(0);
+  const earliest = holdings.map((h) => h.firstBought).filter(Boolean).sort()[0] ?? '';
+  const [mRange, setMRange] = useState<Range>('1y');
+  const [pRange, setPRange] = useState<Range>(rangeSince(earliest));
   useEffect(() => {
     if (slides.length < 2 || paused) return;
     const t = setInterval(() => { if (Date.now() - touched.current > 30000) setI((x) => (x + 1) % slides.length); }, 15000);
     return () => clearInterval(t);
   }, [slides.length, paused]);
   const go = (d: number) => { touched.current = Date.now(); setI((x) => (x + d + slides.length) % slides.length); };
+  const onMarkets = i === mkIdx;
   return (
-    <section className="panel overflow-hidden" aria-roledescription="carousel" aria-label="Markets and your portfolio" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <div className="flex items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-        <h2 className="font-display text-xl font-semibold">{slides[i]}</h2>
+    <section className="panel overflow-hidden" aria-roledescription="carousel" aria-label="Your portfolio and markets" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <h2 className="font-display text-xl font-semibold">{slides[i]}</h2>
+          {onMarkets
+            ? <Segmented size="sm" label="Time range" value={mRange} onChange={setMRange} options={RANGE_OPTS} />
+            : <Segmented size="sm" label="Time range" value={pRange} onChange={setPRange} options={[...RANGE_OPTS, { value: '10y', label: '10Y' }]} />}
+        </div>
         {slides.length > 1 && (
           <div className="flex items-center gap-2">
             <button className="btn-quiet h-9 w-9 justify-center p-0" aria-label="Previous" onClick={() => go(-1)}><Icon name="back" className="h-4 w-4" /></button>
@@ -121,26 +134,21 @@ export function SharesCarousel({ holdings, quotes }: { holdings: Holding[]; quot
       </div>
       <div className="relative overflow-hidden">
         <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${i * 100}%)` }}>
-          <div className="w-full shrink-0 p-5 pt-3 sm:p-6 sm:pt-3" aria-hidden={i !== 0}><MarketsBody /></div>
-          {slides.length > 1 && <div className="w-full shrink-0 p-5 pt-3 sm:p-6 sm:pt-3" aria-hidden={i !== 1}><PortfolioHistory holdings={holdings} quotes={quotes} /></div>}
+          {slides.map((s, k) => (
+            <div key={s} className="flex w-full shrink-0 flex-col p-5 pt-4 sm:p-6 sm:pt-4" aria-hidden={i !== k}>
+              {s === 'Markets'
+                ? <div className="grid flex-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">{MARKETS.map((m) => <MarketCard key={m} id={m} range={mRange} fill={slides.length > 1} />)}</div>
+                : <PortfolioHistory holdings={holdings} quotes={quotes} range={pRange} />}
+            </div>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-function MarketsBody() {
-  const [range, setRange] = useState<Range>('1y');
-  return (<>
-    <div className="flex justify-end"><Segmented size="sm" label="Time range" value={range} onChange={setRange} options={RANGE_OPTS} /></div>
-    <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{MARKETS.map((k) => <MarketCard key={k} id={k} range={range} />)}</div>
-  </>);
-}
-
 /** Portfolio value over time: each holding's units at each day's price, from when you first bought it, against what you put in. */
-function PortfolioHistory({ holdings, quotes }: { holdings: Holding[]; quotes: Quotes }) {
-  const earliest = holdings.map((h) => h.firstBought).filter(Boolean).sort()[0] ?? '';
-  const [range, setRange] = useState<Range>(rangeSince(earliest));
+function PortfolioHistory({ holdings, quotes, range }: { holdings: Holding[]; quotes: Quotes; range: Range }) {
   const [data, setData] = useState<{ t: number; value: number; invested: number }[] | 'loading' | null>('loading');
   const sig = holdings.map((h) => `${h.exchange}:${h.code}:${h.units}:${h.avgCost}:${h.firstBought}`).join('|');
   useEffect(() => {
@@ -177,13 +185,12 @@ function PortfolioHistory({ holdings, quotes }: { holdings: Holding[]; quotes: Q
   const gain = last.value - last.invested;
   const color = gain >= 0 ? 'rgb(var(--gum))' : 'rgb(var(--clay))';
   return (<>
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div>
       <div className="flex flex-wrap gap-x-8 gap-y-2">
         <div><p className="text-xs text-muted">Value now</p><p className="font-display text-2xl font-semibold">{money(last.value)}</p></div>
         <div><p className="text-xs text-muted">Put in</p><p className="font-display text-2xl font-semibold">{money(last.invested)}</p></div>
         <div><p className="text-xs text-muted">Gain</p><p className={`font-display text-2xl font-semibold ${gain >= 0 ? 'text-gum' : 'text-clay'}`}>{money(gain, { sign: true })}</p></div>
       </div>
-      <Segmented size="sm" label="Time range" value={range} onChange={setRange} options={[...RANGE_OPTS, { value: '10y', label: '10Y' }]} />
     </div>
     <div className="mt-3 h-56 -ml-2">
       <ResponsiveContainer width="100%" height="100%">

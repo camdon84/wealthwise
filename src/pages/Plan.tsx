@@ -736,8 +736,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><div className="mb-3"><Segmented size="sm" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} /></div>
-                <h2 className="font-display text-2xl font-semibold">Your Wise Future</h2>
+              <div><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h2 className="font-display text-2xl font-semibold">Your Wise Future</h2><Segmented size="xs" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} /></div>
                 <p className={`text-sm font-medium ${proj.runsOutAge != null ? 'text-clay' : 'text-gum'}`}>{proj.runsOutAge != null ? `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money runs out at ${proj.runsOutAge}.` : `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money lasts to ${p.goals.lifeExpectancy ?? 90}.`}</p></div>
               <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
             </div>

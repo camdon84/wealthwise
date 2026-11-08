@@ -46,15 +46,6 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
         </div>
       </div>
 
-      {crypto ? (
-        <div className="flex gap-3 rounded-xl border border-brass/40 bg-brass/10 p-4 text-sm">
-          <Icon name="coin" className="mt-0.5 h-5 w-5 shrink-0 text-brass" />
-          <p>{p.cryptoInPlan && p.cryptoGrowth != null
-            ? `Your crypto is included in your plan as a simple figure: today’s value growing at your own estimate of ${p.cryptoGrowth}% a year. Cryptocurrency is volatile, so treat that part of the plan as a rough guide.`
-            : 'As cryptocurrency is a volatile asset, we cannot measure its future performance. Your crypto counts towards your net worth today, but it’s left out of your plan, projections and Your Wise Future unless you choose to include it below.'}</p>
-        </div>
-      ) : <SharesCarousel holdings={mine} quotes={quotes} />}
-
       <section className="panel p-5 sm:p-6">
         <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
           <div><p className="text-sm text-muted">Portfolio value</p><p className="font-display text-4xl font-semibold">{money(st.value)}</p></div>
@@ -70,6 +61,16 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
           </div>
         )}
       </section>
+
+      {crypto ? (
+        <div className="flex gap-3 rounded-xl border border-brass/40 bg-brass/10 p-4 text-sm">
+          <Icon name="coin" className="mt-0.5 h-5 w-5 shrink-0 text-brass" />
+          <p>{p.cryptoInPlan && p.cryptoGrowth != null
+            ? `Your crypto is included in your plan as a simple figure: today’s value growing at your own estimate of ${p.cryptoGrowth}% a year. Cryptocurrency is volatile, so treat that part of the plan as a rough guide.`
+            : 'As cryptocurrency is a volatile asset, we cannot measure its future performance. Your crypto counts towards your net worth today, but it’s left out of your plan, projections and Your Wise Future unless you choose to include it below.'}</p>
+        </div>
+      ) : <SharesCarousel holdings={mine} quotes={quotes} />}
+
 
       {mine.length === 0 ? (
         <div className="panel p-10 text-center"><p className="font-medium">{crypto ? 'No crypto yet' : 'No shares yet'}</p><p className="mt-1 text-sm text-muted">{crypto ? 'Import your exchange’s trade history or log a trade to track a coin at live prices.' : 'Import your broker’s trade history or log a trade to start tracking.'}</p></div>

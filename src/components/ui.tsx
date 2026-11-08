@@ -54,7 +54,17 @@ export function Select<T extends string>({ id, value, onChange, options }: { id?
   );
 }
 
-export function Segmented<T extends string>({ value, onChange, options, size = 'md', label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; size?: 'sm' | 'md'; label?: string }) {
+export function Segmented<T extends string>({ value, onChange, options, size = 'md', label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; size?: 'xs' | 'sm' | 'md'; label?: string }) {
+  if (size === 'xs') return (
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-full border border-line/70 p-0.5">
+      {options.map((o) => (
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}
+          className={`rounded-full px-2 py-0.5 text-[10px] font-medium leading-4 transition-colors ${value === o.value ? 'bg-ink/10 text-ink' : 'text-muted hover:text-ink'}`}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
   return (
     <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl border border-line bg-raised p-1">
       {options.map((o) => (

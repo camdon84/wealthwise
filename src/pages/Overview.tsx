@@ -43,9 +43,8 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
           <div className="p-5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <div className="mb-3"><Segmented size="sm" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} /></div>
                 <p className="text-sm text-muted">{p.household.hasPartner ? 'Your combined net worth' : 'Your current net worth'}</p>
-                <p className="font-display text-5xl font-semibold tracking-tight">{money(pos.netWorth)}</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><p className="font-display text-5xl font-semibold tracking-tight">{money(pos.netWorth)}</p><Segmented size="xs" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} /></div>
                 <p className="mt-1 text-sm text-muted">{money(pos.assets, { compact: true })} in assets, {money(pos.liabilities, { compact: true })} owing</p>
               </div>
               <div className="flex flex-col items-end gap-3">
