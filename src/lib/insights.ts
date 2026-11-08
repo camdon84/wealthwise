@@ -348,7 +348,14 @@ export function goalAnalysis(p: Profile, quotes: Quotes) {
   }
   if (target > 0) {
     if (sharesAtRetireReal >= target * 0.98) lines.push({ tone: 'good', text: `Investing ${money(proj.shareMonthly)} a month, your shares reach about ${money(sharesAtRetireReal, { compact: true })} (in today’s money) by ${p.goals.retirementAge}, meeting your ${money(target, { compact: true })} goal.` });
-    else lines.push({ tone: 'warn', text: `To grow your shares to ${money(target, { compact: true })} by ${p.goals.retirementAge}, you’d invest about ${money(proj.requiredShareMonthly)} a month. At ${money(proj.shareMonthly)} a month you’d reach about ${money(sharesAtRetireReal, { compact: true })}.` });
+    else if (proj.requiredShareMonthly > proj.shareMonthly + 50) lines.push({ tone: 'warn', text: `To grow your shares to ${money(target, { compact: true })} by ${p.goals.retirementAge}, you’d invest about ${money(proj.requiredShareMonthly)} a month. At ${money(proj.shareMonthly)} a month you’d reach about ${money(sharesAtRetireReal, { compact: true })}.` });
+    // The amount is right on paper, but savings can't always cover it or it waits for a purchase: say that, not "invest the same again"
+    else {
+      const work = proj.points.filter((x) => x.year < proj.retireYear);
+      const short = work.reduce((t, x) => t + x.shareContribution, 0) < work.reduce((t, x) => t + x.sharePlanned, 0) * 0.98;
+      const why = [(p.goals.shareStartAfter ?? 0) > 0 && 'it waits for your next purchase', short && 'your savings can’t always cover it'].filter(Boolean).join(' and ') || 'not every month goes in';
+      lines.push({ tone: 'warn', text: `Your ${money(proj.shareMonthly)} a month share plan would reach ${money(target, { compact: true })} if it went in every month from now, but ${why}, so your shares reach about ${money(sharesAtRetireReal, { compact: true })} by ${p.goals.retirementAge}. See the plan check on Goals for what would close the gap.` });
+    }
   }
   const incomeReal = atRetire?.passiveIncomeReal ?? 0;
   const life = p.goals.lifeExpectancy ?? 90;

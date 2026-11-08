@@ -134,9 +134,35 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   // 4. Shares short of goal with a custom amount
   const years = Math.max(1, retireAge - (p.household.you.age ?? 35));
   const sharesReal = r.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years); // before any retirement sale money is added
-  if ((g.sharesTarget ?? 0) > 0 && sharesReal < (g.sharesTarget ?? 0) * 0.97) {
-    problems.push(`Investing ${m(r.shareMonthly)} a month, your shares reach about ${m(sharesReal)} by ${retireAge}, short of your ${m(g.sharesTarget ?? 0)} goal.`);
-    fixes.push(`Invest about ${money(r.requiredShareMonthly)} a month (set “Monthly investment” in Shares), or lower your share goal to about ${m(round(sharesReal, 50000))}.`);
+  // (Skipped when the share plan is already flagged for using deposit savings: that problem's fix covers shares.)
+  if (!cap && (g.sharesTarget ?? 0) > 0 && sharesReal < (g.sharesTarget ?? 0) * 0.97) {
+    const target = g.sharesTarget ?? 0;
+    // Why it falls short: the amount is too low, or savings can't always cover it (shares only come from money
+    // above the emergency fund), or it waits for a purchase. The textbook monthly figure ignores the last two,
+    // so the fix is the amount that actually reaches the goal in the projection, tested.
+    const work = r.points.filter((x) => x.year < r.retireYear);
+    const savingsShort = work.reduce((t, x) => t + x.shareContribution, 0) < work.reduce((t, x) => t + x.sharePlanned, 0) * 0.98;
+    const realAt = (x: Projection) => x.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years);
+    const reaches = (v: number) => { const x = run((y) => { y.goals.shareMonthly = v; }); return realAt(x) >= target * 0.995 && cashOk(x) && propsOk(p, x); };
+    // Step up from today's amount (too much in shares can start blocking purchases, so a bigger amount isn't always
+    // better), then narrow down between the last amount that falls short and the first that gets there.
+    let need: number | null = null;
+    const step = 250, top = Math.max(r.shareMonthly * 3, 6000);
+    for (let v = r.shareMonthly + step, prev = r.shareMonthly; v <= top; prev = v, v += step) {
+      if (!reaches(v)) continue;
+      let lo = prev, hi = v;
+      for (let i = 0; i < 6; i++) { const mid = (lo + hi) / 2; if (reaches(mid)) hi = mid; else lo = mid; }
+      need = Math.ceil(hi / 50) * 50;
+      break;
+    }
+    const lower = m(round(sharesReal, 50000));
+    problems.push(savingsShort
+      ? `Your savings can’t always cover the ${m(r.shareMonthly)} a month share plan (shares are only bought from money above your emergency fund), so your shares reach about ${m(sharesReal)} by ${retireAge}, short of your ${m(target)} goal.`
+      : `Investing ${m(r.shareMonthly)} a month${n0(g.shareStartAfter) > 0 ? ` from property ${owned + n0(g.shareStartAfter)}` : ''}, your shares reach about ${m(sharesReal)} by ${retireAge}, short of your ${m(target)} goal.`);
+    const startNow = n0(g.shareStartAfter) > 0 ? run((y) => { y.goals.shareStartAfter = 0; }) : null;
+    if (startNow && realAt(startNow) >= target * 0.97 && cashOk(startNow) && propsOk(p, startNow)) fixes.push(`Start your share plan now rather than after property ${owned + n0(g.shareStartAfter)} (untick the box in Shares). That reaches your ${m(target)} goal and still buys every property on time.`);
+    else if (need != null && need > r.shareMonthly + 50) fixes.push(`Invest about ${money(need)} a month (set “Monthly investment” in Shares), or lower your share goal to about ${lower}.`);
+    else fixes.push(`Lower your share goal to about ${lower}: that’s what your savings can cover alongside your property plan.`);
   }
 
   // What's working

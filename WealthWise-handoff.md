@@ -94,7 +94,7 @@ This is one of the most important things.
 - **Claude preview artifact.** A copy of the app runs as a Claude artifact on demo data:
   - slug `426277df-a86e-4fce-b44a-40e1f0c7bdee`
   - URL https://claude.ai/artifact/9CTFY1vT9D9F4XH3Yo8him
-  - latest version `1794177409-4211`
+  - latest version `1794177968-c006`
   - Build it with `npx vite build --mode preview --outDir dist-preview`.
   - Publish with mode `replace`, including `index.html`, `assets/index-*.js`, `assets/index-*.css` and `samples/{loan,super,valuation}-sample.pdf`.
 - **Demo account:** log in with "Explore the demo account". The demo's CPI baseline is set one year back, so the inflation pop-up shows.
@@ -157,6 +157,7 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
 - **Goals**
   - Wealth focus question (property, shares or balanced). It's also asked in onboarding, and it tailors the ideas.
   - "Accessible cash reserves in retirement". Hint text: "The minimum amount of money you want access to in your everyday bank accounts during retirement (in today's money). This replaces the emergency cash buffer you set in My Details once you retire. We recommend at least $50,000." Zero is allowed.
+  - **Share goal short:** the plan check says why (amount too low, savings can't always cover it, or it waits for a purchase) and offers a tested fix: start the share plan now, the monthly amount that actually reaches the goal in the projection, or a lower share goal. It's skipped when shares are already flagged for using deposit savings. Wise suggesting an *earlier* stop-work age is fine.
   - **Stop-work age is the user's choice.** Nothing in the app suggests working longer or retiring later. When money doesn't last, the tested fixes are: a lower retirement income, a bigger share plan while working (smallest tested amount that lasts and still buys every property on time), or one fewer property.
   - **Plan check:**
     - The dot points and red crosses can't be dismissed.
@@ -252,9 +253,6 @@ These rules are enforced in the prompts and also by filters in `worker/index.ts`
 6. Set up a custom domain.
 
 Done in November 2026: AI ideas no longer suggest purchases after retirement, and the "keep working to X" fixes are gone.
-
-### Known quirk (not fixed yet)
-- When the share plan is held back by savings, the plan check can say "Invest about $X a month" where $X is what they already invest (section 4 of `planCheck()` uses `requiredShareMonthly`).
 
 ### Suburb data research (done; nothing built yet)
 - **Free official sources, open licence, quarterly:**
