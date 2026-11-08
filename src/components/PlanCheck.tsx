@@ -95,7 +95,7 @@ function PlanCheckResult({ check, compact }: { check: PlanCheck; compact?: boole
           <ul className="mt-2 space-y-2 text-[15px] leading-relaxed">
             {check.fixes.map((t) => <li key={t} className="flex gap-3"><Icon name="arrow" className="mt-1 h-4 w-4 shrink-0 text-brass" />{t}</li>)}
           </ul>
-          <p className="mt-3 text-[11px] text-muted">Each suggestion was tested against your numbers. Change it in Goals, Property portfolio or Shares and this updates.</p>
+          <p className="mt-3 text-[11px] text-muted">Each suggestion was tested against your numbers. Change it in Goals, Property Portfolio or Shares and this updates.</p>
         </div>
       )}
       {check.ideas.length > 0 && (

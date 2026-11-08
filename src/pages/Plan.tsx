@@ -49,7 +49,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
           <p className="text-muted">{forecasting ? 'Try changes here without touching your live plan. Save it, or make it your new Wise Future.' : 'Set where you want to end up, check the assumptions, and see how it plays out.'}</p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 xl:flex-nowrap" role="tablist" aria-label="Plan section">
-          <Segmented stretch label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property portfolio' }, { value: 'shares', label: 'Shares' }, { value: 'liquidations', label: 'Liquidation events' }, { value: 'gifts', label: 'Gifts' }]} />
+          <Segmented stretch label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property Portfolio' }, { value: 'shares', label: 'Shares' }, { value: 'liquidations', label: 'Liquidation Events' }, { value: 'gifts', label: 'Gifts' }]} />
           <button role="tab" aria-selected={tab === 'projections'} onClick={() => setTab('projections')}
             className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${tab === 'projections'
               ? 'bg-brass text-ground shadow-[0_6px_20px_-6px_rgb(var(--brass)/0.7)] ring-2 ring-brass/40'
@@ -75,7 +75,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
       }} onKeyDownCapture={(e) => { if (locked && editable && (e.target as HTMLElement).closest('input, select, textarea')) { e.preventDefault(); setAsk({}); } }}>
         {tab === 'goals' && <Goals quotes={quotes} go={setTab} />}
         {tab === 'assumptions' && <AssumptionsTab />}
-        {tab === 'timeline' && <Timeline quotes={quotes} />}
+        {tab === 'timeline' && <Timeline quotes={quotes} onGoals={() => setTab('goals')} />}
         {tab === 'shares' && <SharesPlan quotes={quotes} />}
         {tab === 'liquidations' && <LiquidationsTab quotes={quotes} />}
         {tab === 'gifts' && <GiftsTab />}
@@ -184,7 +184,7 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <Field label="Stop working at age">{(id) => <NumInput id={id} value={g.retirementAge} onChange={(v) => update((d) => { d.goals.retirementAge = v ?? 60; })} />}</Field>
           <Field label="Planning to live to">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} />}</Field>
-          <LinkedValue label="Properties owned by retirement" value={`${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}`} hint="Update your property goal on the Property portfolio tab." tabLabel="Property portfolio" onGo={() => go('timeline')} />
+          <LinkedValue label="Properties owned by retirement" value={`${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}`} hint="Update your property goal on the Property Portfolio tab." tabLabel="Property Portfolio" onGo={() => go('timeline')} />
           <LinkedValue label="Share portfolio value at retirement" value={g.sharesTarget ? `${money(g.sharesTarget)}` : 'No goal set'} hint="Update your share plan on the Shares tab." tabLabel="Shares" onGo={() => go('shares')} />
           <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working, in today’s money. The plan sells shares and properties if it needs to.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
           <div><Field label="Cash to keep on hand in retirement" hint="The least you want in the bank at any time once you stop work, in today’s money. This replaces the emergency cash buffer you set in My Details once you retire. We recommend at least $50,000, but you can set it to $0 and your Wise Future will use that.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder="50000" />}</Field>
@@ -285,7 +285,7 @@ function AssumptionsTab() {
 }
 
 /* ---------- Property portfolio ---------- */
-function Timeline({ quotes }: { quotes: Quotes }) {
+function Timeline({ quotes, onGoals }: { quotes: Quotes; onGoals: () => void }) {
   const p = usePlanProfile();
   const update = usePlanUpdate();
   const need = Math.max(0, p.goals.targetProperties - p.properties.length);
@@ -307,7 +307,7 @@ function Timeline({ quotes }: { quotes: Quotes }) {
     <div className="space-y-6">
       <section className="panel p-5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div><h2 className="font-display text-xl font-semibold">Your property portfolio</h2><p className="text-sm text-muted">From what you own now to {p.goals.targetProperties} properties by {retireAge}. Open a property to set its loan plan.</p></div>
+          <div><h2 className="font-display text-xl font-semibold">Your Property Portfolio</h2><p className="text-sm text-muted">From what you own now to {p.goals.targetProperties} properties by {retireAge}. Open a property to set its loan plan.</p></div>
           <div>
             <p className="field-label">Properties I want to own by {retireAge}</p>
             <div className="flex items-center gap-2">
@@ -324,7 +324,7 @@ function Timeline({ quotes }: { quotes: Quotes }) {
           ))}
           {plans.map((plan, k) => (
             <PlannedRow key={plan.id} plan={plan} k={k} n={p.properties.length + k + 1} open={open === plan.id} onToggle={() => toggle(plan.id)}
-              bought={proj.purchases[k]} firstMissing={k === proj.purchases.length} block={proj.block} startYear={startYear} startAge={startAge} retireAge={retireAge} />
+              bought={proj.purchases[k]} firstMissing={k === proj.purchases.length} block={proj.block} startYear={startYear} startAge={startAge} retireAge={retireAge} onGoals={onGoals} />
           ))}
         </ol>
         {need === 0 && <p className="mt-4 text-sm text-muted">You already own your target number of properties. Raise the target in Goals to plan the next one.</p>}
@@ -392,9 +392,9 @@ function OwnedRow({ pr, n, open, onToggle, retireAge, startAge }: { pr: Property
   );
 }
 
-function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, startYear, startAge, retireAge }: {
+function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, startYear, startAge, retireAge, onGoals }: {
   plan: PlannedPurchase; k: number; n: number; open: boolean; onToggle: () => void; bought?: { year: number; price: number }; firstMissing: boolean;
-  block: ReturnType<typeof project>['block']; startYear: number; startAge: number; retireAge: number;
+  block: ReturnType<typeof project>['block']; startYear: number; startAge: number; retireAge: number; onGoals: () => void;
 }) {
   const update = usePlanUpdate();
   const assumedRate = usePlanProfile().assumptions.newLoanRate;
@@ -412,7 +412,7 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
       {!bought && firstMissing && block && (
         <p className="mb-3 text-sm text-clay">{block.reason === 'servicing' ? `Held back by borrowing power: lenders would want about ${money(block.monthlyShort, { compact: true })} a month more income. Try a cheaper price or a higher yield.` : `Needs about ${money(block.deposit, { compact: true })} for the deposit and costs; you’d have ${money(block.available, { compact: true })}.`}</p>
       )}
-      {late && <p className="mb-3 text-sm text-clay">You want this before {plan.buyBy}, but the earliest it fits is {bought!.year}.</p>}
+      {late && <p className="mb-3 text-sm text-clay">You want to purchase this property before {plan.buyBy}, but the earliest it fits is {bought!.year}. Adjust the price, the purchase year, or go to your <button className="font-semibold underline" onClick={onGoals}>Goals tab</button> for further recommendations.</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Name (optional)">{(id) => <TextInput id={id} value={plan.label} onChange={(v) => set({ label: v })} placeholder={`Property ${n}`} />}</Field>
         <Field label="Price in today’s money">{(id) => <MoneyInput id={id} value={plan.price} onChange={(v) => set({ price: v ?? 0 })} />}</Field>
@@ -521,7 +521,7 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
   return (
     <section className="panel p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 className="font-display text-xl font-semibold">Liquidation events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Planned sales of shares, crypto or a property you own, to free up cash for a deposit or anything else. The money goes into your savings after selling costs, any loan and an estimate of capital gains tax. They show on your charts as a red $.</p></div>
+        <div><h2 className="font-display text-xl font-semibold">Liquidation Events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Planned sales of shares, crypto or a property you own, to free up cash for a deposit or anything else. The money goes into your savings after selling costs, any loan and an estimate of capital gains tax. They show on your charts as a red $.</p></div>
         <button className="btn-primary" disabled={what.length === 0} onClick={add}><Icon name="plus" className="h-4 w-4" />Add a liquidation event</button>
       </div>
       {list.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No liquidation events yet. Add one here, or from a suggestion in Your Wise Future.</p> : (
