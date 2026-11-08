@@ -528,7 +528,7 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
   return (
     <section className="panel p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 className="font-display text-xl font-semibold">Liquidation Events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Plan the sale of shares, crypto or a property you own. Selling shares or crypto can free up capital for another property purchase, and selling any of your assets can strengthen your cash reserves. The money goes into your interest-earning or offset accounts, after selling costs, any loan and an estimate of capital gains tax. Liquidation events show on your charts as <span className="inline-flex h-4 w-4 translate-y-0.5 items-center justify-center rounded-full bg-clay font-display text-[10px] font-bold leading-none text-white" aria-label="a red dollar sign">$</span>.</p></div>
+        <div><h2 className="font-display text-xl font-semibold">Liquidation Events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Plan the sale of shares, crypto or a property you own. Selling shares or crypto can free up capital for another property purchase, and selling any of your assets can strengthen your cash reserves.</p></div>
         <button className="btn-primary" disabled={what.length === 0} onClick={add}><Icon name="plus" className="h-4 w-4" />Add a liquidation event</button>
       </div>
       {list.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No liquidation events yet. Add one here, or from a suggestion in Your Wise Future.</p> : (
