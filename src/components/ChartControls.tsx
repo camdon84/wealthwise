@@ -1,4 +1,4 @@
-import { useApp } from '../lib/store';
+import { usePlanProfile, usePlanUpdate } from '../lib/planContext';
 import { Segmented } from './ui';
 
 export type Dollars = 'real' | 'nominal';
@@ -8,7 +8,7 @@ export function DollarsToggle({ value, onChange }: { value: Dollars; onChange: (
 }
 
 export function DollarsNote({ value }: { value: Dollars }) {
-  const p = useApp((s) => s.profile)!;
+  const p = usePlanProfile();
   const inf = p.assumptions.inflation;
   return value === 'real'
     ? <>Shown in <strong className="font-medium text-ink">today’s money</strong>: every year is adjusted for {inf}% a year inflation, so a figure means what it would buy now.</>
@@ -16,8 +16,8 @@ export function DollarsNote({ value }: { value: Dollars }) {
 }
 
 export function LiveToAge() {
-  const p = useApp((s) => s.profile)!;
-  const update = useApp((s) => s.update);
+  const p = usePlanProfile();
+  const update = usePlanUpdate();
   const v = p.goals.lifeExpectancy ?? 90;
   const min = Math.max((p.household.you.age ?? 30) + 5, p.goals.retirementAge + 1);
   return (

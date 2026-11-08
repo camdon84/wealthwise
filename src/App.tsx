@@ -19,7 +19,7 @@ const NAV = [
   { id: 'properties', label: 'Properties', icon: 'property' },
   { id: 'investments', label: 'Shares', icon: 'shares' },
   { id: 'crypto', label: 'Crypto', icon: 'coin' },
-  { id: 'plan', label: 'Plan', icon: 'plan' },
+  { id: 'plan', label: 'Plan Wise', icon: 'plan' },
   { id: 'renovate', label: 'Renovator Centre', icon: 'renovate' },
   { id: 'details', label: 'My details', icon: 'details' },
   { id: 'dependants', label: 'Dependants', icon: 'family' },

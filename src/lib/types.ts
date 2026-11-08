@@ -119,6 +119,7 @@ export interface Goals {
   shareMonthly?: number | null; // planned monthly share investment; null = whatever reaches the target
   shareStartAfter?: number | null; // don't start the share plan until this many planned purchases are bought
   passiveIncome: number; // today's dollars p.a.
+  plannedChildren?: { id: string; year: number }[]; // children you plan to have: average costs from birth to 18
   retireCash?: number | null; // cash to keep on hand in retirement, today's money (replaces the emergency buffer once retired)
   targetProperties: number;
   risk: number; // 1-5
@@ -171,6 +172,8 @@ export interface Profile {
   eofy?: { fy: string; done: string[] }; // end-of-financial-year update checklist
   renovations?: Renovation[];
   liquidations?: Liquidation[];
+  forecasts?: Forecast[]; // saved forecasts and previous live plans
+  planLocked?: boolean;
   gifts?: Gift[];
   cryptoGrowth?: number | null;
   cryptoInPlan?: boolean; // opted in: crypto grows at cryptoGrowth in the plan // the user's own guess, only used on the Crypto page
@@ -203,3 +206,10 @@ export interface Renovation {
 export interface Liquidation { id: string; year: number; asset: 'crypto' | 'shares'; pct: number; note?: string }
 /** Money expected from family: a gift or an inheritance. Amount is in the dollars of that year. */
 export interface Gift { id: string; year: number; amount: number; from: string; kind: 'gift' | 'inheritance'; note?: string }
+
+export interface PlanSnapshot {
+  goals: Goals; assumptions: Assumptions; plannedPurchases: PlannedPurchase[]; liquidations: Liquidation[]; gifts: Gift[];
+  propertyPlans: Record<string, { planIo5?: boolean; planPayOff?: boolean }>;
+}
+/** A saved forecast, or a previous live plan kept when a forecast replaced it. */
+export interface Forecast { id: string; name: string; kind: 'forecast' | 'previous'; savedAt: string; plan: PlanSnapshot }

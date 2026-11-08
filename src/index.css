@@ -82,3 +82,6 @@ h1, h2, h3, .font-display { font-family: 'Bricolage Grotesque', system-ui, sans-
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 input[type=range] { accent-color: rgb(var(--brass)); }
+
+/* Locked plan: inputs look read-only; clicking them asks whether to unlock */
+.plan-locked input, .plan-locked select, .plan-locked textarea, .plan-locked [role='radiogroup'], .plan-locked .btn-primary, .plan-locked .btn-quiet { opacity: 0.55; cursor: not-allowed; }

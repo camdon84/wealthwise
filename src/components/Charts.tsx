@@ -94,7 +94,7 @@ export function WealthChart({ points, retireYear, height = 320, real, hidden = [
         ))}</defs>
         <CartesianGrid vertical={false} stroke={C.grid} strokeDasharray="2 4" />
         <XAxis dataKey="year" {...axis} interval="preserveStartEnd" minTickGap={28} />
-        <YAxis {...axis} width={56} domain={[0, yMax]} allowDataOverflow tickCount={5} tickFormatter={(v) => money(v, { compact: true })} />
+        <YAxis {...axis} width={56} domain={[0, yMax]} allowDataOverflow ticks={[0, yMax / 4, yMax / 2, (yMax * 3) / 4, yMax]} tickFormatter={(v) => money(v, { compact: true })} />
         <Tooltip content={<Tip rows={shown} rowsAll={all.length} real={real} />} cursor={{ stroke: C.muted, strokeDasharray: '3 3' }} />
         {shown.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} strokeWidth={1.5} fill={`url(#g-${s.key})`} isAnimationActive={false} />)}
         <ReferenceLine x={retireYear} stroke={C.brass} strokeDasharray="4 4" label={{ value: 'Stop work', position: 'insideTopRight', fill: C.brass, fontSize: 11 }} />
@@ -183,7 +183,7 @@ export function CashFlowChart({ points, retireYear, height = 320, real }: { poin
       <ComposedChart data={data} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid vertical={false} stroke={C.grid} strokeDasharray="2 4" />
         <XAxis dataKey="year" {...axis} interval="preserveStartEnd" minTickGap={28} />
-        <YAxis {...axis} width={56} domain={[0, cap]} allowDataOverflow tickFormatter={(v) => money(v, { compact: true })} />
+        <YAxis {...axis} width={56} domain={[0, cap]} allowDataOverflow ticks={[0, cap / 4, cap / 2, (cap * 3) / 4, cap]} tickFormatter={(v) => money(v, { compact: true })} />
         <Tooltip cursor={{ fill: 'rgb(var(--line) / 0.35)' }} content={({ active, payload, label }: any) => {
           if (!active || !payload?.length) return null;
           const d = payload[0].payload;

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
-import { pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, type Quotes } from '../lib/calc';
+import { applySnapshot, newForecast, PlanProvider, snapshot, useForecast, usePlanMode, usePlanProfile, usePlanUpdate, type PlanCtx } from '../lib/planContext';
+import { CHILD_COST_YEAR, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, type Quotes } from '../lib/calc';
 import { maxShareMonthly, planCheck, saleAfterTax } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { wiseInsights } from '../lib/insights';
 import { money } from '../lib/format';
 import { plannedPurchase, uid } from '../lib/defaults';
 import { useCashRate } from '../lib/rates';
-import type { Assumptions, Gift, Liquidation, PlannedPurchase, Property } from '../lib/types';
+import type { Assumptions, Forecast, Gift, Liquidation, PlanSnapshot, PlannedPurchase, Profile, Property } from '../lib/types';
 import { CashFlowChart, CashFlowKey, MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
 import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { useWiseTake } from '../components/Assistants';
@@ -17,35 +18,161 @@ type Tab = 'goals' | 'assumptions' | 'timeline' | 'shares' | 'liquidations' | 'g
 
 export function Plan({ quotes }: { quotes: Quotes }) {
   const [tab, setTab] = useState<Tab>(() => { const t = useNavIntent.getState().planTab as Tab | null; useNavIntent.getState().set({ planTab: null }); return t ?? 'goals'; });
+  const live = useApp((s) => s.profile)!;
+  const liveUpdate = useApp((s) => s.update);
+  const fc = useForecast();
+  const forecasting = fc.mode === 'forecast' && fc.draft != null;
+  const locked = !forecasting && !!live.planLocked;
+  const [ask, setAsk] = useState<null | { then?: (p: Profile) => void }>(null);
+  const ctx: PlanCtx = forecasting
+    ? { profile: fc.draft!, update: fc.edit, mode: 'forecast', locked: false }
+    : { profile: live, update: (fn) => (locked ? setAsk({ then: fn }) : liveUpdate(fn)), mode: 'live', locked };
+  const startForecast = () => {
+    if (!fc.draft) fc.set({ draft: structuredClone(live), name: '', sourceId: null });
+    fc.set({ mode: 'forecast' });
+  };
+  const editable = tab !== 'projections';
   return (
+    <PlanProvider value={ctx}>
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Your plan</h1><p className="text-muted">Set where you want to end up, check the assumptions, and see how it plays out.</p></div>
+        <div>
+          <div className="mb-3 inline-flex rounded-xl border border-line bg-surface/5 p-1" role="radiogroup" aria-label="Plan mode">
+            {(['live', 'forecast'] as const).map((m) => (
+              <button key={m} role="radio" aria-checked={(forecasting ? 'forecast' : 'live') === m} onClick={() => (m === 'live' ? fc.set({ mode: 'live' }) : startForecast())}
+                className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors ${(forecasting ? 'forecast' : 'live') === m ? (m === 'live' ? 'bg-gum text-surface' : 'bg-sky text-surface') : 'text-muted hover:text-ink'}`}>
+                {m === 'live' ? 'Live plan' : 'Forecast'}
+              </button>
+            ))}
+          </div>
+          <h1 className="font-display text-3xl font-semibold sm:text-4xl">{forecasting ? 'Forecast' : 'Your plan'}</h1>
+          <p className="text-muted">{forecasting ? 'Try changes here without touching your live plan. Save it, or make it your new Wise Future.' : 'Set where you want to end up, check the assumptions, and see how it plays out.'}</p>
+        </div>
         <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Plan section">
           <Segmented label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property portfolio' }, { value: 'shares', label: 'Shares' }, { value: 'liquidations', label: 'Liquidation events' }, { value: 'gifts', label: 'Gifts' }]} />
           <button role="tab" aria-selected={tab === 'projections'} onClick={() => setTab('projections')}
             className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${tab === 'projections'
               ? 'bg-brass text-ground shadow-[0_6px_20px_-6px_rgb(var(--brass)/0.7)] ring-2 ring-brass/40'
               : 'border border-brass/60 bg-brass/10 text-brass hover:bg-brass/20 hover:shadow-[0_4px_16px_-6px_rgb(var(--brass)/0.6)]'}`}>
-            <Icon name="spark" className={`h-4 w-4 ${tab === 'projections' ? '' : 'transition-transform group-hover:rotate-45'}`} />Your Wise Future
+            <Icon name="spark" className={`h-4 w-4 ${tab === 'projections' ? '' : 'transition-transform group-hover:rotate-45'}`} />{forecasting ? 'Forecast Future' : 'Your Wise Future'}
           </button>
+          {!forecasting && (
+            <button onClick={() => (locked ? setAsk({}) : liveUpdate((d) => { d.planLocked = true; }))} title={locked ? 'Your plan is locked. Click to unlock.' : 'Lock your plan so it can’t be changed by accident'}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold ${locked ? 'bg-ink text-surface' : 'border border-line text-muted hover:text-ink'}`}>
+              <Icon name={locked ? 'lock' : 'unlock'} className="h-4 w-4" />{locked ? 'Locked' : 'Lock'}
+            </button>
+          )}
         </div>
       </div>
-      {tab === 'goals' && <Goals quotes={quotes} go={setTab} />}
-      {tab === 'assumptions' && <AssumptionsTab />}
-      {tab === 'timeline' && <Timeline quotes={quotes} />}
-      {tab === 'shares' && <SharesPlan quotes={quotes} />}
-      {tab === 'liquidations' && <LiquidationsTab quotes={quotes} />}
-      {tab === 'gifts' && <GiftsTab />}
-      {tab === 'projections' && <Projections quotes={quotes} />}
+
+      {forecasting && <ForecastBar />}
+      {locked && editable && <p className="flex items-center gap-2 rounded-xl border border-line bg-raised/40 px-4 py-2.5 text-sm text-muted"><Icon name="lock" className="h-4 w-4" />Your Wise Future plan is locked. Switch to Forecast to try changes, or click Locked to unlock.</p>}
+
+      <div className={locked && editable ? 'plan-locked' : ''} onMouseDownCapture={(e) => {
+        if (!locked || !editable) return;
+        const t = e.target as HTMLElement;
+        if (t.closest('input, select, textarea, button, label, [role=radio]') && !t.closest('[data-free]')) { e.preventDefault(); e.stopPropagation(); setAsk({}); }
+      }} onKeyDownCapture={(e) => { if (locked && editable && (e.target as HTMLElement).closest('input, select, textarea')) { e.preventDefault(); setAsk({}); } }}>
+        {tab === 'goals' && <Goals quotes={quotes} go={setTab} />}
+        {tab === 'assumptions' && <AssumptionsTab />}
+        {tab === 'timeline' && <Timeline quotes={quotes} />}
+        {tab === 'shares' && <SharesPlan quotes={quotes} />}
+        {tab === 'liquidations' && <LiquidationsTab quotes={quotes} />}
+        {tab === 'gifts' && <GiftsTab />}
+      </div>
+      {tab === 'projections' && <Projections quotes={quotes} onLock={() => liveUpdate((d) => { d.planLocked = true; })} onAskUnlock={() => setAsk({})} />}
+
+      {ask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="lock-h" onClick={() => setAsk(null)}>
+          <div className="paper w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-surface"><Icon name="lock" className="h-5 w-5" /></span><h2 id="lock-h" className="font-display text-xl font-semibold">Your plan is locked</h2></div>
+            <p className="mt-4 leading-relaxed">Your Wise Future plan has been locked in. If you want to play with the variables, try doing a forecast. Changing live variables can affect your plan in real time.</p>
+            <p className="mt-3 font-medium">Do you want to unlock it?</p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button className="btn-quiet" onClick={() => { setAsk(null); startForecast(); }}>Try a forecast instead</button>
+              <button className="btn-quiet" onClick={() => setAsk(null)}>No</button>
+              <button className="btn-primary" onClick={() => { const then = ask.then; liveUpdate((d) => { d.planLocked = false; if (then) then(d); }); setAsk(null); }}>Yes, unlock</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+    </PlanProvider>
+  );
+}
+
+/** Forecast controls: name and save the draft, make it live, or open a saved one. */
+function ForecastBar() {
+  const fc = useForecast();
+  const live = useApp((s) => s.profile)!;
+  const liveUpdate = useApp((s) => s.update);
+  const [confirm, setConfirm] = useState<null | { name: string; plan: PlanSnapshot }>(null);
+  const [saved, setSaved] = useState('');
+  const list = live.forecasts ?? [];
+  const save = () => {
+    const name = fc.name.trim() || `Forecast ${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;
+    const f = newForecast(name, fc.draft!);
+    liveUpdate((d) => {
+      d.forecasts ??= [];
+      const i = fc.sourceId ? d.forecasts.findIndex((x) => x.id === fc.sourceId && x.kind === 'forecast') : -1;
+      if (i >= 0) d.forecasts[i] = { ...f, id: fc.sourceId! }; else d.forecasts.unshift(f);
+    });
+    if (!fc.sourceId) fc.set({ sourceId: f.id, name });
+    setSaved(`Saved “${name}”.`);
+  };
+  const makeLive = (name: string, plan: PlanSnapshot) => {
+    liveUpdate((d) => {
+      (d.forecasts ??= []).unshift(newForecast(`Wise Future before “${name}” (${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })})`, d, 'previous'));
+      applySnapshot(d, plan);
+    });
+    fc.set({ mode: 'live', draft: null, name: '', sourceId: null });
+    setConfirm(null);
+  };
+  const open = (f: Forecast) => { const d = structuredClone(live); applySnapshot(d, f.plan); fc.set({ draft: d, name: f.kind === 'forecast' ? f.name : `Copy of ${f.name}`, sourceId: f.kind === 'forecast' ? f.id : null, mode: 'forecast' }); setSaved(''); };
+  return (
+    <section className="panel border-l-4 border-l-sky p-5" data-free>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[14rem] flex-1"><Field label="Forecast name">{(id) => <TextInput id={id} value={fc.name} onChange={(v) => fc.set({ name: v })} placeholder="e.g. Buy property 3 sooner, retire at 55" />}</Field></div>
+        <button className="btn-quiet" onClick={save}><Icon name="check" className="h-4 w-4" />Save forecast</button>
+        <button className="btn-primary" onClick={() => setConfirm({ name: fc.name.trim() || 'this forecast', plan: snapshot(fc.draft!) })}><Icon name="spark" className="h-4 w-4" />Make this my new Wise Future</button>
+        <button className="btn-ghost text-sm" onClick={() => fc.set({ draft: structuredClone(live), name: '', sourceId: null })} title="Start again from your live plan">Start again from live plan</button>
+      </div>
+      {saved && <p role="status" className="mt-2 text-sm text-gum">{saved}</p>}
+      {list.length > 0 && (
+        <div className="mt-5 border-t border-line pt-4">
+          <p className="text-sm font-semibold">Saved forecasts and previous plans</p>
+          <ul className="mt-2 divide-y divide-line">
+            {list.map((f) => (
+              <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                <div><p className="font-medium">{f.name}{fc.sourceId === f.id && <span className="ml-2 rounded bg-sky/15 px-1.5 py-0.5 text-[11px] text-sky">open</span>}</p>
+                  <p className="text-xs text-muted">{f.kind === 'previous' ? 'Previous Wise Future' : 'Forecast'} · saved {new Date(f.savedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })} · {f.plan.goals.targetProperties} properties · {money(f.plan.goals.passiveIncome, { compact: true })} a year from {f.plan.goals.retirementAge}</p></div>
+                <div className="flex flex-wrap gap-2">
+                  <button className="btn-quiet py-1.5 text-sm" onClick={() => open(f)}>Open</button>
+                  <button className="btn-quiet py-1.5 text-sm" onClick={() => setConfirm({ name: f.name, plan: f.plan })}>{f.kind === 'previous' ? 'Reinstate' : 'Make it my Wise Future'}</button>
+                  <button className="btn-ghost p-2" aria-label={`Delete ${f.name}`} onClick={() => liveUpdate((d) => { d.forecasts = (d.forecasts ?? []).filter((x) => x.id !== f.id); })}><Icon name="trash" className="h-4 w-4" /></button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {confirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="mk-h" onClick={() => setConfirm(null)}>
+          <div className="paper w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 id="mk-h" className="font-display text-xl font-semibold">Make this your Wise Future?</h2>
+            <p className="mt-3 leading-relaxed">Are you sure? The details from “{confirm.name}” will now be put in your current Wise Future plan. Your current plan is kept under Saved forecasts, so you can reinstate it later.</p>
+            <div className="mt-6 flex justify-end gap-2"><button className="btn-quiet" onClick={() => setConfirm(null)}>No</button><button className="btn-primary" onClick={() => makeLive(confirm.name, confirm.plan)}>Yes, make it live</button></div>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
 /* ---------- Goals ---------- */
 function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
-  const p = useApp((s) => s.profile)!;
-  const update = useApp((s) => s.update);
+  const p = usePlanProfile();
+  const update = usePlanUpdate();
   const g = p.goals;
   const check = useMemo(() => planCheck(p, quotes), [p, quotes]);
   const insights = useMemo(() => wiseInsights(p, quotes), [p, quotes]);
@@ -61,6 +188,20 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
           <LinkedValue label="Share portfolio value at retirement" value={g.sharesTarget ? `${money(g.sharesTarget)}` : 'No goal set'} hint="Update your share plan on the Shares tab." tabLabel="Shares" onGo={() => go('shares')} />
           <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working, in today’s money. The plan sells shares and properties if it needs to.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
           <Field label="Cash to keep on hand in retirement" hint="The least you want in the bank at any time once you stop work, in today’s money. It replaces your emergency cash buffer from then on.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder={String(Math.round(p.finances.buffer ?? recommendedBuffer(p)))} />}</Field>
+          <div className="sm:col-span-2">
+            <p className="field-label">Planning to have children?</p>
+            <p className="-mt-1 mb-2 text-xs text-muted">Add the year you expect each one. We allow the Australian average cost of raising a child, about {money(CHILD_COST_YEAR)} a year from birth to 18 in today’s money. Leave it blank if you’re not planning any. Children you already have go in Dependants.</p>
+            <div className="space-y-2">
+              {(g.plannedChildren ?? []).map((c, k) => (
+                <div key={c.id} className="flex items-center gap-2">
+                  <span className="text-sm text-muted">Child {k + 1}, born in</span>
+                  <div className="w-28"><Select value={String(c.year)} onChange={(v) => update((d) => { d.goals.plannedChildren![k].year = Number(v); })} options={Array.from({ length: 20 }, (_, j) => new Date().getFullYear() + j).map((y) => ({ value: String(y), label: String(y) }))} /></div>
+                  <button className="btn-ghost p-2" aria-label="Remove planned child" onClick={() => update((d) => { d.goals.plannedChildren!.splice(k, 1); })}><Icon name="trash" className="h-4 w-4" /></button>
+                </div>
+              ))}
+            </div>
+            <button className="btn-quiet mt-2 text-sm" onClick={() => update((d) => { const l = (d.goals.plannedChildren ??= []); l.push({ id: uid(), year: (l[l.length - 1]?.year ?? new Date().getFullYear()) + 2 }); })}><Icon name="plus" className="h-4 w-4" />{(g.plannedChildren ?? []).length ? 'Add another child' : 'Add a planned child'}</button>
+          </div>
         </div>
       </section>
 
@@ -85,7 +226,7 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
 function LinkedValue({ label, value, hint, tabLabel, onGo }: { label: string; value: string; hint: string; tabLabel: string; onGo: () => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="relative">
+    <div className="relative" data-free>
       <p className="field-label">{label}</p>
       <button type="button" className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-line bg-raised/60 px-3.5 py-2.5 text-left text-ink hover:border-brass/60" onClick={() => setOpen((o) => !o)} aria-expanded={open} title={hint}>
         <span>{value}</span><Icon name="plan" className="h-4 w-4 text-muted" />
@@ -103,8 +244,8 @@ function LinkedValue({ label, value, hint, tabLabel, onGo }: { label: string; va
 
 /* ---------- Assumptions with recommended markers ---------- */
 function AssumptionsTab() {
-  const p = useApp((s) => s.profile)!;
-  const update = useApp((s) => s.update);
+  const p = usePlanProfile();
+  const update = usePlanUpdate();
   const rba = useCashRate();
   const loanRec = rba ? Math.round((rba.current + 2) * 20) / 20 : 6.85;
   const rows: { key: keyof Assumptions; label: string; min: number; max: number; step: number; fmt: (v: number) => string; rec: number; note: string }[] = [
@@ -146,8 +287,8 @@ function AssumptionsTab() {
 
 /* ---------- Property portfolio ---------- */
 function Timeline({ quotes }: { quotes: Quotes }) {
-  const p = useApp((s) => s.profile)!;
-  const update = useApp((s) => s.update);
+  const p = usePlanProfile();
+  const update = usePlanUpdate();
   const need = Math.max(0, p.goals.targetProperties - p.properties.length);
   useEffect(() => {
     const have = p.plannedPurchases?.length ?? 0;
@@ -214,8 +355,8 @@ function RowShell({ n, tone, title, sub, right, chips, open, onToggle, children 
 }
 
 function OwnedRow({ pr, n, open, onToggle, retireAge, startAge }: { pr: Property; n: number; open: boolean; onToggle: () => void; retireAge: number; startAge: number }) {
-  const p = useApp((s) => s.profile)!;
-  const update = useApp((s) => s.update);
+  const p = usePlanProfile();
+  const update = usePlanUpdate();
   const s = propertyStats(pr, p.assumptions.lvr);
   const set = (patch: Partial<Property>) => update((d) => { Object.assign(d.properties.find((x) => x.id === pr.id)!, patch); });
   const home = pr.use === 'home';
@@ -256,8 +397,8 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
   plan: PlannedPurchase; k: number; n: number; open: boolean; onToggle: () => void; bought?: { year: number; price: number }; firstMissing: boolean;
   block: ReturnType<typeof project>['block']; startYear: number; startAge: number; retireAge: number;
 }) {
-  const update = useApp((s) => s.update);
-  const assumedRate = useApp((s) => s.profile!.assumptions.newLoanRate);
+  const update = usePlanUpdate();
+  const assumedRate = usePlanProfile().assumptions.newLoanRate;
   const set = (patch: Partial<PlannedPurchase>) => update((d) => { Object.assign(d.plannedPurchases![k], patch); });
   const late = plan.buyBy && bought && bought.year >= plan.buyBy;
   const io5 = plan.ioFirst5 !== false;
@@ -296,7 +437,7 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
 
 /** Retirement at a glance, beside the Your Wise Future chart (today's money). */
 function RetirementMetrics({ proj }: { proj: ReturnType<typeof project> }) {
-  const p = useApp((s) => s.profile)!;
+  const p = usePlanProfile();
   const life = p.goals.lifeExpectancy ?? 90;
   const at = proj.points.find((x) => x.year === proj.retireYear);
   const i = at ? at.year - proj.points[0].year : 0;
@@ -322,8 +463,8 @@ function RetirementMetrics({ proj }: { proj: ReturnType<typeof project> }) {
 
 /* ---------- Liquidation events ---------- */
 function LiquidationsTab({ quotes }: { quotes: Quotes }) {
-  const p = useApp((s) => s.profile)!;
-  const update = useApp((s) => s.update);
+  const p = usePlanProfile();
+  const update = usePlanUpdate();
   const list = p.liquidations ?? [];
   const y0 = new Date().getFullYear();
   const lastYear = y0 + Math.max(1, (p.goals.lifeExpectancy ?? 90) - (p.household.you.age ?? 35));
@@ -363,8 +504,8 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
 
 /* ---------- Gifts and inheritances ---------- */
 function GiftsTab() {
-  const p = useApp((s) => s.profile)!;
-  const update = useApp((s) => s.update);
+  const p = usePlanProfile();
+  const update = usePlanUpdate();
   const list = p.gifts ?? [];
   const y0 = new Date().getFullYear();
   const lastYear = y0 + Math.max(1, (p.goals.lifeExpectancy ?? 90) - (p.household.you.age ?? 35));
@@ -398,8 +539,8 @@ function GiftsTab() {
 
 /* ---------- Shares plan ---------- */
 function SharesPlan({ quotes }: { quotes: Quotes }) {
-  const p = useApp((s) => s.profile)!;
-  const update = useApp((s) => s.update);
+  const p = usePlanProfile();
+  const update = usePlanUpdate();
   const proj = useMemo(() => project(p, quotes), [p, quotes]);
   const pos = useMemo(() => position(p, quotes), [p, quotes]);
   const cap = useMemo(() => maxShareMonthly(p, quotes), [p, quotes]);
@@ -488,7 +629,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
 
 /** Property-first view of the share plan: what each monthly amount does to the purchase years. */
 function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quotes; current: number; required: number; cap: number | null; onUse: (v: number) => void }) {
-  const p = useApp((s) => s.profile)!;
+  const p = usePlanProfile();
   const owned = p.properties.length;
   const planned = (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - owned));
   const rows = useMemo(() => {
@@ -548,8 +689,9 @@ const EVENT_STYLE: Record<string, { icon: string; cls: string }> = {
   shares: { icon: 'shares', cls: 'bg-sky/15 text-sky' }, runout: { icon: 'x', cls: 'bg-clay/15 text-clay' }, cost: { icon: 'details', cls: 'bg-line text-ink' }, goal: { icon: 'check', cls: 'bg-gum/15 text-gum' },
 };
 
-function Projections({ quotes }: { quotes: Quotes }) {
-  const p = useApp((s) => s.profile)!;
+function Projections({ quotes, onLock, onAskUnlock }: { quotes: Quotes; onLock: () => void; onAskUnlock: () => void }) {
+  const mode = usePlanMode();
+  const p = usePlanProfile();
   const check = useMemo(() => planCheck(p, quotes), [p, quotes]);
   const proj = check.proj;
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
@@ -568,6 +710,13 @@ function Projections({ quotes }: { quotes: Quotes }) {
                 <p className={`text-sm font-medium ${proj.runsOutAge != null ? 'text-clay' : 'text-gum'}`}>{proj.runsOutAge != null ? `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money runs out at ${proj.runsOutAge}.` : `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money lasts to ${p.goals.lifeExpectancy ?? 90}.`}</p></div>
               <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
             </div>
+            {mode === 'live' && (
+              <div className="mt-3">
+                {p.planLocked
+                  ? <button className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-sm font-semibold text-surface" onClick={onAskUnlock}><Icon name="lock" className="h-4 w-4" />Plan locked · unlock</button>
+                  : <button className="inline-flex items-center gap-2 rounded-xl border border-ink/70 px-4 py-2 text-sm font-semibold text-ink hover:bg-ink hover:text-surface" onClick={onLock}><Icon name="lock" className="h-4 w-4" />Lock my plan</button>}
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
               <Segmented size="sm" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} />
               {view === 'worth' && <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} />}

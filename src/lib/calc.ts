@@ -43,8 +43,13 @@ export function hecsCompulsory(income: number) {
 }
 
 /** Monthly cost of dependants this year, or `yearsAhead` from now (costs stop at each one's support age). */
+/** Average cost of raising a child in Australia, birth to 18 (about $474k in 2026 dollars), spread evenly. */
+export const CHILD_COST_YEAR = 474000 / 18;
+
 export function dependantsMonthly(p: Profile, yearsAhead = 0) {
-  return (p.household.dependantsDetail ?? []).reduce((a, d) => {
+  const year = new Date().getFullYear() + yearsAhead;
+  const planned = (p.goals.plannedChildren ?? []).filter((c) => year >= c.year && year < c.year + 18).length * CHILD_COST_YEAR / 12;
+  return planned + (p.household.dependantsDetail ?? []).reduce((a, d) => {
     if (d.age != null && d.age + yearsAhead >= d.supportUntil) return a;
     const year = new Date().getFullYear() + yearsAhead;
     const start = d.schoolStartYear ?? (d.age != null ? new Date().getFullYear() + 5 - d.age : null); // most children start school at 5
@@ -388,6 +393,10 @@ export function project(p: Profile, quotes: Quotes): Projection {
       youSal = working ? nextSalary('you', youSal) : 0;
       partSal = working && p.household.hasPartner ? nextSalary('partner', partSal) : 0;
       living = (baseLiving + dependantsMonthly(p, i)) * 12 * infl(i);
+      for (const c of p.goals.plannedChildren ?? []) {
+        if (c.year === year) say(year, 'kids', `A new baby is planned. About ${fmt(CHILD_COST_YEAR)} a year (in today’s money) is added to your costs until they turn 18, based on the Australian average.`);
+        if (c.year + 18 === year) say(year, 'kids', 'Your planned child turns 18: their costs drop out of your budget.');
+      }
       for (const d of p.household.dependantsDetail ?? []) if (d.age != null && d.age + i === d.supportUntil && !kidsEnd.has(d.id)) { kidsEnd.add(d.id); say(year, 'kids', `${d.name || 'A dependant'} turns ${d.supportUntil}: their costs drop out of your budget.`); }
       // Super: employer contributions (12%, capped at the concessional cap, less 15% contributions tax), grows at the assumed return after fees
       const ccCap = CC_CAP * infl(i);

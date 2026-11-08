@@ -1,11 +1,11 @@
 import type { PlanCheck } from '../lib/planCheck';
 import { Icon } from './ui';
-import { useApp } from '../lib/store';
+import { usePlanProfile, usePlanUpdate } from '../lib/planContext';
 import { uid } from '../lib/defaults';
 
 /** "Does this plan work?" box, shared by the Goals tab and Your Wise Future. */
 export function PlanCheckBox({ check, compact }: { check: PlanCheck; compact?: boolean }) {
-  const update = useApp((s) => s.update);
+  const update = usePlanUpdate();
   if (check.works) {
     return (
       <section className={compact ? 'rounded-2xl border border-gum/40 bg-gum/10 p-4' : 'panel border-l-4 border-l-gum p-5 sm:p-6'} aria-label="Plan check">

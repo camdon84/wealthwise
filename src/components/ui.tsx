@@ -98,6 +98,8 @@ export function Icon({ name, className = 'h-5 w-5' }: { name: string; className?
     coin: <><circle cx="12" cy="12" r="8.5" /><path d="M10 8h3.2a2 2 0 0 1 0 4H10m0 0h3.6a2 2 0 0 1 0 4H10V8m1.5-2v2m0 8v2" /></>,
     shares: <path d="M3 17l6-6 4 4 8-8M15 7h6v6" />,
     plan: <path d="M4 20V4M4 20h16M8 16c3-1 4-6 7-7s4-3 5-5" />,
+    lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
+    unlock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 7.5-2" /></>,
     renovate: <path d="M14 4l6 6-9 9H5v-6zM12 6l6 6" />,
     profile: <path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c1-4 4-6 8-6s7 2 8 6" />,
     sun: <path d="M12 17a5 5 0 100-10 5 5 0 000 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />,
