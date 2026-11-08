@@ -7,7 +7,7 @@ import { Icon } from '../components/ui';
 
 const GROUPS: { id: WiseAction['group']; title: string; sub: string }[] = [
   { id: 'setup', title: 'Set up once', sub: 'The accounts your plan needs.' },
-  { id: 'payday', title: 'Automate every payday', sub: 'Set these once and your plan runs itself each month.' },
+  { id: 'payday', title: 'Automate every payday', sub: 'Set these up once and they happen every month.' },
   { id: 'check', title: 'Check in', sub: 'Things to keep an eye on.' },
 ];
 
@@ -51,7 +51,7 @@ export function WiseActions({ quotes, go }: { quotes: Quotes; go: (r: string) =>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-semibold sm:text-4xl">Wise Actions</h1>
-          <p className="mt-1 max-w-2xl text-muted">Set up your accounts and automatic payments so your Wise Plan happens on its own. Tick each one off as you do it.</p>
+          <p className="mt-1 max-w-2xl text-muted">Set up your accounts and automatic payments so your plan runs itself. Tick each one off as you go.</p>
         </div>
         <div className="text-right"><p className="font-display text-3xl font-semibold">{count}<span className="text-lg text-muted"> / {actions.length}</span></p><p className="text-xs text-muted">set up</p></div>
       </div>
@@ -79,7 +79,7 @@ export function WiseActions({ quotes, go }: { quotes: Quotes; go: (r: string) =>
 
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">Where your pay goes each month</h2>
-        <p className="mt-1 text-sm text-muted">About <strong className="text-ink">{money(flow.takeHome)}</strong> take-home a month after tax, split the way your Wise Plan and Cash Reserves need it.</p>
+        <p className="mt-1 text-sm text-muted">About <strong className="text-ink">{money(flow.takeHome)}</strong> a month after tax, split the way your plan needs it.</p>
         <div className="mt-4 flex h-4 w-full overflow-hidden rounded-full ring-1 ring-line" aria-hidden="true">
           {legs.map((x) => <div key={x.label} className={x.cls} style={{ width: `${(x.v / total) * 100}%` }} />)}
         </div>
@@ -92,7 +92,7 @@ export function WiseActions({ quotes, go }: { quotes: Quotes; go: (r: string) =>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[11px] text-muted">From your current income, living expenses, loans and plan. Monthly amounts, rounded to the nearest $10.</p>
+        <p className="mt-3 text-[11px] text-muted">Rounded to the nearest $10.</p>
       </section>
 
       {GROUPS.map((g) => {

@@ -29,7 +29,7 @@ export function Auth() {
         <Logo />
         <div className="max-w-lg">
           <h1 className="font-display text-5xl font-semibold leading-[1.05]">See every property, share and dollar on one plan.</h1>
-          <p className="mt-5 text-lg text-muted">Your property, shares and wealth, tracked in one place.</p>
+          <p className="mt-5 text-lg text-muted">Plan when to buy each property, how much to invest and when you can retire.</p>
         </div>
         <HeroTimeline />
       </section>

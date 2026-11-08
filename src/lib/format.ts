@@ -48,4 +48,7 @@ export function price(n: number, currency = 'AUD') {
 export const defaultCurrency = (exchange: string) => (exchange === 'NASDAQ' || exchange === 'NYSE' ? 'USD' : 'AUD');
 
 /** Shown wherever capital gains tax is estimated. Update the engine and this line when the new rules are final. */
-export const CGT_2027_NOTE = 'From 1 July 2027, new capital gains tax rules from the 2026–27 Budget take effect: the 50% discount is replaced by inflation indexation, with a 30% minimum tax on gains made from that date. WealthWise will update how it calculates capital gains tax once the rules are final.';
+export const CGT_2027_NOTE = 'From 1 July 2027, the 2026–27 Budget replaces the 50% capital gains discount with inflation indexation and a 30% minimum tax on new gains. We’ll update our estimates once the rules are final.';
+
+/** "a", "a and b", "a, b and c" (no Oxford comma, per Australian style). */
+export const listJoin = (items: string[]) => (items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);

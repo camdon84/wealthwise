@@ -92,8 +92,8 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
           {big
             ? <>
               {peak.year >= lastBuy
-                ? <p>You’re going to build up large cash reserves in the bank, up to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> (in today’s money). {buys.length ? <>The biggest build-up comes after your last property purchase, so that money isn’t needed for a deposit.{waves.length > 1 ? ' Before that, your cash builds towards each deposit:' : ''}</> : 'Your plan doesn’t have another property purchase before you stop work, so it isn’t needed for a deposit.'}</p>
-                : <p>You’re going to build up large cash reserves in the bank, up to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> (in today’s money). Based on your plan, most of this will go towards the deposits on your property purchases:</p>}
+                ? <p>Your cash in the bank builds to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> (in today’s money). {buys.length ? <>Most of it builds after your last purchase, so it isn’t needed for a deposit.{waves.length > 1 ? ' Before that, it builds towards each deposit:' : ''}</> : 'You have no more purchases planned, so none of it is needed for a deposit.'}</p>
+                : <p>Your cash in the bank builds to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> (in today’s money). Most of it goes towards your property deposits:</p>}
               {waves.length > 1 && (
                 <ul className="flex flex-wrap gap-2 pt-1">
                   {waves.map((w) => <li key={w.year} className="rounded-lg bg-raised px-3 py-2 text-sm ring-1 ring-line"><span className="font-display font-semibold">{money(w.v, { compact: true })}</span> by {w.year}<span className="block text-xs text-muted">{w.label}</span></li>)}
@@ -101,7 +101,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
               )}
             </>
             : <p>Your cash reserves stay fairly close to your emergency fund, but they still need somewhere to sit while they build towards your next deposit.</p>}
-          <p className="text-muted">This section helps you decide where to hold your cash reserves while they build, so the money is working for you until you buy. Your share plan sits outside this, and so does your {money(buffer)} emergency fund.</p>
+          <p className="text-muted">Choose where this cash sits so it works for you until you need it. Your share plan and your {money(buffer)} emergency fund aren’t part of it.</p>
         </div>
       </section>
 
@@ -112,7 +112,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-brass">{saved ? 'Update your cash reserves' : 'Start here'}</p>
               <h3 className="font-display text-xl font-semibold">Choose where your cash reserves sit</h3>
-              <p className="text-sm text-muted">Move the sliders to split your cash between the three options. They always add up to 100%.</p>
+              <p className="text-sm text-muted">Move the sliders to split your cash. They always add up to 100%.</p>
             </div>
           </div>
           <div className="mt-6 grid gap-8 lg:grid-cols-2">
@@ -146,7 +146,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
               )}
             </div>
           </div>
-          {gain > 1000 && <p className="mt-6 rounded-lg bg-gum/10 px-4 py-3 text-sm ring-1 ring-gum/30">Held this way, your cash reserves leave you about <strong>{money(gain, { compact: true })}</strong> better off by {p.goals.retirementAge} (today’s money) than keeping it all in an everyday account.</p>}
+          {gain > 1000 && <p className="mt-6 rounded-lg bg-gum/10 px-4 py-3 text-sm ring-1 ring-gum/30">Held this way, your cash reserves leave you about <strong>{money(gain, { compact: true })}</strong> better off by {p.goals.retirementAge} (in today’s money) than keeping it all in an everyday account.</p>}
           <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-line pt-4">
             {saved && <button className="btn-ghost text-sm" onClick={() => { update((d) => { d.cashPlan = undefined; }); setDraft(starting(p, hisaNow)); }}>Remove</button>}
             {saved && <button className="btn-quiet" onClick={() => { setDraft(saved); setEditing(false); }}>Cancel</button>}
@@ -173,7 +173,7 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
         </section>
       )}
 
-      {!saved && <p className="rounded-lg bg-raised px-4 py-3 text-xs text-muted ring-1 ring-line">Until you save this, your plan assumes all your cash sits in offset accounts against every loan you have. That’s the best case, and most people don’t hold it that way.</p>}
+      {!saved && <p className="rounded-lg bg-raised px-4 py-3 text-xs text-muted ring-1 ring-line">Until you save this, your plan assumes all your cash sits in offsets against every loan. That’s the best case, and most people don’t hold it that way.</p>}
 
       <section className="rounded-2xl border border-line bg-raised/60 p-5 sm:p-6">
         <p className="font-semibold">What about investing this extra capital?</p>

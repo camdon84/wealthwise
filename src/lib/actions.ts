@@ -1,5 +1,5 @@
 import { position, project, recommendedBuffer, type Quotes } from './calc';
-import { money } from './format';
+import { listJoin, money } from './format';
 import type { Profile } from './types';
 
 /**
@@ -55,17 +55,17 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
   // ---- Set up once
   out.push({
     key: 'hisa', group: 'setup', title: 'Open a high-interest savings account',
-    body: `${split.hisa > 0 ? `This is where ${split.hisa}% of the cash you’re building earns interest.` : 'A good home for your emergency fund.'} Compare some of the banks to find the best rates.`,
+    body: `${split.hisa > 0 ? `This is where ${split.hisa}% of the cash you’re building earns interest.` : 'A good home for your emergency fund.'} Compare a few banks for the best rate.`,
     sig: 'hisa',
   });
   out.push({
     key: 'emergency', group: 'setup', title: `Keep your ${money(buffer)} emergency fund in its own account`,
-    body: `A separate account (a high-interest one works well) means it isn’t spent by accident and is there if something goes wrong.${pos.cash < buffer ? ` You have about ${money(pos.cash)} in cash today, so build it up first.` : ''}`,
+    body: `Keeping it separate means it isn’t spent by accident. A high-interest account works well.${pos.cash < buffer ? ` You have about ${money(pos.cash)} in cash today, so build it up first.` : ''}`,
     amount: money(buffer), sig: `emergency:${buffer}`,
   });
   if (flow.bills > 0) out.push({
-    key: 'bills-account', group: 'setup', title: 'Set up a separate account to pay all of your bills',
-    body: 'Loan repayments, rates, insurance, strata and other regular bills all come out of one account. Your pay tops it up automatically, so bills are covered and your spending money is clear.',
+    key: 'bills-account', group: 'setup', title: 'Set up a separate bills account',
+    body: 'Loan repayments, rates, insurance and other regular bills come out of one account, topped up from each pay. Your spending money stays clear.',
     amount: pm(flow.bills), sig: `bills:${flow.bills}`,
   });
   for (const pr of offsetTargets) {
@@ -79,14 +79,14 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
   }
   if (flow.shares > 0 || waiting) out.push({
     key: 'broker', group: 'setup', title: 'Use a share trading account that can auto-invest',
-    body: 'Check your broker lets you schedule a regular buy into ETFs or index funds. If it doesn’t, many Australian brokers now do, so it may be worth moving.',
+    body: 'Check your broker can schedule a regular buy into ETFs or index funds. Many Australian brokers now can.',
     sig: 'broker',
   });
 
   // ---- Every payday
   if (flow.shares > 0) out.push({
     key: 'auto-invest', group: 'payday', title: 'Set up an automatic share purchase',
-    body: 'Take the guesswork out of investing: a regular automatic buy into a diversified ETF or index fund, the same day each month, whatever the market is doing. It’s the amount your share plan uses.',
+    body: 'A regular buy into a diversified ETF or index fund on the same day each month, whatever the market is doing. It’s the amount your share plan uses.',
     amount: pm(flow.shares), sig: `shares:${flow.shares}`,
   });
   if (flow.offset > 0) out.push({
@@ -101,7 +101,7 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
   });
   if (p.finances.debts.some((d) => d.kind === 'credit-card')) out.push({
     key: 'card-autopay', group: 'payday', title: 'Set up regular monthly credit card repayments',
-    body: 'Cover the cost of what you’re spending on your credit card each month. Consider closing your card if you don’t need it, or repaying the full amount owed each month.',
+    body: 'Pay off the full balance each month. If you don’t need the card, consider closing it.',
     sig: 'card',
   });
   for (const d of p.finances.debts.filter((x) => (x.kind === 'car' || x.kind === 'personal' || x.kind === 'other') && (x.balance ?? 0) > 0)) {
@@ -114,13 +114,13 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
   const rentals = p.properties.filter((pr) => pr.use === 'investment' && (pr.weeklyRent ?? 0) > 0);
   if (rentals.length && offsetTargets.length) out.push({
     key: 'rent-offset', group: 'payday', title: 'Have your rent paid into your offset account',
-    body: `Ask your property manager to pay the rent from ${rentals.map((x) => x.address).join(', ')} straight into your offset, so it starts saving interest the day it arrives.`,
+    body: `Ask your property manager to pay the rent from ${listJoin(rentals.map((x) => x.address))} straight into your offset, so it starts saving interest the day it arrives.`,
     sig: `rent:${rentals.map((x) => x.id).join(',')}`,
   });
   const holding = p.properties.reduce((t, pr) => t + (pr.annualCosts ?? 0), 0);
   if (holding > 0) out.push({
     key: 'holding', group: 'payday', title: 'Put money aside for property bills',
-    body: 'Rates, insurance, strata and maintenance arrive in lumps. This much of what goes into your bills account each month is for them, so they’re already covered when they land.',
+    body: 'Rates, insurance, strata and maintenance arrive in lumps. Setting this much aside in your bills account each month means they’re covered when they land.',
     amount: pm(r10(holding / 12)), sig: `holding:${r10(holding / 12)}`,
   });
 

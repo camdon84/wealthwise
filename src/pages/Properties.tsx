@@ -33,7 +33,7 @@ export function Properties() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Your current property portfolio</h1><p className="text-muted">{p.properties.length} properties · {money(totals.v, { compact: true })} value · {money(totals.v - totals.d, { compact: true })} equity</p></div>
+        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Your property portfolio</h1><p className="text-muted">{p.properties.length} properties · {money(totals.v, { compact: true })} value · {money(totals.v - totals.d, { compact: true })} equity</p></div>
         <div className="flex gap-2">
           <Segmented size="sm" label="Layout" value={view} onChange={setView} options={[{ value: 'cards', label: 'Cards' }, { value: 'list', label: 'List' }]} />
           <button className="btn-primary" onClick={() => setEditing(emptyProperty())}><Icon name="plus" className="h-4 w-4" />Add property</button>
@@ -65,7 +65,7 @@ export function Properties() {
                   </div>
                   <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 text-sm sm:grid-cols-3">
                     <div><p className="text-xs text-muted">Value</p><p className="font-display text-xl font-semibold">{money(s.val.value)}</p>{s.growthSincePurchase != null && <p className="text-xs text-gum">{pct(s.growthSincePurchase, 0, true)} since purchase</p>}</div>
-                    <div><p className="text-xs text-muted">{pr.use === 'investment' ? 'Cash flow' : 'Yearly cost'}</p><p className={`font-display text-xl font-semibold ${s.cashflow >= 0 ? 'text-gum' : 'text-clay'}`}>{money(s.cashflow, { sign: true })}</p><p className="text-xs text-muted">a year after repayments</p></div>
+                    <div><p className="text-xs text-muted">{pr.use === 'investment' ? 'Cash flow' : 'Cost'}</p><p className={`font-display text-xl font-semibold ${s.cashflow >= 0 ? 'text-gum' : 'text-clay'}`}>{money(s.cashflow, { sign: true })}</p><p className="text-xs text-muted">a year after repayments</p></div>
                     <div><p className="text-xs text-muted">Equity</p><p className="font-display text-xl font-semibold">{money(s.equity)}</p></div>
                     <div><p className="text-xs text-muted">Usable equity</p><p className="text-base">{money(s.usable)}</p></div>
                     {pr.use === 'investment' && <div><p className="text-xs text-muted">Gross yield</p><p className="text-base">{pct(s.grossYield)}</p></div>}
@@ -237,8 +237,8 @@ function ValueHistory({ property: pr }: { property: Property }) {
         </div>
       </div>
       <p className="mt-2 text-[11px] leading-snug text-muted">{own != null
-        ? `Forecast uses this property’s average growth since purchase. Suburb data will replace it once connected.`
-        : `Forecast uses the growth rate set for this property. Suburb data will replace it once connected.`} Purchase-to-today line is smoothed. Not a valuation.</p>
+        ? 'Forecast uses this property’s average growth since you bought it.'
+        : 'Forecast uses the growth rate set for this property.'} Not a valuation.</p>
     </section>
   );
 }

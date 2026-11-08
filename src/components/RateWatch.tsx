@@ -33,7 +33,7 @@ export function RateWatch() {
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${up ? 'bg-clay/15 text-clay' : 'bg-gum/15 text-gum'}`}><Icon name="shares" /></span>
           <div>
             <h2 id="rate-h" className="font-display text-xl font-semibold">The RBA {up ? 'raised' : 'cut'} the cash rate by {Math.abs(delta).toFixed(2)}%</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted">It moved from {p.rateWatch.cashRate.toFixed(2)}% to {rba.current.toFixed(2)}% on {longDate(rba.effective)}. Lenders usually pass this on to variable rates within a few weeks. We’ve estimated your new rates below. Check them against your lender’s email, change any that differ, then confirm.</p>
+            <p className="mt-1 max-w-2xl text-sm text-muted">It moved from {p.rateWatch.cashRate.toFixed(2)}% to {rba.current.toFixed(2)}% on {longDate(rba.effective)}. Lenders usually pass this on to variable rates within a few weeks. Check our estimates below against your lender’s email, then confirm.</p>
           </div>
         </div>
         <ul className="mt-5 divide-y divide-line rounded-xl border border-line">
@@ -49,7 +49,7 @@ export function RateWatch() {
           <button className="btn-primary" onClick={() => close(true)}>Confirm new rates</button>
           <button className="btn-quiet" onClick={() => close(false)}>My rates haven’t changed</button>
         </div>
-        <p className="mt-3 text-[11px] text-muted">Cash rate from the Reserve Bank of Australia’s published series. Fixed-rate loans aren’t affected until their fixed term ends.</p>
+        <p className="mt-3 text-[11px] text-muted">Source: Reserve Bank of Australia. Fixed-rate loans aren’t affected until the fixed term ends.</p>
       </div>
     </section>
   );

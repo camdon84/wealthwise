@@ -48,9 +48,9 @@ export function Plan({ quotes }: { quotes: Quotes }) {
             ))}
           </div>
           <h1 className="font-display text-3xl font-semibold sm:text-4xl">{forecasting ? 'Forecast' : 'Your plan'}</h1>
-          <p className="text-muted">{forecasting ? 'Try changes here without touching your live plan. Save it, or make it your new Wise Future.' : 'Set where you want to end up, check the assumptions, and see how it plays out.'}</p>
+          <p className="text-muted">{forecasting ? 'Try changes here without touching your live plan. Save it, or make it your new Wise Future.' : 'Set your goals, check the assumptions and see how it plays out.'}</p>
         </div>
-        <div className="flex w-full flex-wrap items-center gap-2 xl:flex-nowrap" role="tablist" aria-label="Plan section">
+        <div className="flex w-full flex-wrap items-center gap-2 min-[1400px]:flex-nowrap" role="tablist" aria-label="Plan section">
           <Segmented scroll label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property Portfolio' }, { value: 'shares', label: 'Shares' }, { value: 'cash', label: 'Cash Reserves' }, { value: 'liquidations', label: 'Liquidation Events' }, { value: 'gifts', label: 'Gifts' }]} />
           <button role="tab" aria-selected={tab === 'projections'} onClick={() => setTab('projections')}
             className={`group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition-all sm:flex-none ${tab === 'projections'
@@ -190,14 +190,14 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <Field label="Stop working at age">{(id) => <NumInput id={id} value={g.retirementAge} onChange={(v) => update((d) => { d.goals.retirementAge = v ?? 60; })} />}</Field>
           <Field label="Planning to live to">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} />}</Field>
-          <LinkedValue label="Properties owned by retirement" value={`${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}`} hint="Update your property goal on the Property Portfolio tab." tabLabel="Property Portfolio" onGo={() => go('timeline')} />
-          <LinkedValue label="Share portfolio value at retirement" value={g.sharesTarget ? `${money(g.sharesTarget)}` : 'No goal set'} hint="Update your share plan on the Shares tab." tabLabel="Shares" onGo={() => go('shares')} />
-          <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working (in today’s money). The plan sells shares and properties if it needs to.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
+          <LinkedValue label="Properties owned by retirement" value={`${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}`} hint="Set on the Property Portfolio tab." tabLabel="Property Portfolio" onGo={() => go('timeline')} />
+          <LinkedValue label="Share portfolio value at retirement" value={g.sharesTarget ? `${money(g.sharesTarget)}` : 'No goal set'} hint="Set on the Shares tab." tabLabel="Shares" onGo={() => go('shares')} />
+          <Field label="Yearly income after retirement" hint="What you want to live on each year after you stop work (in today’s money). The plan sells shares and properties if needed.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
           <div><Field label="Accessible cash reserves in retirement" hint="The minimum amount of money you want access to in your everyday bank accounts during retirement (in today’s money). This replaces the emergency cash buffer you set in My Details once you retire. We recommend at least $50,000.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder="50000" />}</Field>
             {g.retireCash != null && g.retireCash < RETIRE_CASH_MIN && <p role="status" className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-sm">We recommend keeping at least {money(RETIRE_CASH_MIN)} in cash once you’ve retired, for repairs, health costs and surprises without having to sell anything.</p>}</div>
           <div className="sm:col-span-2">
             <p className="field-label">Planning to have children?</p>
-            <p className="-mt-1 mb-2 text-xs text-muted">Add the year you expect each one. We allow the Australian average cost of raising a child, about {money(CHILD_COST_YEAR)} a year from birth to 18 (in today’s money). Leave it blank if you’re not planning any. Children you already have go in My Details, under Dependants.</p>
+            <p className="-mt-1 mb-2 text-xs text-muted">Add the year you expect each one. We allow the Australian average of about {money(CHILD_COST_YEAR)} a year per child until 18 (in today’s money). Children you already have go in My Details, under Dependants.</p>
             <div className="space-y-2">
               {(g.plannedChildren ?? []).map((c, k) => (
                 <div key={c.id} className="flex items-center gap-2">
@@ -232,8 +232,7 @@ function LinkedValue({ label, value, hint, tabLabel, onGo }: { label: string; va
       </button>
       <p className="mt-1.5 text-xs text-muted">{hint}</p>
       <div role="dialog" aria-hidden={!open} className={`absolute left-0 right-0 top-[4.6rem] z-20 rounded-xl border border-brass/50 bg-surface p-3 text-sm shadow-xl transition-all duration-300 ${open ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'}`}>
-        <p>This is set on the {tabLabel} tab, so it always matches your plan there.</p>
-        <button className="btn-primary mt-2 py-1.5 text-sm" tabIndex={open ? 0 : -1} onClick={onGo}>Go to {tabLabel}</button>
+        <button className="btn-primary py-1.5 text-sm" tabIndex={open ? 0 : -1} onClick={onGo}>Go to {tabLabel}</button>
       </div>
     </div>
   );
@@ -256,7 +255,7 @@ function AssumptionsTab() {
   return (
     <section className="panel p-5 sm:p-6">
       <h2 className="font-display text-xl font-semibold">Assumptions</h2>
-      <p className="mt-1 text-sm text-muted">Each one has a recommended setting, marked on the slider, based on long-run averages. Tap the marker to use it.</p>
+      <p className="mt-1 text-sm text-muted">Each slider marks a recommended setting, based on long-run averages. Tap the marker to use it.</p>
       <div className="mt-6 grid gap-x-10 gap-y-8 lg:grid-cols-2">
         {rows.map((r) => {
           const v = p.assumptions[r.key];
@@ -305,7 +304,7 @@ function Timeline({ quotes, onGoals }: { quotes: Quotes; onGoals: () => void }) 
     <div className="space-y-6">
       <section className="panel p-5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div><h2 className="font-display text-xl font-semibold">Your Property Portfolio</h2><p className="text-sm text-muted">From what you own now to {p.goals.targetProperties} properties by {retireAge}. Open a property to set its loan plan.</p></div>
+          <div><h2 className="font-display text-xl font-semibold">Your Property Portfolio</h2><p className="text-sm text-muted">Open a property to set its loan plan.</p></div>
           <div>
             <p className="field-label">Properties I want to own by {retireAge}</p>
             <div className="flex items-center gap-2">
@@ -313,7 +312,7 @@ function Timeline({ quotes, onGoals }: { quotes: Quotes; onGoals: () => void }) 
               <div className="w-20"><NumInput value={p.goals.targetProperties} onChange={(v) => update((d) => { d.goals.targetProperties = Math.max(d.properties.length, Math.min(15, v ?? d.properties.length)); })} min={p.properties.length} max={15} /></div>
               <button className="btn-quiet h-10 w-10 justify-center p-0 text-lg" aria-label="One more property" disabled={p.goals.targetProperties >= 15} onClick={() => update((d) => { d.goals.targetProperties = Math.min(15, d.goals.targetProperties + 1); })}>+</button>
             </div>
-            <p className="mt-1 text-xs text-muted">You own {p.properties.length} now. This is also your goal on the Goals tab.</p>
+            <p className="mt-1 text-xs text-muted">You own {p.properties.length} now.</p>
           </div>
         </div>
         <ol className="relative mt-8 space-y-4 border-l-2 border-line pl-8">
@@ -326,7 +325,7 @@ function Timeline({ quotes, onGoals }: { quotes: Quotes; onGoals: () => void }) 
           ))}
         </ol>
         {need === 0 && <p className="mt-4 text-sm text-muted">You already own your target number of properties. Raise the target in Goals to plan the next one.</p>}
-        <p className="mt-6 text-[11px] text-muted">A purchase happens in the first year your equity and savings cover the deposit and buying costs, and estimated borrowing power covers the loan. Prices grow at the rate you set until then. At retirement, an investment property that isn’t set to be paid off and still has a loan is sold; a home loan still owing is paid out from savings, then super once you can reach it at 60.</p>
+        <p className="mt-6 text-[11px] text-muted">Each property is bought in the first year your equity and savings cover the deposit and costs, and a lender would lend the rest. At retirement, investment properties that still have a loan are sold, unless you set them to be paid off. A home loan still owing is paid from savings, then from super at 60.</p>
       </section>
     </div>
   );
@@ -524,7 +523,7 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
         <div><h2 className="font-display text-xl font-semibold">Liquidation Events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Plan the sale of shares, crypto or a property you own. Selling shares or crypto can free up capital for another property purchase, and selling any of your assets can strengthen your cash reserves.</p></div>
         <button className="btn-primary" disabled={what.length === 0} onClick={add}><Icon name="plus" className="h-4 w-4" />Add a liquidation event</button>
       </div>
-      {list.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No liquidation events yet. Add one here, or from a suggestion in Your Wise Future.</p> : (
+      {list.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No liquidation events yet. Add one here, or from an idea on the Goals tab.</p> : (
         <ul className="mt-6 space-y-3">
           {list.map((lq) => {
             const est = liquidationEstimate(p, quotes, lq);
@@ -579,22 +578,30 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
       {auto.length > 0 && (
         <div className="mt-6 rounded-xl border border-line p-4">
           <p className="font-semibold">Property sales already in your plan</p>
-          <ul className="mt-3 space-y-3">
-            {auto.map((e, k) => (
-              <li key={k} className="flex gap-3">
-                <span className="mt-0.5 inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-clay bg-surface" aria-hidden="true" />
-                <div className="text-sm">
-                  <p><span className="font-semibold">{e.year} (age {e.age}):</span> {e.name} is sold. You’d get about {money(e.net, { compact: true })} (in today’s money) after the loan, selling costs and tax.</p>
-                  <p className="text-muted">{e.reason === 'loan'
-                    ? <>Why: it still has a loan when you stop work and isn’t set to be paid off. To keep it, tick “pay off by retirement” for it on the Property Portfolio tab.</>
-                    : <>Why: by then your savings, super and shares have run low, so it’s sold to keep paying your retirement income.</>}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {(['loan', 'income'] as const).map((why) => {
+            // The reason is said once for each group, rather than under every sale
+            const items = auto.filter((e) => (e.reason === 'loan') === (why === 'loan'));
+            if (!items.length) return null;
+            const one = items.length === 1;
+            return (
+              <div key={why} className="mt-3">
+                <p className="text-sm text-muted">{why === 'loan'
+                  ? <>{one ? 'This property still has a loan' : 'These properties still have a loan'} when you stop work and {one ? 'isn’t' : 'aren’t'} set to be paid off, so {one ? 'it’s' : 'they’re'} sold. To keep one, tick “pay off by retirement” on the Property Portfolio tab.</>
+                  : <>{one ? 'This property is' : 'These properties are'} sold when your savings, super and shares run low, to keep paying your retirement income.</>}</p>
+                <ul className="mt-2 space-y-2">
+                  {items.map((e, k) => (
+                    <li key={k} className="flex gap-3 text-sm">
+                      <span className="mt-0.5 inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-clay bg-surface" aria-hidden="true" />
+                      <p><span className="font-semibold">{e.year} (age {e.age}):</span> {e.name} is sold, leaving about {money(e.net, { compact: true })} (in today’s money) after the loan, selling costs and tax.</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </div>
       )}
-      <p className="mt-5 text-[11px] text-muted">Capital gains tax is estimated at your marginal rate with the 50% discount for anything held over 12 months; your home is exempt. Your plan uses the values in the year of the sale, so the figures there may differ from these. An accountant can help you time a sale. General information, not financial advice.</p>
+      <p className="mt-5 text-[11px] text-muted">Capital gains tax is estimated at your marginal rate, with the 50% discount for assets held over 12 months. Your home is exempt. An accountant can help you time a sale. General information, not financial advice.</p>
       <p className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-[11px] text-ink ring-1 ring-brass/30">{CGT_2027_NOTE}</p>
     </section>
   );
@@ -731,9 +738,9 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">Your share plan</h2>
-        <p className="mt-1 text-sm text-muted">Shares only. Crypto is tracked in its own tab but left out of the plan.</p>
+        <p className="mt-1 text-sm text-muted">Crypto has its own tab and isn’t part of this plan.</p>
         <div className="mt-5"><p className="text-xs text-muted">Shares today</p><p className="font-display text-2xl font-semibold">{money(sharesNow)}</p></div>
-        <p className="mt-5 text-sm">Plan your shares one of two ways: set a goal for retirement, or set how much you’ll invest each month. We’ll work out the other.</p>
+        <p className="mt-5 text-sm">Set a retirement goal or a monthly amount, and we’ll work out the other.</p>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <Field label="Retirement goal" hint="What you’d like your shares to be worth when you stop work (in today’s money). Leave blank if you don’t have one.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
           <Field label="Monthly investment" hint={auto && p.goals.sharesTarget ? 'Worked out from your goal. Type an amount to set your own instead.' : 'The amount goes up with inflation each year.'}>{(id) => <MoneyInput id={id} value={auto ? (p.goals.sharesTarget ? Math.round(required) : null) : p.goals.shareMonthly ?? null} onChange={(v) => {
@@ -756,7 +763,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
                     {(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).map((pp, k) => <option key={pp.id} value={k + 1}>{pp.label || `property ${p.properties.length + k + 1}`}</option>)}
                   </select>
                 ) : ' my next property'}.
-                <span className="block text-xs text-muted">Your monthly amount stays the same; it just starts once that purchase is done.{p.goals.shareStartAfter && proj.purchases[p.goals.shareStartAfter - 1] ? ` On these numbers that’s ${proj.purchases[p.goals.shareStartAfter - 1].year + 1}.` : p.goals.shareStartAfter ? ' On these numbers that purchase doesn’t happen before you stop work, so no shares would be bought.' : ''}</span>
+                <span className="block text-xs text-muted">Your monthly amount stays the same. It just starts after that purchase.{p.goals.shareStartAfter && proj.purchases[p.goals.shareStartAfter - 1] ? ` On these numbers that’s ${proj.purchases[p.goals.shareStartAfter - 1].year + 1}.` : p.goals.shareStartAfter ? ' On these numbers that purchase doesn’t happen before you stop work, so no shares would be bought.' : ''}</span>
               </span>
             </label>
           </div>
@@ -813,9 +820,9 @@ function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quot
   }, [p, quotes, current, required, cap]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section className="panel p-5 sm:p-6">
-      <h3 className="font-display text-lg font-semibold">What your share plan does to your property portfolio</h3>
-      <p className="mt-1 text-sm text-muted">Every dollar into shares comes out of the savings that fund your deposits. Here’s when each property lands at different monthly amounts.</p>
-      {planned.length === 0 ? <p className="mt-6 text-sm text-muted">You haven’t planned any more properties. Raise “Properties owned by retirement” in Goals to see the trade-off.</p> : (
+      <h3 className="font-display text-lg font-semibold">How shares affect your property plan</h3>
+      <p className="mt-1 text-sm text-muted">Shares and deposits come out of the same savings. Here’s when each property fits at different monthly amounts.</p>
+      {planned.length === 0 ? <p className="mt-6 text-sm text-muted">You haven’t planned any more properties. Raise your property goal on the Property Portfolio tab to see the trade-off.</p> : (
         <div className="mt-5 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted"><tr className="border-b border-line">
@@ -890,8 +897,8 @@ function Projections({ quotes }: { quotes: Quotes }) {
 
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">What happens, year by year</h2>
-        <p className="mt-1 text-sm text-muted">Worked out from your figures, goals and assumptions. Change any of them and this updates.</p>
-        <p className="mt-4 text-xs text-muted">Milestone years only. Under each one: your cash at year end (including your {money(proj.buffer, { compact: true })} emergency fund), rent collected and what goes into shares, {dollars === 'real' ? 'in today’s money' : 'in the dollars of that year'}.</p>
+        <p className="mt-1 text-sm text-muted">Worked out from your figures, goals and assumptions.</p>
+        <p className="mt-4 text-xs text-muted">Milestone years only, {dollars === 'real' ? 'in today’s money' : 'in the dollars of each year'}. Cash includes your {money(proj.buffer, { compact: true })} emergency fund.</p>
         <ol className="mt-4 divide-y divide-line">
           {pts.map((pt, i) => {
             const evs = proj.events.filter((e) => e.year === pt.year);
@@ -922,7 +929,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
             );
           })}
         </ol>
-        <p className="mt-5 text-[11px] text-muted">In retirement your yearly income is paid from super first (it opens at 60; a minimum amount must come out each year, from 4% rising with age), then rent and savings, then by selling shares, then by selling investment properties newest first. Money not needed straight away is invested in shares. Your home is kept. Super contributions are 12% of salary, capped at $32,500 a year, less 15% tax. Sale figures allow for selling costs and capital gains tax at an estimated rate. {CGT_2027_NOTE} Estimates only, not financial advice.</p>
+        <p className="mt-5 text-[11px] text-muted">In retirement your income comes from super first (from 60, with a minimum yearly withdrawal), then rent and savings, then selling shares, then selling investment properties, newest first. Your home is kept. Super contributions are 12% of salary, capped at $32,500 a year, less 15% tax. Sale figures allow for selling costs and capital gains tax. {CGT_2027_NOTE} Estimates only, not financial advice.</p>
       </section>
 
     </div>

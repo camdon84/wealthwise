@@ -77,7 +77,7 @@ export function SeriesToggles({ hidden, onChange, crypto }: { hidden: string[]; 
         );
       })}
     </ul>
-    <p className="text-[11px] text-muted">Tick or untick to show or hide. It only changes the view, not your plan.</p>
+    <p className="text-[11px] text-muted">Tick to show or hide. Your plan doesn’t change.</p>
     </div>
   );
 }

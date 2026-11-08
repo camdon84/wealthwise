@@ -208,6 +208,6 @@ function PortfolioHistory({ holdings, quotes, range }: { holdings: Holding[]; qu
         </AreaChart>
       </ResponsiveContainer>
     </div>
-    <p className="mt-1 text-[11px] text-muted">Your current holdings at each day’s closing price, from when you first bought each one{first ? ` (from ${fmtDate(first.t, true)})` : ''}. Dashed line: what you put in. Shares bought or sold in between aren’t tracked separately.</p>
+    <p className="mt-1 text-[11px] text-muted">What your current holdings were worth each day since you first bought them{first ? ` (${fmtDate(first.t, true)})` : ''}. Dashed line: what you put in.</p>
   </>);
 }

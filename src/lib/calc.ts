@@ -343,7 +343,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
 
   if (shareMonthly > 0 && !n(p.goals.shareStartAfter)) say(y0, 'shares', p.goals.shareMonthly == null ? `Invest about ${fmt(shareMonthly)} a month in shares${p.goals.sharesTarget ? ` to reach your ${fmt(n(p.goals.sharesTarget))} goal by ${retireAge}` : ''}, rising with inflation.` : `Invest ${fmt(shareMonthly)} a month in shares (your own amount), rising with inflation.`);
   if (cryptoIn && cryptoNow > 0) say(y0, 'goal', `Your ${fmt(cryptoNow)} in crypto is included in the plan, growing at your own estimate of ${n(p.cryptoGrowth)}% a year. It’s a volatile asset, so treat this part of the plan as a rough guide.`);
-  if (cryptoExcluded > 0) say(y0, 'goal', `Your ${fmt(cryptoExcluded)} in crypto stays in today’s net worth but isn’t projected forward, because its future value can’t be reasonably estimated.`);
+  if (cryptoExcluded > 0) say(y0, 'goal', `Your ${fmt(cryptoExcluded)} in crypto counts in today’s net worth but isn’t projected forward.`);
 
   for (let i = 0; i <= endAge - startAge; i++) {
     const year = y0 + i;
@@ -532,7 +532,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
           const capNow = (buffer + n(cp.accessMax)) * infl(i); // emergency fund + what they want within reach
           if (cash > capNow + 100) {
             const ex = cash - capNow; cash -= ex; sweepBal += ex; sweepCost += ex;
-            if (!sweepSaid) { sweepSaid = true; say(year, 'shares', `Your cash passes your emergency fund plus the ${fmt(n(cp.accessMax))} you want to keep within reach (today’s money), so the extra starts going into shares. They’re sold down when a property needs the deposit.`); }
+            if (!sweepSaid) { sweepSaid = true; say(year, 'shares', `Your cash passes your emergency fund plus the ${fmt(n(cp.accessMax))} you want to keep within reach (in today’s money), so the extra starts going into shares. They’re sold down when a property needs the deposit.`); }
           }
         }
       } else {
@@ -541,10 +541,10 @@ export function project(p: Profile, quotes: Quotes): Projection {
           sharesAtRetire = shares;
           // Stopping work: investments that still carry a loan (and weren't set to be paid off) are sold
           const at = events.length;
-          for (let k = sims.length - 1; k >= 0; k--) if (sims[k].invest && !sims[k].payOff && sims[k].debt > 1000) sellProperty(k, ' at retirement, as it still has a loan and isn’t set to be paid off', 'loan');
-          const snap = `After that you’d have about ${fmt(sup / infl(i))} in super, ${fmt(shares / infl(i))} in shares, ${cryptoBal > 1000 ? `${fmt(cryptoBal / infl(i))} in crypto, ` : ''}${fmt(Math.max(0, cash) / infl(i))} in cash and ${sims.length} ${sims.length === 1 ? 'property' : 'properties'} (today’s money).`;
+          for (let k = sims.length - 1; k >= 0; k--) if (sims[k].invest && !sims[k].payOff && sims[k].debt > 1000) sellProperty(k, '', 'loan');
+          const snap = `After that you’d have about ${fmt(sup / infl(i))} in super, ${fmt(shares / infl(i))} in shares, ${cryptoBal > 1000 ? `${fmt(cryptoBal / infl(i))} in crypto, ` : ''}${fmt(Math.max(0, cash) / infl(i))} in cash and ${sims.length} ${sims.length === 1 ? 'property' : 'properties'} (in today’s money).`;
           const sold = events.length - at;
-          say(year, 'retire', `Stop working at ${retireAge}.${sold ? ` ${sold === 1 ? 'One property is' : `${sold} properties are`} sold (below). ${snap}` : ` ${snap.replace('After that you’d', 'You’d')}`} From here you live on ${fmt(p.goals.passiveIncome)} a year (in today’s money).`);
+          say(year, 'retire', `Stop work at ${retireAge}${sold ? ` and sell the ${sold === 1 ? 'property that still has a loan and isn’t' : `${sold} properties that still have a loan and aren’t`} set to be paid off (below). ${snap}` : `. ${snap.replace('After that you’d', 'You’d')}`} From here you live on ${fmt(p.goals.passiveIncome)} a year.`);
           events.splice(at, 0, events.pop()!);
         }
         // A home loan still owing in retirement is cleared from savings, then from super once it can be reached
@@ -561,7 +561,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         if (age >= PRESERVATION_AGE && sup > 0) {
           superDraw = Math.min(sup, Math.max(sup * minDrawdown(age), spendGoal));
           sup -= superDraw; superDrawn = superDraw;
-          if (sup < 1000 && superDraw > 0 && !superGone) { superGone = true; sup = 0; say(year, 'super', 'Your super is fully drawn down by now. Rent, savings and shares take over.'); }
+          if (sup < 1000 && superDraw > 0 && !superGone) { superGone = true; sup = 0; say(year, 'super', 'Your super is used up. Rent, savings and shares take over.'); }
         }
         cash += propNet + offsetSaving + superDraw - spendGoal - debtRepay - renoCost - rentTax;
         const floor = retireBuffer * infl(i);
@@ -638,12 +638,12 @@ export function project(p: Profile, quotes: Quotes): Projection {
           purchases.push({ year, price, id: plan?.id });
           bought = price;
           const via = [fromEquity > 1000 ? `${fmt(fromEquity)} of equity` : '', fromCash > 1000 ? `${fmt(fromCash)} of savings` : ''].filter(Boolean).join(' and ');
-          const waited = prevBlock && waitFrom != null && waitFrom < year - 1 ? (prevBlock.reason === 'servicing' ? ' It waits until now because, until this year, a lender wouldn’t lend enough on your income, so savings build up to cover the gap.' : ' It waits until now for enough equity and savings to cover the deposit and costs.') : '';
-          const loanPlan = ` ${plan?.ioFirst5 === false ? 'Principal and interest from day one' : 'Interest-only for 5 years, then principal and interest'}${plan?.payOff ? `, paid off by ${retireAge}` : `, sold at ${retireAge} if a loan is still owing`}.`;
+          const waited = prevBlock && waitFrom != null && waitFrom < year - 1 ? (prevBlock.reason === 'servicing' ? ' It can’t happen sooner because a lender wouldn’t lend enough on your income until now.' : ' It can’t happen sooner because your equity and savings don’t cover the deposit and costs until now.') : '';
+          const loanPlan = ` ${plan?.ioFirst5 === false ? 'Principal and interest from day one' : 'Interest-only for 5 years, then principal and interest'}${plan?.payOff ? `, paid off by ${retireAge}` : `. Sold at ${retireAge} if a loan is left`}.`;
           waitFrom = null;
           const fhbNote = fhb ? ` First home buyer help: ${[fhb.deposit5 && '5% deposit with no mortgage insurance', fhb.grant && `a ${fmt(grant)} First Home Owner Grant`, fhb.noStampDuty && 'no stamp duty'].filter(Boolean).join(', ') || 'none ticked'}.` : '';
-          const ngNote = !(plan?.firstHome && p.properties.length === 0 && k === 0) ? (plan?.newBuild ? ' As a new build it keeps negative gearing.' : ' As an established home bought after Budget night 2026, rental losses can’t reduce your other tax from July 2027; they carry forward against its future rent.') : '';
-          say(year, 'buy', `Buy ${label}${fhb ? ' as your first home' : ''} for about ${fmt(price / infl(i))} (in today’s money; ${fmt(price)} at the time), putting in ${via || 'equity'} and borrowing ${fmt(newLoan)}.${waited}${fhb ? '' : loanPlan}${fhbNote}${ngNote}`);
+          const ngNote = !(plan?.firstHome && p.properties.length === 0 && k === 0) ? (plan?.newBuild ? ' As a new build it keeps negative gearing.' : ' As an established property bought after Budget night 2026, its rental losses can’t reduce your other tax from July 2027. They carry forward against its future rent.') : '';
+          say(year, 'buy', `Buy ${label}${fhb ? ' as your first home' : ''} for about ${fmt(price / infl(i))} (in today’s money; ${fmt(price)} at the time), using ${via || 'equity'} and borrowing ${fmt(newLoan)}.${waited}${fhb ? '' : loanPlan}${fhbNote}${ngNote}`);
         } else {
           if (waitFrom == null) waitFrom = year;
           block = { year, reason: deposit - usable > spare ? 'deposit' : 'servicing', price, deposit, available: usable + spare, monthlyShort: Math.max(0, pmt(rate + a.serviceBuffer, 30, total - spare) - pmt(rate + a.serviceBuffer, 30, maxLoan)) };

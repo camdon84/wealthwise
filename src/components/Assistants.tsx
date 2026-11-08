@@ -93,7 +93,7 @@ export function WisePanel({ profile, quotes, go }: { profile: Profile; quotes: Q
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brass text-ground"><Icon name="spark" /></span>
         <div>
           <h2 id="wise-h" className="font-display text-xl font-semibold">Wise Insights</h2>
-          <p className="text-sm text-muted">{insights.length ? `${insights.length} ${insights.length === 1 ? 'idea' : 'ideas'} from your numbers, refreshed whenever they change${queued ? ` · ${queued} more waiting` : ''}` : 'Nothing to show right now'}</p>
+          <p className="text-sm text-muted">{insights.length ? `${insights.length} ${insights.length === 1 ? 'idea' : 'ideas'} from your numbers${queued ? ` · ${queued} more waiting` : ''}` : 'Nothing to show right now'}</p>
         </div>
       </div>
       {take && insights.length > 0 && (
@@ -176,7 +176,7 @@ export function NewsPanel({ profile }: { profile: Profile }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-raised ring-1 ring-line text-ink"><Icon name="news" /></span>
-          <div><p className="text-xs font-semibold uppercase tracking-wider text-brass">News and updates</p><h2 className="font-display text-xl font-semibold">{tab === 'property' ? 'Property Pulse' : 'Equity Spot'}</h2><p className="text-sm text-muted">{tab === 'property' ? 'Your suburbs and the national market' : 'What the share market did this week'}</p></div>
+          <div><h2 className="font-display text-xl font-semibold">{tab === 'property' ? 'Property Pulse' : 'Equity Spot'}</h2><p className="text-sm text-muted">{tab === 'property' ? 'Your suburbs and the national market' : 'What the share market did this week'}</p></div>
         </div>
         <Segmented size="sm" label="Briefing" value={tab} onChange={setTab} options={[{ value: 'property', label: 'Property' }, { value: 'equity', label: 'Shares' }]} />
       </div>

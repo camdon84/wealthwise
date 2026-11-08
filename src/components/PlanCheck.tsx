@@ -196,7 +196,7 @@ function PlanIdeas({ check, take }: { check: PlanCheck; take?: Take }) {
         </ul>
       )}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-        <p className="text-[11px] text-muted">Ideas with figures were tested against your numbers; Wise’s are written by AI. General information, not financial advice.{tested.some((t) => t.liquidation) && ` ${CGT_2027_NOTE}`}</p>
+        <p className="text-[11px] text-muted">Ideas with figures were tested against your numbers. Wise’s are written by AI.{tested.some((t) => t.liquidation) && ` ${CGT_2027_NOTE}`}</p>
         <button onClick={generate} disabled={busy} className="group inline-flex items-center gap-2 rounded-xl border border-brass/60 bg-brass/10 px-3.5 py-2 text-sm font-semibold text-brass transition-all hover:bg-brass/20 disabled:opacity-60">
           <Icon name="spark" className={`h-4 w-4 ${busy ? 'animate-spin' : 'transition-transform group-hover:rotate-45'}`} />{busy ? 'Thinking about your plan…' : 'Give me Wise ideas about my plan'}
         </button>

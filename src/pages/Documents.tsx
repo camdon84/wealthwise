@@ -170,7 +170,7 @@ export function Documents() {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Documents</h1><p className="text-muted">Upload a statement or report and Wise reads it, works out what it belongs to and suggests the updates.</p></div>
+      <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Documents</h1><p className="text-muted">Upload a statement or report. Wise reads it and suggests updates to your plan.</p></div>
 
       {eofy.outstanding.length > 0 && <EofyChecklist />}
 
@@ -229,7 +229,7 @@ export function Documents() {
 
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">Uploaded</h2>
-        {(p.documents ?? []).length === 0 ? <p className="mt-2 text-sm text-muted">Nothing yet. Documents you upload are listed here with what they updated.</p> : (
+        {(p.documents ?? []).length === 0 ? <p className="mt-2 text-sm text-muted">Nothing uploaded yet.</p> : (
           <ul className="mt-3 divide-y divide-line">
             {(p.documents ?? []).map((d) => (
               <li key={d.id} className="py-3">
@@ -255,7 +255,7 @@ function EofyChecklist() {
       <div className="h-1 bg-brass" />
       <div className="p-5 sm:p-6">
         <h2 id="eofy-h" className="font-display text-xl font-semibold">The {fy} financial year has ended. Time to update your figures</h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted">Your end-of-year statements will have arrived. Upload them above, or enter the numbers here, so your plan reflects where you really are. {done.length} of {items.length} done.</p>
+        <p className="mt-1 max-w-2xl text-sm text-muted">Your end-of-year statements should have arrived. Upload them, or enter the numbers here. {done.length} of {items.length} done.</p>
         <div className="mt-3 h-1.5 max-w-md rounded-full bg-line"><div className="h-1.5 rounded-full bg-brass transition-all" style={{ width: `${(done.length / items.length) * 100}%` }} /></div>
         <ul className="mt-5 divide-y divide-line rounded-xl border border-line">
           {items.map((it) => {

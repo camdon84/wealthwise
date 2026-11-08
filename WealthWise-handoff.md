@@ -94,7 +94,7 @@ This is one of the most important things.
 - **Claude preview artifact.** A copy of the app runs as a Claude artifact on demo data:
   - slug `426277df-a86e-4fce-b44a-40e1f0c7bdee`
   - URL https://claude.ai/artifact/9CTFY1vT9D9F4XH3Yo8him
-  - latest version `1794177968-c006`
+  - latest version `1794178809-b121`
   - Build it with `npx vite build --mode preview --outDir dist-preview`.
   - Publish with mode `replace`, including `index.html`, `assets/index-*.js`, `assets/index-*.css` and `samples/{loan,super,valuation}-sample.pdf`.
 - **Demo account:** log in with "Explore the demo account". The demo's CPI baseline is set one year back, so the inflation pop-up shows.
@@ -152,7 +152,7 @@ This is one of the most important things.
 - **Yearly review reminder:** appears when a review is due.
 
 ### Wise Plan tabs
-The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liquidation Events and Gifts, plus the Your Wise Future and Lock buttons. On phones and tablets the section tabs are a swipeable row (the chosen tab scrolls into view) with Your Wise Future and Lock on the row below; from `xl` they fill the width. My Details uses the same swipeable row.
+The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liquidation Events and Gifts, plus the Your Wise Future and Lock buttons. Below 1400px wide the section tabs sit on their own row (swipeable on phones, the chosen tab scrolls into view) with Your Wise Future and Lock on the row below; from 1400px everything sits on one row. My Details uses the same swipeable row.
 
 - **Goals**
   - Wealth focus question (property, shares or balanced). It's also asked in onboarding, and it tailors the ideas.
@@ -238,6 +238,9 @@ These rules are enforced in the prompts and also by filters in `worker/index.ts`
 - **Sample documents:** use fictional organisations only.
 
 ### Wording
+- Keep copy short: one idea per sentence, no text that repeats what's already on screen, and no explaining the obvious. A full copy pass was done in November 2026.
+- Say why once per group (for example, one reason above a list of property sales), not under every item.
+- Join lists with `listJoin()` from `format.ts` ("a, b and c").
 - Put "(in today's money)" in brackets when it appears mid-sentence.
 - Show the CGT note (`CGT_2027_NOTE`) wherever CGT is estimated. From 1 July 2027, the 50% discount is replaced by indexation plus a 30% minimum tax, for gains after that date. The engine still uses the 50% discount.
 

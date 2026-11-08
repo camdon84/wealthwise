@@ -1,5 +1,5 @@
 import { holdingsStats, incomeTax, position, project, propertyStats, type Projection, type Quotes } from './calc';
-import { money } from './format';
+import { listJoin, money } from './format';
 import type { Liquidation, Profile } from './types';
 
 /**
@@ -166,7 +166,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   }
 
   // What's working
-  if (g.targetProperties > owned && propsOk(p, r)) good.push(`You reach ${g.targetProperties} properties, buying in ${r.purchases.map((x) => x.year).join(', ')}.`);
+  if (g.targetProperties > owned && propsOk(p, r)) good.push(`You reach ${g.targetProperties} properties, buying in ${listJoin(r.purchases.map((x) => String(x.year)))}.`);
   if ((g.sharesTarget ?? 0) > 0 && sharesReal >= (g.sharesTarget ?? 0) * 0.97) good.push(`Investing ${m(r.shareMonthly)} a month, your shares reach about ${m(sharesReal)} by ${retireAge}.`);
   if (lastsOk(r)) {
     const last = r.points[r.points.length - 1];
@@ -176,7 +176,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
     if (propsOk(p, r) && cashOk(r) && g.targetProperties < 10 && g.wealthFocus !== 'shares') {
       const more = run((x) => { x.goals.targetProperties += 1; });
       const extra = more.purchases[r.purchases.length];
-      if (extra && extra.year <= r.retireYear - 3 && lastsOk(more) && cashOk(more)) good.push(`There’s room for one more: property ${g.targetProperties + 1} would fit around ${extra.year}. Raise “Properties owned by retirement” to add it.`);
+      if (extra && extra.year <= r.retireYear - 3 && lastsOk(more) && cashOk(more)) good.push(`There’s room for one more: property ${g.targetProperties + 1} would fit around ${extra.year}. Raise your property goal on the Property Portfolio tab to add it.`);
     }
   }
   if (cashOk(r) && position(p, quotes).monthlySurplus < 0) problems.push('You’re spending more than you earn each month right now. Check your living expenses in My Details.');
@@ -215,7 +215,7 @@ function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) =>
       const sale = saleAfterTax(p, quotes, kind, frac);
       if (!sale || sale.gross < 10000) continue;
       levers.push({
-        text: `consider a liquidation event: sell ${frac === 1 ? 'all of your' : 'about half your'} ${kind} (${m(sale.gross)}). After an estimated ${m(sale.tax)} in capital gains tax, that adds about ${m(sale.net)} to your deposit savings. An accountant can help you time the sale${kind === 'shares' && (p.goals.sharesTarget ?? 0) > 0 ? ', and your share goal would need more invested later' : ''}`,
+        text: `sell ${frac === 1 ? 'all your' : 'about half your'} ${kind} (${m(sale.gross)}) in a liquidation event. After about ${m(sale.tax)} in capital gains tax, that adds about ${m(sale.net)} to your deposit. An accountant can help you time the sale${kind === 'shares' && (p.goals.sharesTarget ?? 0) > 0 ? '. Your share goal would then need more invested later' : ''}`,
         mod: (x) => { (x.liquidations ??= []).push({ id: 'test', year: y0, asset: kind, pct: frac * 100 }); },
         liquidation: { asset: kind, pct: frac * 100 },
       });
@@ -278,7 +278,7 @@ function equityIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void)
       const avg = work.reduce((t2, x, i) => t2 + x.shareContribution / Math.pow(1 + p.assumptions.inflation / 100, i), 0) / Math.max(1, work.length * 12);
       const monthly = Math.floor(avg / 50) * 50;
       const gain = real(rr.sharesAtRetire) - real(r.sharesAtRetire);
-      if (gain > 50000 && monthly > r.shareMonthly + 100) out.push({ text: `Have you thought about owning ${t} ${t === 1 ? 'property' : 'properties'} instead of ${g.targetProperties}? You could invest about ${m(monthly)} a month in shares on average instead of ${m(r.shareMonthly)}, with your shares reaching about ${m(real(rr.sharesAtRetire))} by ${g.retirementAge} (in today’s money) (${m(gain)} more), and less borrowing.` });
+      if (gain > 50000 && monthly > r.shareMonthly + 100) out.push({ text: `Own ${t} ${t === 1 ? 'property' : 'properties'} instead of ${g.targetProperties}, and invest about ${m(monthly)} a month in shares on average instead of ${m(r.shareMonthly)}. Your shares would reach about ${m(real(rr.sharesAtRetire))} by ${g.retirementAge} (in today’s money), ${m(gain)} more, with less borrowing.` });
     }
   }
   // A share plan that waits for a property purchase: starting now gives it longer to grow

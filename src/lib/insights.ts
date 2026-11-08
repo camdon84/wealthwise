@@ -37,8 +37,8 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
       id: 'goal', kind: 'goal',
       title: onTrack ? `${money(p.goals.passiveIncome, { compact: true })} a year from ${p.goals.retirementAge} looks affordable` : `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money runs out at ${proj.runsOutAge}`,
       body: onTrack
-        ? `Paid from rent, savings, super and, if needed, selling shares and investment properties, your money lasts past ${life} with about ${money(Math.max(0, leftReal), { compact: true })} in today's money to spare.`
-        : `After rent, savings, super and selling shares and investment properties, the plan can't keep paying ${money(p.goals.passiveIncome, { compact: true })} a year past ${proj.runsOutAge}. A lower yearly income or a bigger share plan would stretch it. Try them in the plan.`,
+        ? `Rent, savings, super and, if needed, selling shares and investment properties pay for it. Your money lasts past ${life}, with about ${money(Math.max(0, leftReal), { compact: true })} (in today’s money) to spare.`
+        : `Even after selling shares and investment properties, the plan can’t keep paying ${money(p.goals.passiveIncome, { compact: true })} a year past ${proj.runsOutAge}. A lower yearly income or a bigger share plan would stretch it.`,
       figure: onTrack ? `${life}+` : `${proj.runsOutAge}`, figureLabel: onTrack ? 'money lasts past' : 'money runs out at age',
     });
   }
@@ -67,7 +67,7 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
     if (pk.v > Math.max(150000, buf * 3)) out.push({
       id: 'idle-cash', kind: 'opportunity',
       title: 'Your plan builds up large cash reserves',
-      body: `On the way to your next deposit you’d hold up to about ${money(pk.v, { compact: true })} in cash (today’s money) around ${pk.year}. Cash Reserves helps you choose where it sits while it builds: offset, high-interest savings or a savings account.`,
+      body: `On the way to your next deposit you’d hold up to about ${money(pk.v, { compact: true })} in cash (in today’s money) around ${pk.year}. Cash Reserves helps you choose where it sits while it builds: offset, high-interest savings or a savings account.`,
       figure: money(pk.v, { compact: true }), figureLabel: `cash around ${pk.year}`,
       action: { label: 'Choose where your cash sits', to: 'plan:cash' },
     });
@@ -105,7 +105,7 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
       const s = propertyStats(pr, a.lvr);
       out.push({
         id: `reno-${pr.id}`, kind: 'opportunity',
-        title: `${pr.address} is ${age} years old, a renovation could add equity`,
+        title: `${pr.address} is ${age} years old: a renovation could add equity`,
         body: pr.use === 'investment'
           ? `Older properties often respond well to a cosmetic refresh (paint, flooring, lighting, fixtures). It can lift both the value and the rent, and some costs may be deductible or depreciable. An accountant can confirm what applies.`
           : `A targeted kitchen or bathroom update on an older home can lift its value and your usable equity. Run the numbers before committing, so you don't over-capitalise for the street.`,
@@ -344,7 +344,7 @@ export function goalAnalysis(p: Profile, quotes: Quotes) {
   if (projectedProps >= p.goals.targetProperties && p.goals.targetProperties < 8) {
     const more = project({ ...p, goals: { ...p.goals, targetProperties: p.goals.targetProperties + 1 } }, quotes);
     const extra = more.purchases[proj.purchases.length];
-    if (extra && extra.year <= proj.retireYear - 3) lines.push({ tone: 'good', text: `There looks to be room for one more. On these numbers you could also buy property ${p.goals.targetProperties + 1} around ${extra.year} at about ${money(extra.price, { compact: true })}. Raise “Properties owned by retirement” to add it to your plan.` });
+    if (extra && extra.year <= proj.retireYear - 3) lines.push({ tone: 'good', text: `There looks to be room for one more. On these numbers you could also buy property ${p.goals.targetProperties + 1} around ${extra.year} at about ${money(extra.price, { compact: true })}. Raise your property goal on the Property Portfolio tab to add it.` });
   }
   if (target > 0) {
     if (sharesAtRetireReal >= target * 0.98) lines.push({ tone: 'good', text: `Investing ${money(proj.shareMonthly)} a month, your shares reach about ${money(sharesAtRetireReal, { compact: true })} (in today’s money) by ${p.goals.retirementAge}, meeting your ${money(target, { compact: true })} goal.` });

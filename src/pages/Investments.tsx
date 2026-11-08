@@ -66,8 +66,8 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
         <div className="flex gap-3 rounded-xl border border-brass/40 bg-brass/10 p-4 text-sm">
           <Icon name="coin" className="mt-0.5 h-5 w-5 shrink-0 text-brass" />
           <p>{p.cryptoInPlan && p.cryptoGrowth != null
-            ? `Your crypto is included in your plan as a simple figure: today’s value growing at your own estimate of ${p.cryptoGrowth}% a year. Cryptocurrency is volatile, so treat that part of the plan as a rough guide.`
-            : 'As cryptocurrency is a volatile asset, we cannot measure its future performance. Your crypto counts towards your net worth today, but it’s left out of your plan, projections and Your Wise Future unless you choose to include it below.'}</p>
+            ? `Your crypto is in your plan, growing at your own estimate of ${p.cryptoGrowth}% a year. Crypto is volatile, so treat that part of the plan as a rough guide.`
+            : 'Crypto is too volatile to forecast, so it counts in your net worth today but stays out of your plan unless you include it.'}</p>
         </div>
       ) : <SharesCarousel holdings={mine} quotes={quotes} />}
 
@@ -190,8 +190,8 @@ function CryptoGuess({ value }: { value: number }) {
       </div>
       <label className="flex cursor-pointer items-start gap-3 border-t border-line pt-4">
         <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={inPlan} onChange={(e) => { if (e.target.checked) setAsking(true); else update((d) => { d.cryptoInPlan = false; }); }} />
-        <span className="text-sm font-medium">I want to include my crypto in my full financial plan
-          <span className="block text-xs font-normal text-muted">{inPlan ? 'Included: it grows at your expected rate in your projections and Your Wise Future, and can be sold in retirement after your shares.' : 'Off: your crypto only counts in today’s net worth.'}</span>
+        <span className="text-sm font-medium">Include my crypto in my plan
+          <span className="block text-xs font-normal text-muted">{inPlan ? 'It grows at your expected rate in your plan, and can be sold in retirement after your shares.' : ''}</span>
         </span>
       </label>
       {missing && <p role="alert" className="rounded-lg bg-clay/10 px-3 py-2 text-sm text-clay">Enter your expected growth above to include crypto in your plan, or untick the box. Until then it’s left out.</p>}

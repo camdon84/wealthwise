@@ -64,14 +64,14 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
               <div className="mt-2 -ml-2"><CashFlowChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} /></div>
               <CashFlowKey />
             </>)}
-            <p className="mt-2 text-xs text-muted">Projected from your current position to age {p.goals.lifeExpectancy ?? 90}, using the assumptions in your plan. Markers show when your equity could fund each new purchase.</p>
+            <p className="mt-2 text-xs text-muted">Projected to age {p.goals.lifeExpectancy ?? 90}, using your plan’s assumptions.</p>
           </div>
           <div className="grid grid-cols-2 gap-px border-t border-line bg-line lg:grid-cols-1 lg:border-l lg:border-t-0">
             <Kpi label="Usable equity today" value={money(pos.usable, { compact: true })} sub={`at ${p.assumptions.lvr}% LVR`} />
             <Kpi label="Borrowing capacity today" value={money(pos.bc.capacity, { compact: true })} sub="estimate, before a lender checks" />
             <Kpi label="Left over cash each month" value={money(pos.monthlySurplus)} sub="after living costs and all repayments" wide />
             <div className="col-span-2 border-t-4 border-line bg-raised px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted lg:col-span-1">At retirement</div>
-            {atRetire && <Kpi label={`${p.household.hasPartner ? 'Your combined net worth' : 'Your net worth'} at retirement age (${p.goals.retirementAge})`} value={money(atRetire.netWorth / Math.pow(1 + p.assumptions.inflation / 100, atRetire.year - proj.points[0].year), { compact: true })} sub={`in today’s money · ${money(atRetire.netWorth, { compact: true })} in ${atRetire.year} dollars`} accent />}
+            {atRetire && <Kpi label={`${p.household.hasPartner ? 'Combined net worth' : 'Net worth'} at retirement (${p.goals.retirementAge})`} value={money(atRetire.netWorth / Math.pow(1 + p.assumptions.inflation / 100, atRetire.year - proj.points[0].year), { compact: true })} sub={`in today’s money · ${money(atRetire.netWorth, { compact: true })} in ${atRetire.year} dollars`} accent />}
             <div className="bg-surface p-5">
               <p className="text-xs text-muted">Living on {money(p.goals.passiveIncome, { compact: true })} a year from {p.goals.retirementAge}</p>
               <p className={`font-display text-2xl font-semibold mt-0.5 ${proj.runsOutAge == null ? '' : 'text-clay'}`}>{proj.runsOutAge == null ? `Lasts past ${life}` : `Runs out at ${proj.runsOutAge}`}</p>

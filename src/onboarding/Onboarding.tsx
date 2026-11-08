@@ -132,7 +132,7 @@ function AboutYou({ thorough }: { thorough: boolean }) {
         <Field label="State you live in">{(id) => <Select id={id} value={hh.state} onChange={(v) => update((d) => { d.household.state = v; })} options={['QLD', 'NSW', 'VIC', 'SA', 'WA', 'TAS', 'ACT', 'NT'].map((s) => ({ value: s as any, label: s }))} />}</Field>
       </div>
       <div className="panel p-5">
-        <Toggle checked={hh.hasPartner} onChange={(v) => update((d) => { d.household.hasPartner = v; })} label="I’m planning with a partner" description="Your partner’s income, super and share of each asset will count toward the plan." />
+        <Toggle checked={hh.hasPartner} onChange={(v) => update((d) => { d.household.hasPartner = v; })} label="I’m planning with a partner" description="Your partner’s income, super and share of each asset count towards the plan." />
         {hh.hasPartner && (
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <Field label="Partner’s first name">{(id) => <TextInput id={id} value={hh.partner.name} onChange={(v) => update((d) => { d.household.partner.name = v; })} />}</Field>
@@ -217,7 +217,7 @@ export function Income({ thorough, withDates }: { thorough: boolean; withDates?:
           <Promotions who={who} />
         </div>
       ))}
-      <Field label="Other income" hint="Bonuses, dividends, side business, family payments. Rent from your properties comes in the property step.">{(id) => <MoneyInput id={id} value={hh.otherIncome} onChange={(v) => update((d) => { d.household.otherIncome = v; })} suffix="/ year" />}</Field>
+      <Field label="Other income" hint="Bonuses, dividends, side business, family payments. Rent is entered with each property.">{(id) => <MoneyInput id={id} value={hh.otherIncome} onChange={(v) => update((d) => { d.household.otherIncome = v; })} suffix="/ year" />}</Field>
     </div>
   );
 }
@@ -241,7 +241,7 @@ export function Spending(_: { thorough: boolean }) {
         )}
         {f.housing === 'own' && (
           <div className="mt-4 space-y-4">
-            <div className="max-w-sm"><Field label="Mortgage repayments" hint="The full monthly repayment on your home loan. Leave blank if it’s paid off, or to work it out from the loan you add in the Properties step.">{(id) => <MoneyInput id={id} value={f.mortgageMonthly} onChange={(v) => update((d) => { d.finances.mortgageMonthly = v; })} suffix="/ month" />}</Field></div>
+            <div className="max-w-sm"><Field label="Mortgage repayments" hint="Your full monthly home loan repayment. Leave blank if it’s paid off, or to work it out from your loan.">{(id) => <MoneyInput id={id} value={f.mortgageMonthly} onChange={(v) => update((d) => { d.finances.mortgageMonthly = v; })} suffix="/ month" />}</Field></div>
             <Toggle checked={helped} onChange={(v) => update((d) => { d.finances.mortgageSharePct = v ? 50 : 100; })} label="Someone else helps pay the mortgage" description={`For example a family member or someone outside this plan. We’ll only count the share ${who} pay.`} />
             {helped && (
               <div className="max-w-xs pl-14"><Field label={`Share ${who} pay`}>{(id) => <NumInput id={id} value={f.mortgageSharePct} onChange={(v) => update((d) => { d.finances.mortgageSharePct = Math.min(100, Math.max(0, v ?? 0)); })} suffix="%" min={0} max={100} />}</Field></div>
@@ -254,7 +254,7 @@ export function Spending(_: { thorough: boolean }) {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="field-label mb-0">Monthly living costs</p>
-            <p className="mt-1 max-w-xl text-sm text-muted">Groceries, bills, petrol, transport, subscriptions, insurance, school and everything else you spend each month. Leave out rent, mortgage and loan repayments: they’re counted separately.</p>
+            <p className="mt-1 max-w-xl text-sm text-muted">Everything you spend each month. Leave out rent, mortgage and loan repayments, and costs you’ve entered under Dependants: they’re counted separately.</p>
           </div>
           <Segmented size="sm" label="How to enter living costs" value={f.livingMode} onChange={(v) => update((d) => { d.finances.livingMode = v; })} options={[{ value: 'total', label: 'Enter a total' }, { value: 'breakdown', label: 'Break it down' }]} />
         </div>
@@ -277,7 +277,7 @@ export function Spending(_: { thorough: boolean }) {
 
       <section>
         <p className="field-label">Other debts</p>
-        <p className="mb-3 text-sm text-muted">Car loans, personal loans, HECS and credit cards. Lenders count a card’s full limit, even if you pay it off each month.</p>
+        <p className="mb-3 text-sm text-muted">Car loans, personal loans, HECS and credit cards.</p>
         <div className="space-y-3">
           {f.debts.map((d) => {
             const isHecs = d.kind === 'hecs';
@@ -354,7 +354,7 @@ export function CashSuper({ withDates }: { thorough: boolean; withDates?: boolea
       <div className="max-w-xl">
         <div className="max-w-sm"><Field label="Emergency cash buffer you want to keep" hint="Kept aside in savings. We won’t use it for deposits, shares or paying off debt.">{(id) => <MoneyInput id={id} value={f.buffer} onChange={(v) => update((d) => { d.finances.buffer = v; })} />}</Field></div>
         {f.buffer != null && f.buffer < recommendedBuffer(p) && (
-          <p role="status" className="mt-2 flex gap-2 rounded-lg bg-brass/10 px-3 py-2 text-sm"><Icon name="spark" className="mt-0.5 h-4 w-4 shrink-0 text-brass" />Based on your age and current financial situation, we recommend keeping at least {money(recommendedBuffer(p))} in savings as an emergency reserve.</p>
+          <p role="status" className="mt-2 flex gap-2 rounded-lg bg-brass/10 px-3 py-2 text-sm"><Icon name="spark" className="mt-0.5 h-4 w-4 shrink-0 text-brass" />For your situation, we recommend at least {money(recommendedBuffer(p))}.</p>
         )}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -468,7 +468,7 @@ function Goals({ thorough }: { thorough: boolean }) {
     <div className="space-y-8">
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Age you’d like to stop working">{(id) => <NumInput id={id} value={g.retirementAge} onChange={(v) => update((d) => { d.goals.retirementAge = v ?? 60; })} />}</Field>
-        <Field label="Yearly income you want then" hint="In today’s dollars, before tax.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
+        <Field label="Yearly income you want then" hint="In today’s money, before tax.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
         <Field label="Properties you’d like to own">{(id) => <NumInput id={id} value={g.targetProperties} onChange={(v) => update((d) => { d.goals.targetProperties = v ?? 0; })} />}</Field>
         <Field label="Age you’re planning to live to" hint="Your plan runs to this age, so you can see if the money lasts.">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} min={60} max={110} />}</Field>
       </div>
