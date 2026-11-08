@@ -58,6 +58,21 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
     }
   }
 
+  // 1c. Idle cash: the plan builds a big cash pile on the way to the next deposit
+  if (!p.cashPlan?.active) {
+    const buf = p.finances.buffer ?? 0;
+    const ri = proj.points.findIndex((x) => x.year === proj.retireYear);
+    const real = proj.points.slice(0, Math.max(0, ri)).map((x, i) => ({ year: x.year, v: x.cash / Math.pow(1 + a.inflation / 100, i) }));
+    const pk = real.reduce((m, x) => (x.v > m.v ? x : m), { year: 0, v: 0 });
+    if (pk.v > Math.max(150000, buf * 3)) out.push({
+      id: 'idle-cash', kind: 'opportunity',
+      title: 'Your plan builds up a lot of cash',
+      body: `On the way to your next deposit you’d hold up to about ${money(pk.v, { compact: true })} in cash (today’s money) around ${pk.year}. The Cash tab compares keeping it in an offset, a high-interest account or shares, and can put the extra to work until you buy.`,
+      figure: money(pk.v, { compact: true }), figureLabel: `cash around ${pk.year}`,
+      action: { label: 'Put it to work in the Cash tab', to: 'plan:cash' },
+    });
+  }
+
   // 2. Next purchase from equity
   const nextDeposit = a.newPurchasePrice * 0.25;
   const available = pos.usable + Math.max(0, pos.cash - (p.finances.buffer ?? 0));

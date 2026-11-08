@@ -177,6 +177,7 @@ export interface Profile {
   liquidations?: Liquidation[];
   forecasts?: Forecast[]; // saved forecasts and previous live plans
   insightState?: InsightState;
+  cashPlan?: CashPlan; // the Cash tab's answers
   planIdeas?: { dismissed?: Record<string, number>; refreshedAt?: number; ai?: { id: string; title: string; body: string; at: number }[] }; // "Have you thought about these options?" on the plan
   cpiBase?: { period: string; index: number }; // CPI quarter the locked plan's figures are in (set when the plan is locked)
   cpiLog?: { period: string; annual: number; at: string; updated: string[]; kept: string[] }[]; // inflation updates offered // Wise Insights: what's been seen, dismissed and refreshed
@@ -241,4 +242,20 @@ export interface InsightState {
   refreshedAt?: number; // last "Give me Wise Insights"
   spendBase?: number | null; // retirement income when we first suggested they could afford more
   spendSnoozeUntil?: number; // they changed it after that suggestion: don't suggest again until then
+}
+
+/**
+ * How spare cash is put to work (the Cash tab). Accessible cash (offset + high-interest + everyday) is capped at
+ * accessMax in today's money; anything above it is invested in shares and sold down when a property needs a deposit.
+ */
+export interface CashPlan {
+  active: boolean;
+  risk: 'conservative' | 'balanced' | 'growth';
+  accessMax: number | null; // today's money; null = no cap, nothing moves to shares
+  split: { offset: number; hisa: number; everyday: number }; // % of accessible cash, adds to 100
+  offsetProperties: string[]; // owned property ids whose loans the offset sits against
+  hisaRate: number; // % a year
+  everydayRate: number; // % a year
+  sweep: boolean;
+  answeredAt?: string;
 }

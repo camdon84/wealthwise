@@ -268,10 +268,9 @@ async function api(req: Request, env: Env, path: string) {
   if (path === '/api/documents/read' && method === 'POST') return readDocument(req, env);
   if (path === '/api/geocode' && method === 'GET') return geocode(req, env);
   if (path === '/api/renovate-image' && method === 'POST') return renovateImage(req, env);
-  if (path === '/api/savings-rates-probe' && method === 'GET') {
-    const res = await fetch('https://www.rba.gov.au/statistics/tables/csv/f4-data.csv', { headers: { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' } });
-    const lines = latin1(await res.arrayBuffer()).split(/\r?\n/);
-    return json({ status: res.status, head: lines.slice(0, 12), tail: lines.filter((l) => /^\d/.test(l)).slice(-3) }, 200, { 'cache-control': 'no-store' });
+  if (path === '/api/savings-rates' && method === 'GET') {
+    const data = await savingsRates(env);
+    return data ? json(data, 200, { 'cache-control': 'public, max-age=3600' }) : fail('Savings rates unavailable right now.', 503);
   }
   if (path === '/api/cpi' && method === 'GET') {
     const data = await cpi(env);
@@ -293,6 +292,7 @@ export default {
       await nationalBriefing(env, 'property', true);
       await cashRate(env, true);
       await cpi(env, true);
+      await savingsRates(env, true);
     })());
   },
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -487,6 +487,23 @@ function cpi(env: Env, force = false) {
     const last = recent[recent.length - 1];
     const yearAgo = recent[recent.length - 5];
     return { latest: { ...last, annual: last.annual ?? Math.round((last.index / yearAgo.index - 1) * 1000) / 10 }, released, series: recent };
+  }, force);
+}
+
+/* ---------- Average savings rates (Canstar data published by the RBA, table F4, monthly) ---------- */
+function savingsRates(env: Env, force = false) {
+  return cached(env, 'rba:savings-rates', 12 * 3600e3, async () => {
+    const res = await fetch('https://www.rba.gov.au/statistics/tables/csv/f4-data.csv', { headers: { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' } });
+    if (!res.ok) throw new Error(`rba f4 ${res.status}`);
+    const lines = latin1(await res.arrayBuffer()).split(/\r?\n/).map((l) => l.split(','));
+    const ids = (lines.find((c) => c[0]?.trim() === 'Series ID') ?? []).map((x) => x.trim());
+    const col = { bonus: ids.indexOf('FRDIRSAB10K'), online: ids.indexOf('FRDIRSAO10K'), everyday: ids.indexOf('FRDIRTAB5K') };
+    if (col.bonus < 0) throw new Error('no bonus savings column');
+    const rows = lines.filter((c) => /^\d{1,2}-[A-Za-z]{3}-\d{4}$/.test(c[0]?.trim() ?? '') && c[col.bonus]?.trim());
+    const last = rows[rows.length - 1];
+    if (!last) throw new Error('no savings rate rows');
+    const num = (k: number) => (k >= 0 && last[k]?.trim() ? Number(last[k]) : null);
+    return { asOf: new Date(`${last[0]} UTC`).toISOString().slice(0, 10), highInterest: num(col.bonus), online: num(col.online), everyday: num(col.everyday) };
   }, force);
 }
 
