@@ -357,11 +357,20 @@ export function CashSuper({ withDates }: { thorough: boolean; withDates?: boolea
         )}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        {(['you', 'partner'] as const).filter((w) => w === 'you' || hh.hasPartner).map((who) => (
-          <Field key={who} label={`${hh[who].name || (who === 'you' ? 'Your' : 'Partner')}${hh[who].name ? '’s' : ''} super balance`} hint={withDates ? <AsOf date={hh[who].superAsOf} onToday={() => update((d) => { d.household[who].superAsOf = today(); })} /> : undefined}>
-            {(id) => <MoneyInput id={id} value={hh[who].superBalance} onChange={(v) => update((d) => { d.household[who].superBalance = v; if (withDates) d.household[who].superAsOf = today(); })} />}
-          </Field>
-        ))}
+        {(['you', 'partner'] as const).filter((w) => w === 'you' || hh.hasPartner).map((who) => {
+          const nm = hh[who].name ? `${hh[who].name}’s` : who === 'you' ? 'Your' : 'Partner’s';
+          return (
+          <div key={who} className="space-y-3 rounded-xl border border-line p-4">
+            <Field label={`${nm} superannuation balance`} hint={withDates ? <AsOf date={hh[who].superAsOf} onToday={() => update((d) => { d.household[who].superAsOf = today(); })} /> : undefined}>
+              {(id) => <MoneyInput id={id} value={hh[who].superBalance} onChange={(v) => update((d) => { d.household[who].superBalance = v; if (withDates) d.household[who].superAsOf = today(); })} />}
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Provider (optional)">{(id) => <TextInput id={id} value={hh[who].superFund ?? ''} onChange={(v) => update((d) => { d.household[who].superFund = v || undefined; })} placeholder="e.g. your super fund’s name" />}</Field>
+              <Field label="Policy / account number (optional)">{(id) => <TextInput id={id} value={hh[who].superMember ?? ''} onChange={(v) => update((d) => { d.household[who].superMember = v || undefined; })} placeholder="Member number" />}</Field>
+            </div>
+          </div>
+          );
+        })}
       </div>
     </div>
   );
