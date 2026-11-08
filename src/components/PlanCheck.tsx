@@ -2,9 +2,37 @@ import type { PlanCheck } from '../lib/planCheck';
 import { Icon } from './ui';
 import { usePlanProfile, usePlanUpdate } from '../lib/planContext';
 import { uid } from '../lib/defaults';
+import { afterTax } from '../lib/calc';
+import { money } from '../lib/format';
+
+/** Friendly nudge when no retirement income has been set. Not an error: it suggests a starting figure. */
+function RetireIncomeNotice() {
+  const p = usePlanProfile();
+  const update = usePlanUpdate();
+  if ((p.goals.passiveIncome ?? 0) > 0) return null;
+  const h = p.household;
+  const takeHome = afterTax((h.you.salary ?? 0) + (h.otherIncome ?? 0)) + (h.hasPartner ? afterTax(h.partner.salary ?? 0) : 0);
+  const suggest = Math.max(5000, Math.round(takeHome / 5000) * 5000);
+  return (
+    <section className="mb-4 rounded-2xl border border-brass/50 bg-brass/10 p-4" aria-label="Retirement income not set">
+      <div className="flex gap-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brass font-display text-lg font-bold leading-none text-surface" aria-hidden="true">!</span>
+        <div className="text-[15px] leading-relaxed">
+          <p>Your yearly income after retirement hasn’t been set. Let’s put a value in here now so we can build the rest of your plan around it. Based on your current yearly income, why don’t you start with <strong>{money(suggest)} a year</strong>? You can always change this later.</p>
+          <button className="mt-3 rounded-lg border border-brass/60 bg-surface px-3 py-1.5 text-sm font-semibold hover:bg-brass/15" onClick={() => update((d) => { d.goals.passiveIncome = suggest; })}>Use {money(suggest)} a year</button>
+          <p className="mt-2 text-[11px] text-muted">This is your current take-home pay{h.hasPartner ? ' (both of you)' : ''}, rounded to the nearest $5,000.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /** "Does this plan work?" box, shared by the Goals tab and Your Wise Future. */
-export function PlanCheckBox({ check, compact }: { check: PlanCheck; compact?: boolean }) {
+export function PlanCheckBox(props: { check: PlanCheck; compact?: boolean }) {
+  return <><RetireIncomeNotice /><PlanCheckResult {...props} /></>;
+}
+
+function PlanCheckResult({ check, compact }: { check: PlanCheck; compact?: boolean }) {
   const update = usePlanUpdate();
   if (check.works) {
     return (

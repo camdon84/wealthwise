@@ -19,7 +19,6 @@ export function Properties() {
   const update = useApp((s) => s.update);
   const [view, setView] = useState<'cards' | 'list'>('cards');
   const [selected, setSelected] = useState<string | null>(null);
-  const [focus, setFocus] = useState<string | null>(null);
   const [editing, setEditing] = useState<Property | null>(() => {
     const id = useNavIntent.getState().editProperty; if (!id) return null;
     useNavIntent.getState().set({ editProperty: null });
@@ -52,36 +51,32 @@ export function Properties() {
       )}
 
       {view === 'cards' ? (
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
         <div className="space-y-5">
           {p.properties.map((pr) => {
             const s = propertyStats(pr, lvr);
             return (
-              <button key={pr.id} onClick={() => setSelected(pr.id)} onMouseEnter={() => setFocus(pr.id)} onFocus={() => setFocus(pr.id)} className={`panel block w-full overflow-hidden text-left transition-colors hover:border-brass/60 ${(focus ?? p.properties[0]?.id) === pr.id ? 'ring-2 ring-brass/50' : ''}`}>
-                <PropertyPhoto property={pr} className="h-36 w-full" />
-                <div className="p-5">
+              <div key={pr.id} className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-stretch">
+              <button onClick={() => setSelected(pr.id)} className="panel flex h-full w-full flex-col overflow-hidden text-left transition-colors hover:border-brass/60">
+                <PropertyPhoto property={pr} className="h-44 w-full shrink-0" />
+                <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-start justify-between gap-3">
-                    <div><p className="font-semibold">{pr.address}</p><p className="text-sm text-muted">{pr.suburb} {pr.state} {pr.postcode}</p></div>
+                    <div><p className="font-display text-xl font-semibold">{pr.address}</p><p className="text-sm text-muted">{pr.suburb} {pr.state} {pr.postcode}</p></div>
                     <span className={`chip ${pr.use === 'home' ? 'bg-sky/15 text-sky' : 'bg-gum/15 text-gum'}`}>{pr.use === 'home' ? 'Home' : 'Investment'}</span>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-y-3 text-sm">
-                    <div><p className="text-xs text-muted">Value</p><p className="font-display text-lg font-semibold">{money(s.val.value)}</p>{s.growthSincePurchase != null && <p className="text-xs text-gum">{pct(s.growthSincePurchase, 0, true)} since purchase</p>}</div>
-                    <div><p className="text-xs text-muted">{pr.use === 'investment' ? 'Cash flow' : 'Yearly cost'}</p><p className={`font-display text-lg font-semibold ${s.cashflow >= 0 ? 'text-gum' : 'text-clay'}`}>{money(s.cashflow, { sign: true })}</p><p className="text-xs text-muted">a year after repayments</p></div>
-                    <div><p className="text-xs text-muted">Equity</p><p>{money(s.equity)}</p></div>
-                    <div><p className="text-xs text-muted">Usable equity</p><p>{money(s.usable)}</p></div>
-                    {pr.use === 'investment' && <div><p className="text-xs text-muted">Gross yield</p><p>{pct(s.grossYield)}</p></div>}
-                    <div><p className="text-xs text-muted">LVR</p><p>{pct(s.lvrNow, 0)}</p></div>
+                  <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 text-sm sm:grid-cols-3">
+                    <div><p className="text-xs text-muted">Value</p><p className="font-display text-xl font-semibold">{money(s.val.value)}</p>{s.growthSincePurchase != null && <p className="text-xs text-gum">{pct(s.growthSincePurchase, 0, true)} since purchase</p>}</div>
+                    <div><p className="text-xs text-muted">{pr.use === 'investment' ? 'Cash flow' : 'Yearly cost'}</p><p className={`font-display text-xl font-semibold ${s.cashflow >= 0 ? 'text-gum' : 'text-clay'}`}>{money(s.cashflow, { sign: true })}</p><p className="text-xs text-muted">a year after repayments</p></div>
+                    <div><p className="text-xs text-muted">Equity</p><p className="font-display text-xl font-semibold">{money(s.equity)}</p></div>
+                    <div><p className="text-xs text-muted">Usable equity</p><p className="text-base">{money(s.usable)}</p></div>
+                    {pr.use === 'investment' && <div><p className="text-xs text-muted">Gross yield</p><p className="text-base">{pct(s.grossYield)}</p></div>}
+                    <div><p className="text-xs text-muted">LVR</p><p className="text-base">{pct(s.lvrNow, 0)}</p></div>
                   </div>
                 </div>
               </button>
+              <ValueHistory property={pr} />
+              </div>
             );
           })}
-        </div>
-        {p.properties.length > 0 && (
-          <div className="lg:sticky lg:top-6">
-            <ValueHistory property={p.properties.find((x) => x.id === focus) ?? p.properties[0]} onPick={setFocus} />
-          </div>
-        )}
         </div>
       ) : (
         <div className="panel overflow-x-auto">
@@ -200,7 +195,7 @@ function PropertyDetail({ property: pr, onClose, onEdit }: { property: Property;
 }
 
 /** Purchase to today to ten years out, for one property. */
-function ValueHistory({ property: pr, onPick }: { property: Property; onPick: (id: string) => void }) {
+function ValueHistory({ property: pr }: { property: Property }) {
   const p = useApp((s) => s.profile)!;
   const now = propertyStats(pr, p.assumptions.lvr).val.value;
   const y0 = new Date().getFullYear();
@@ -216,39 +211,34 @@ function ValueHistory({ property: pr, onPick }: { property: Property; onPick: (i
   for (let k = 1; k <= 10; k++) data.push({ year: y0 + k, future: now * Math.pow(1 + g, k) });
   const end = data[data.length - 1].future!;
   return (
-    <section className="panel p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 className="font-display text-xl font-semibold">{pr.address}</h2><p className="text-sm text-muted">{pr.suburb} {pr.state} · value since you bought it, and the next 10 years</p></div>
-        {p.properties.length > 1 && (
-          <div className="flex flex-wrap gap-1.5">{p.properties.map((x) => (
-            <button key={x.id} onClick={() => onPick(x.id)} className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${x.id === pr.id ? 'bg-brass text-ground ring-brass' : 'ring-line text-muted hover:text-ink'}`}>{x.address}</button>
-          ))}</div>
-        )}
+    <section className="panel flex h-full flex-col p-5" aria-label={`${pr.address} value over time`}>
+      <div><h2 className="font-display text-base font-semibold">Value over time</h2><p className="text-xs text-muted">Since you bought it, and the next 10 years</p></div>
+      <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+        <div><p className="text-xs text-muted">Bought {bought > 0 ? `${by}` : ''}</p><p className="font-display text-base font-semibold">{bought > 0 ? money(bought, { compact: true }) : '—'}</p></div>
+        <div><p className="text-xs text-muted">Today</p><p className="font-display text-base font-semibold">{money(now, { compact: true })}</p>{bought > 0 && <p className="text-[11px] text-gum">{money(now - bought, { compact: true, sign: true })}</p>}</div>
+        <div><p className="text-xs text-muted">Forecast {y0 + 10}</p><p className="font-display text-base font-semibold text-gum">{money(end, { compact: true })}</p><p className="text-[11px] text-muted">{(g * 100).toFixed(1)}% a year</p></div>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-        <div><p className="text-xs text-muted">Bought {bought > 0 ? `${by}` : ''}</p><p className="font-display text-xl font-semibold">{bought > 0 ? money(bought, { compact: true }) : '—'}</p></div>
-        <div><p className="text-xs text-muted">Today</p><p className="font-display text-xl font-semibold">{money(now, { compact: true })}</p>{bought > 0 && <p className="text-xs text-gum">{money(now - bought, { compact: true, sign: true })}</p>}</div>
-        <div><p className="text-xs text-muted">Forecast {y0 + 10}</p><p className="font-display text-xl font-semibold text-gum">{money(end, { compact: true })}</p><p className="text-xs text-muted">{(g * 100).toFixed(1)}% a year</p></div>
-      </div>
-      <div className="mt-4 -ml-2">
-        <ResponsiveContainer width="100%" height={280}>
+      <div className="relative -ml-2 mt-3 min-h-[170px] flex-1">
+        <div className="absolute inset-0">
+        <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 16, right: 12, left: 0, bottom: 0 }}>
-            <defs><linearGradient id="vh-past" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="rgb(var(--gum))" stopOpacity={0.35} /><stop offset="1" stopColor="rgb(var(--gum))" stopOpacity={0.05} /></linearGradient></defs>
+            <defs><linearGradient id={`vh-past-${pr.id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="rgb(var(--gum))" stopOpacity={0.35} /><stop offset="1" stopColor="rgb(var(--gum))" stopOpacity={0.05} /></linearGradient></defs>
             <CartesianGrid vertical={false} stroke="rgb(var(--line))" strokeDasharray="2 4" />
-            <XAxis dataKey="year" tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
-            <YAxis tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickLine={false} axisLine={false} width={56} tickFormatter={(v) => money(v, { compact: true })} domain={['dataMin', 'dataMax']} />
+            <XAxis dataKey="year" tick={{ fill: 'rgb(var(--muted))', fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
+            <YAxis tick={{ fill: 'rgb(var(--muted))', fontSize: 10 }} tickLine={false} axisLine={false} width={50} tickFormatter={(v) => money(v, { compact: true })} domain={['dataMin', 'dataMax']} />
             <Tooltip formatter={(v: number, k: string) => [money(v, { compact: true }), k === 'past' ? 'Value' : 'Forecast']} labelFormatter={(l) => String(l)} contentStyle={{ background: 'rgb(var(--surface))', border: '1px solid rgb(var(--line))', borderRadius: 12, fontSize: 12 }} />
-            <Area type="monotone" dataKey="past" stroke="rgb(var(--gum))" strokeWidth={2} fill="url(#vh-past)" isAnimationActive={false} connectNulls />
+            <Area type="monotone" dataKey="past" stroke="rgb(var(--gum))" strokeWidth={2} fill={`url(#vh-past-${pr.id})`} isAnimationActive={false} connectNulls />
             <Area type="monotone" dataKey="future" stroke="rgb(var(--brass))" strokeWidth={2} strokeDasharray="5 4" fill="rgb(var(--brass) / 0.06)" isAnimationActive={false} connectNulls />
             {bought > 0 && by < y0 && <ReferenceDot x={by} y={bought} r={5} fill="rgb(var(--surface))" stroke="rgb(var(--gum))" strokeWidth={2} label={{ value: `Bought ${money(bought, { compact: true })}`, position: 'top', fill: 'rgb(var(--muted))', fontSize: 10 }} />}
             <ReferenceDot x={y0} y={now} r={5} fill="rgb(var(--gum))" stroke="rgb(var(--surface))" strokeWidth={2} label={{ value: 'Today', position: 'top', fill: 'rgb(var(--muted))', fontSize: 10 }} />
             <ReferenceLine x={y0} stroke="rgb(var(--muted))" strokeDasharray="3 3" />
           </AreaChart>
         </ResponsiveContainer>
+        </div>
       </div>
-      <p className="mt-2 text-[11px] text-muted">{own != null
-        ? `Property forecast based on this property’s average growth since you bought it (${(own * 100).toFixed(1)}% a year). Suburb data from the last 10 years will replace this once it’s connected.`
-        : `Property forecast based on the growth rate set for this property (${pr.growthRate}% a year). Suburb data from the last 10 years will replace this once it’s connected.`} The line between purchase and today is smoothed. Not a valuation.</p>
+      <p className="mt-2 text-[11px] leading-snug text-muted">{own != null
+        ? `Forecast uses this property’s average growth since purchase. Suburb data will replace it once connected.`
+        : `Forecast uses the growth rate set for this property. Suburb data will replace it once connected.`} Purchase-to-today line is smoothed. Not a valuation.</p>
     </section>
   );
 }
