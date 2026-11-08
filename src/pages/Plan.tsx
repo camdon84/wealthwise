@@ -5,6 +5,7 @@ import { CHILD_COST_YEAR, RETIRE_CASH_MIN, pmt, position, project, propertyStats
 import { holdingValue, liquidationEstimate, maxShareMonthly, planCheck, propertyValueIn } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { CashTab } from './CashTab';
+import { WealthFocusPicker } from '../components/WealthFocus';
 import { wiseInsights } from '../lib/insights';
 import { money } from '../lib/format';
 import { plannedPurchase, uid } from '../lib/defaults';
@@ -183,6 +184,7 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">What you want</h2>
+        <div className="mt-5"><WealthFocusPicker value={g.wealthFocus} onChange={(v) => update((d) => { d.goals.wealthFocus = v; })} /></div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <Field label="Stop working at age">{(id) => <NumInput id={id} value={g.retirementAge} onChange={(v) => update((d) => { d.goals.retirementAge = v ?? 60; })} />}</Field>
           <Field label="Planning to live to">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} />}</Field>

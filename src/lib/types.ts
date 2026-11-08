@@ -120,6 +120,7 @@ export interface Goals {
   lifeExpectancy?: number; // age the plan runs to
   sharesTarget?: number | null; // share portfolio wanted at retirement, today's money
   shareMonthly?: number | null; // planned monthly share investment; null = whatever reaches the target
+  wealthFocus?: 'property' | 'shares' | 'balanced'; // how they prefer to build wealth; tailors Wise's ideas
   shareStartAfter?: number | null; // don't start the share plan until this many planned purchases are bought
   passiveIncome: number; // today's dollars p.a.
   plannedChildren?: { id: string; year: number }[]; // children you plan to have: average costs from birth to 18

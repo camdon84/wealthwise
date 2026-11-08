@@ -125,6 +125,7 @@ function PlanIdeas({ check }: { check: PlanCheck }) {
     let fresh: { id: string; title: string; body: string; at: number }[] = [];
     if (live) {
       const facts = {
+        wealthFocus: p.goals.wealthFocus ?? 'balanced',
         goal: { stopWorkAge: p.goals.retirementAge, incomeWantedTodayDollars: p.goals.passiveIncome, propertiesWanted: p.goals.targetProperties, sharePortfolioWantedTodayDollars: p.goals.sharesTarget ?? null, shareInvestmentPerMonth: p.goals.shareMonthly ?? null },
         planWorks: check.works, problems: check.problems, testedFixes: check.fixes, whatWorks: check.good,
         ideasAlreadyShown: [...check.ideas.map((x) => x.text), ...(st?.ai ?? []).map((x) => x.title)],

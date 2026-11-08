@@ -142,7 +142,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
     const left = last ? Math.max(0, last.netWorth) / Math.pow(1 + p.assumptions.inflation / 100, r.points.length - 1) : 0;
     good.push(`Living on ${m(g.passiveIncome)} a year from ${retireAge}, your money lasts past ${life}, with about ${m(left)} in today’s money to spare.`);
     // Room for more?
-    if (propsOk(p, r) && cashOk(r) && g.targetProperties < 10) {
+    if (propsOk(p, r) && cashOk(r) && g.targetProperties < 10 && g.wealthFocus !== 'shares') {
       const more = run((x) => { x.goals.targetProperties += 1; });
       const extra = more.purchases[r.purchases.length];
       if (extra && extra.year <= r.retireYear - 3 && lastsOk(more) && cashOk(more)) good.push(`There’s room for one more: property ${g.targetProperties + 1} would fit around ${extra.year}. Raise “Properties owned by retirement” to add it.`);
@@ -150,18 +150,24 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   }
   if (cashOk(r) && position(p, quotes).monthlySurplus < 0) problems.push('You’re spending more than you earn each month right now. Check your living expenses in My Details.');
 
-  const ideas: PlanIdea[] = [...buyIdeas(p, r, run, quotes), ...(lastsOk(r) && cashOk(r) && propsOk(p, r) ? retireIdeas(p, run).map((text) => ({ text })) : [])];
+  // Ideas follow how they prefer to build wealth: share-focused people hear about owning fewer properties
+  // and investing more, not about selling shares for property; property-focused people see property levers first.
+  const focus = g.wealthFocus ?? 'balanced';
+  const buy = buyIdeas(p, r, run, quotes, focus);
+  const retire = lastsOk(r) && cashOk(r) && propsOk(p, r) ? retireIdeas(p, run).map((text) => ({ text })) : [];
+  const equity = focus === 'property' ? [] : equityIdeas(p, r, run, focus);
+  const ideas: PlanIdea[] = focus === 'shares' ? [...equity, ...retire, ...buy] : focus === 'property' ? [...buy, ...retire] : [...buy, ...equity, ...retire];
   return { works: problems.length === 0, problems, fixes: [...new Set(fixes)], good, ideas, proj: r };
 }
 
 /** Tested levers that would bring a property purchase forward. */
-function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) => Projection, quotes: Quotes): PlanIdea[] {
+function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) => Projection, quotes: Quotes, focus: 'property' | 'shares' | 'balanced' = 'balanced'): PlanIdea[] {
   const owned = p.properties.length;
   const planned = (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - owned));
   if (planned.length === 0) return [];
   const base = planned.map((_, k) => r.purchases[k]?.year ?? null);
   const levers: { text: string; mod: (x: Profile) => void; liquidation?: PlanIdea['liquidation'] }[] = [];
-  if (r.shareMonthly > 0) {
+  if (r.shareMonthly > 0 && focus !== 'shares') {
     if (!p.goals.shareStartAfter) levers.push({ text: `hold off on your ${m(r.shareMonthly)} a month share plan until it’s bought (tick the box in Shares)`, mod: (x) => { x.goals.shareMonthly = Math.round(r.shareMonthly); x.goals.shareStartAfter = 1; } });
     else levers.push({ text: 'pause the share plan until then', mod: (x) => { x.goals.shareMonthly = 0; } });
     levers.push({ text: `halve your share plan to about ${money(Math.round(r.shareMonthly / 2 / 50) * 50)} a month`, mod: (x) => { x.goals.shareMonthly = Math.round(r.shareMonthly / 2); } });
@@ -173,7 +179,7 @@ function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) =>
   if (withDebt.some((pr) => pr.planPayOff && pr.use === 'investment') || planned.some((pp) => pp.payOff)) levers.push({ text: 'don’t pay the investment loans off by retirement (it means bigger repayments now)', mod: (x) => { x.properties.forEach((pr) => { if (pr.use === 'investment') pr.planPayOff = false; }); x.plannedPurchases?.forEach((pp) => { pp.payOff = false; }); } });
   // Selling some crypto or shares to fund the deposit, after capital gains tax (tested as a liquidation event this year)
   const y0 = new Date().getFullYear();
-  for (const kind of ['crypto', 'shares'] as const) {
+  for (const kind of (focus === 'shares' ? ['crypto'] : ['crypto', 'shares']) as ('crypto' | 'shares')[]) {
     for (const frac of [0.5, 1]) {
       const sale = saleAfterTax(p, quotes, kind, frac);
       if (!sale || sale.gross < 10000) continue;
@@ -218,6 +224,40 @@ function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) =>
   });
   return pick.sort((a, b) => a.k - b.k || b.gain - a.gain).slice(0, 4).map((x) => ({ text: x.text, liquidation: x.liquidation }));
 }
+
+/** For people who'd rather build wealth in shares: own fewer properties and invest the difference, or start the share plan sooner. */
+function equityIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) => Projection, focus: 'shares' | 'balanced'): PlanIdea[] {
+  const out: PlanIdea[] = [];
+  const g = p.goals;
+  const owned = p.properties.length;
+  const years = Math.max(1, g.retirementAge - (p.household.you.age ?? 35));
+  const real = (v: number) => v / Math.pow(1 + p.assumptions.inflation / 100, years);
+  const ok = (x: Projection) => lastsOk(x) && cashOk(x);
+  // One (shares focus: or two) fewer property purchases, with the savings going into shares instead
+  if (g.targetProperties > owned) {
+    const t = focus === 'shares' && g.targetProperties - owned >= 2 && g.targetProperties >= 4 ? g.targetProperties - 2 : g.targetProperties - 1;
+    const fewer = (v: number) => run((x) => { x.goals.targetProperties = t; x.goals.shareMonthly = v; x.goals.shareStartAfter = 0; });
+    const fewerGoals = { ...p, goals: { ...g, targetProperties: t } };
+    // The most a month that still buys the remaining properties on time and never runs short
+    const most = bisect(Math.max(0, r.shareMonthly), Math.max(5000, r.shareMonthly * 4), (v) => { const x = fewer(v); return ok(x) && propsOk(fewerGoals, x); }, 12);
+    if (most != null) {
+      const rr = fewer(Math.floor(most / 50) * 50);
+      // What actually goes in, on average, in today's money (shares only take savings above the emergency fund)
+      const work = rr.points.filter((x) => x.year < rr.retireYear);
+      const avg = work.reduce((t2, x, i) => t2 + x.shareContribution / Math.pow(1 + p.assumptions.inflation / 100, i), 0) / Math.max(1, work.length * 12);
+      const monthly = Math.floor(avg / 50) * 50;
+      const gain = real(rr.sharesAtRetire) - real(r.sharesAtRetire);
+      if (gain > 50000 && monthly > r.shareMonthly + 100) out.push({ text: `Have you thought about owning ${t} ${t === 1 ? 'property' : 'properties'} instead of ${g.targetProperties}? You could invest about ${m(monthly)} a month in shares on average instead of ${m(r.shareMonthly)}, with your shares reaching about ${m(real(rr.sharesAtRetire))} by ${g.retirementAge} in today’s money (${m(gain)} more), and less borrowing.` });
+    }
+  }
+  // A share plan that waits for a property purchase: starting now gives it longer to grow
+  if (n0(g.shareStartAfter) > 0 && r.shareMonthly > 0) {
+    const rr = run((x) => { x.goals.shareStartAfter = 0; });
+    if (ok(rr) && propsOk(p, rr)) out.push({ text: `Start your ${m(r.shareMonthly)} a month share plan now rather than after property ${owned + n0(g.shareStartAfter)}. Your property plan still works, and your shares reach about ${m(real(rr.sharesAtRetire))} by ${g.retirementAge} instead of ${m(real(r.sharesAtRetire))}.` });
+  }
+  return out;
+}
+const n0 = (v: number | null | undefined) => v ?? 0;
 
 /** When the plan has room to spare: an earlier finish, or a bigger retirement income. */
 function retireIdeas(p: Profile, run: (mod: (x: Profile) => void) => Projection): string[] {

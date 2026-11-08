@@ -5,6 +5,7 @@ import { afterTax, recommendedBuffer, hecsAnnual, hecsCompulsory, livingCosts, p
 import { defaultCurrency, money, num, price } from '../lib/format';
 import { DEBT_RATE, LIVING_CATEGORIES, emptyDebt, emptyDependant, emptyProperty, uid } from '../lib/defaults';
 import type { Debt, Holding, Profile, Property } from '../lib/types';
+import { WealthFocusPicker } from '../components/WealthFocus';
 import { Field, Icon, Logo, MoneyInput, NumInput, PriceInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
 import { PropertyEditor } from '../components/PropertyEditor';
 import { CsvImport } from '../components/CsvImport';
@@ -471,6 +472,7 @@ function Goals({ thorough }: { thorough: boolean }) {
         <Field label="Properties you’d like to own">{(id) => <NumInput id={id} value={g.targetProperties} onChange={(v) => update((d) => { d.goals.targetProperties = v ?? 0; })} />}</Field>
         <Field label="Age you’re planning to live to" hint="Your plan runs to this age, so you can see if the money lasts.">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} min={60} max={110} />}</Field>
       </div>
+      <WealthFocusPicker value={g.wealthFocus} onChange={(v) => update((d) => { d.goals.wealthFocus = v; })} />
       <div className="panel p-5">
         <label htmlFor="risk" className="field-label">How comfortable are you with ups and downs?</label>
         <input id="risk" type="range" min={1} max={5} value={g.risk} onChange={(e) => update((d) => { d.goals.risk = Number(e.target.value); })} className="mt-3 w-full" />
