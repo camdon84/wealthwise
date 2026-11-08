@@ -214,7 +214,7 @@ export interface YearPoint {
   year: number; age: number; propertyValue: number; propertyDebt: number; propertyEquity: number; shares: number; cashShares: number; super: number; cash: number; crypto: number;
   netWorth: number; passiveIncome: number; passiveIncomeReal: number; properties: number; borrowing: number; monthlySavings: number;
   repayUp2: number; repayBase: number; repayDown2: number; bought?: number;
-  spendGoalReal: number; spendFundedReal: number; shareContribution: number; sharePlanned: number; rentIncome: number; superDrawn: number; paidOff?: string[]; sold?: string[]; payNet: number; investNet: number; saleIn: number; giftIn: number; liqIn: number; propNet: number; spending: number; liquidated?: number;
+  spendGoalReal: number; spendFundedReal: number; shareContribution: number; sharePlanned: number; rentIncome: number; superDrawn: number; paidOff?: string[]; sold?: string[]; payNet: number; investNet: number; saleIn: number; giftIn: number; liqIn: number; shareSaleIn: number; propSaleIn: number; propNet: number; spending: number; liquidated?: number;
 }
 export interface PurchaseBlock { year: number; reason: 'deposit' | 'servicing' | 'date'; price: number; deposit: number; available: number; monthlyShort: number }
 export interface PlanEvent { year: number; age: number; kind: 'buy' | 'sell' | 'debt' | 'pay' | 'gift' | 'liquidate' | 'kids' | 'retire' | 'super' | 'shares' | 'runout' | 'cost' | 'goal'; text: string }
@@ -353,6 +353,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
     let contribution = 0;
     let spendGoal = 0, spendFunded = 0, superDrawn = 0, sharePlanned = 0;
     let payNet = 0, saleIn = 0, giftIn = 0, liqIn = 0, propNetY = 0, liquidated = 0, investNet = 0, rentTax = 0;
+    let shareSaleIn = 0, propSaleIn = 0; // money from selling, by what's sold (planned liquidations and the plan's own sales)
     const paidOff: string[] = i === 0 ? [...paidAtStart] : [];
     const sold: string[] = [];
 
@@ -480,7 +481,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
           const tax = s.home ? 0 : Math.max(0, incomeTax(income + gain * 0.5) - incomeTax(income)); // main residence is CGT-free
           const net = price - costs - s.debt - tax;
           sims.splice(idx, 1);
-          cash += net; liqIn += net; liquidated += Math.max(1, net);
+          cash += net; liqIn += net; propSaleIn += net; liquidated += Math.max(1, net);
           say(year, 'liquidate', `Liquidation event: sell ${s.name} for about ${fmt(price)}. After ${fmt(costs)} in agent fees and selling costs, ${fmt(s.debt)} to pay out the loan${tax ? ` and an estimated ${fmt(tax)} in capital gains tax` : ''}, ${fmt(net)} goes into your savings.`);
           continue;
         }
@@ -495,7 +496,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         } else { gross = shares * f; gain = Math.max(0, shares - shareCost) * f; shares -= gross; shareCost *= 1 - f; }
         if (gross < 1) continue;
         const tax = Math.max(0, incomeTax(income + gain * 0.5) - incomeTax(income));
-        cash += gross - tax; liqIn += gross - tax; liquidated += gross - tax;
+        cash += gross - tax; liqIn += gross - tax; shareSaleIn += gross - tax; liquidated += gross - tax;
         say(year, 'liquidate', `Liquidation event: sell ${fmt(gross)} of your ${lq.asset}. After an estimated ${fmt(tax)} in capital gains tax, ${fmt(gross - tax)} goes into your savings.`);
       }
 
@@ -504,13 +505,13 @@ export function project(p: Profile, quotes: Quotes): Projection {
         const gainShare = Math.max(0, 1 - shareCost / shares);
         const gross = Math.min(shares, need / (1 - gainShare * CGT_RATE));
         if (gross >= shares * 0.999 && shares > 1000 && !sharesGoneSaid) { sharesGoneSaid = true; say(year, 'sell', 'Your share portfolio is fully sold down by now.'); }
-        shareCost *= 1 - gross / shares; shares -= gross; cash += gross * (1 - gainShare * CGT_RATE); saleIn += gross * (1 - gainShare * CGT_RATE);
+        shareCost *= 1 - gross / shares; shares -= gross; cash += gross * (1 - gainShare * CGT_RATE); saleIn += gross * (1 - gainShare * CGT_RATE); shareSaleIn += gross * (1 - gainShare * CGT_RATE);
       };
       const sellProperty = (idx: number, why: string, reason: 'loan' | 'income') => {
         const s = sims[idx];
         const proceeds = s.value * (1 - SELL_COSTS) - s.debt - Math.max(0, s.value - s.cost) * CGT_RATE;
         sims.splice(idx, 1);
-        cash += proceeds; saleIn += Math.max(0, proceeds); sold.push(s.name);
+        cash += proceeds; saleIn += Math.max(0, proceeds); propSaleIn += Math.max(0, proceeds); sold.push(s.name);
         sales.push({ year, age, name: s.name, net: proceeds / infl(i), reason });
         say(year, 'sell', `Sell ${s.name} for about ${fmt(s.value / infl(i))} (in today’s money)${why}, freeing about ${fmt(proceeds / infl(i))} after the loan, selling costs and tax.`);
       };
@@ -570,7 +571,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
           const gainShare = Math.max(0, 1 - cryptoCost / cryptoBal);
           const gross = Math.min(cryptoBal, need / (1 - gainShare * CGT_RATE));
           if (gross >= cryptoBal * 0.999 && cryptoBal > 1000) say(year, 'sell', 'Your crypto is fully sold down by now.');
-          cryptoCost *= 1 - gross / cryptoBal; cryptoBal -= gross; cash += gross * (1 - gainShare * CGT_RATE); saleIn += gross * (1 - gainShare * CGT_RATE);
+          cryptoCost *= 1 - gross / cryptoBal; cryptoBal -= gross; cash += gross * (1 - gainShare * CGT_RATE); saleIn += gross * (1 - gainShare * CGT_RATE); shareSaleIn += gross * (1 - gainShare * CGT_RATE);
         }
         while (cash < floor - 1) {
           const idx = sims.map((s, k) => ({ s, k })).filter((x) => x.s.invest).map((x) => x.k).pop(); // newest investment first
@@ -624,7 +625,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
             let g = Math.min(sweepBal, need);
             for (let it = 0; it < 4; it++) g = Math.min(sweepBal, need + sweepTax(g));
             const tax = sweepTax(g), got = g - tax;
-            sweepCost *= 1 - g / sweepBal; sweepBal -= g; cash += got; liqIn += got; liquidated += got; cashSharesTax += tax;
+            sweepCost *= 1 - g / sweepBal; sweepBal -= g; cash += got; liqIn += got; shareSaleIn += got; liquidated += got; cashSharesTax += tax;
             say(year, 'liquidate', `Sell ${fmt(g)} of the shares your spare cash went into, for this deposit. After about ${fmt(tax)} in capital gains tax, ${fmt(got)} goes towards the purchase.`);
           }
           cash -= fromCash;
@@ -665,7 +666,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       passiveIncome, passiveIncomeReal: passiveIncome / infl(i), properties: sims.length,
       borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, false))) : 0,
       monthlySavings: monthlyNet, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
-      spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, rentIncome: sims.filter((x) => x.invest).reduce((t, x) => t + x.rent, 0), superDrawn, paidOff: paidOff.length ? paidOff : undefined, sold: sold.length ? sold : undefined, payNet, investNet, saleIn, giftIn, liqIn, propNet: propNetY, spending: working ? living : spendGoal, liquidated: liquidated || undefined,
+      spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, rentIncome: sims.filter((x) => x.invest).reduce((t, x) => t + x.rent, 0), superDrawn, paidOff: paidOff.length ? paidOff : undefined, sold: sold.length ? sold : undefined, payNet, investNet, saleIn, giftIn, liqIn, shareSaleIn, propSaleIn, propNet: propNetY, spending: working ? living : spendGoal, liquidated: liquidated || undefined,
     });
   }
   if (runsOutAge == null) say(y0 + (endAge - startAge), 'goal', `Your money lasts to ${endAge}, with about ${fmt((points[points.length - 1].netWorth) / infl(endAge - startAge))} (in today’s money) left over.`);

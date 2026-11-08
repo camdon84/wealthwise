@@ -43,7 +43,7 @@ export const wealthSeries = [
 export function toReal(points: YearPoint[], inflation: number): YearPoint[] {
   return points.map((p, i) => {
     const d = Math.pow(1 + inflation / 100, i);
-    return { ...p, propertyEquity: p.propertyEquity / d, shares: p.shares / d, super: p.super / d, cash: p.cash / d, crypto: p.crypto / d, payNet: p.payNet / d, rentIncome: p.rentIncome / d, superDrawn: p.superDrawn / d, saleIn: p.saleIn / d, giftIn: p.giftIn / d, liqIn: p.liqIn / d, spending: p.spending / d, propNet: p.propNet / d, netWorth: p.netWorth / d, bought: p.bought ? p.bought / d : undefined };
+    return { ...p, propertyEquity: p.propertyEquity / d, shares: p.shares / d, super: p.super / d, cash: p.cash / d, crypto: p.crypto / d, payNet: p.payNet / d, rentIncome: p.rentIncome / d, superDrawn: p.superDrawn / d, saleIn: p.saleIn / d, giftIn: p.giftIn / d, liqIn: p.liqIn / d, shareSaleIn: p.shareSaleIn / d, propSaleIn: p.propSaleIn / d, spending: p.spending / d, propNet: p.propNet / d, netWorth: p.netWorth / d, bought: p.bought ? p.bought / d : undefined };
   });
 }
 
@@ -156,8 +156,9 @@ const flowSeries = [
   { key: 'payNet', label: 'Take-home pay', color: C.brass },
   { key: 'rentIncome', label: 'Rent', color: C.equity },
   { key: 'superDrawn', label: 'From super', color: C.super },
-  { key: 'saleIn', label: 'From selling shares or property', color: C.shares },
-  { key: 'oneOff', label: 'Gifts and liquidation events', color: '#8b6fb3' },
+  { key: 'shareSaleIn', label: 'From selling shares or crypto', color: C.shares },
+  { key: 'propSaleIn', label: 'From selling property', color: '#c0784a' },
+  { key: 'giftIn', label: 'Gifts and inheritances', color: '#8b6fb3' },
 ] as const;
 
 export function CashFlowKey() {
@@ -170,7 +171,7 @@ export function CashFlowKey() {
 }
 
 export function CashFlowChart({ points, retireYear, height = 320, real }: { points: YearPoint[]; retireYear: number; height?: number; real?: boolean }) {
-  const data = points.slice(1).map((p) => ({ ...p, oneOff: p.giftIn + p.liqIn }));
+  const data = points.slice(1);
   // One big sale (usually properties at retirement) would flatten every other year, so the scale is set by the typical years and tall bars are labelled instead
   const totals = data.map((d) => flowSeries.reduce((t, s) => t + Math.max(0, (d as any)[s.key] ?? 0), 0));
   const sorted = [...totals].sort((a, b) => a - b);
