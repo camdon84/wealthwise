@@ -1,8 +1,11 @@
 import type { PlanCheck } from '../lib/planCheck';
 import { Icon } from './ui';
+import { useApp } from '../lib/store';
+import { uid } from '../lib/defaults';
 
 /** "Does this plan work?" box, shared by the Goals tab and Your Wise Future. */
 export function PlanCheckBox({ check, compact }: { check: PlanCheck; compact?: boolean }) {
+  const update = useApp((s) => s.update);
   if (check.works) {
     return (
       <section className={compact ? 'rounded-2xl border border-gum/40 bg-gum/10 p-4' : 'panel border-l-4 border-l-gum p-5 sm:p-6'} aria-label="Plan check">
@@ -17,7 +20,15 @@ export function PlanCheckBox({ check, compact }: { check: PlanCheck; compact?: b
         <div className="mt-4 rounded-xl bg-raised p-4 ring-1 ring-line">
           <p className="text-sm font-semibold">{check.works ? 'Ways to do even better' : 'Other ideas'}</p>
           <ul className="mt-2 space-y-2 text-[15px] leading-relaxed">
-            {check.ideas.map((t) => <li key={t} className="flex gap-3"><Icon name="spark" className="mt-1 h-4 w-4 shrink-0 text-brass" />{t}</li>)}
+            {check.ideas.map((t) => (
+              <li key={t.text} className="flex gap-3"><Icon name="spark" className="mt-1 h-4 w-4 shrink-0 text-brass" />
+                <span>{t.text}
+                  {t.liquidation && <button className="mt-2 flex items-center gap-1.5 rounded-lg border border-clay/50 bg-clay/10 px-3 py-1.5 text-sm font-semibold text-clay hover:bg-clay/20"
+                    onClick={() => { const l = t.liquidation!; update((d) => { (d.liquidations ??= []).push({ id: uid(), year: new Date().getFullYear(), asset: l.asset, pct: l.pct }); }); }}>
+                    <span className="font-display text-base leading-none">$</span>Add liquidation event to my plan</button>}
+                </span>
+              </li>
+            ))}
           </ul>
           <p className="mt-3 text-[11px] text-muted">Each idea was tested against your numbers. General information, not financial advice.</p>
         </div>
@@ -47,7 +58,15 @@ export function PlanCheckBox({ check, compact }: { check: PlanCheck; compact?: b
         <div className="mt-4 rounded-xl bg-raised p-4 ring-1 ring-line">
           <p className="text-sm font-semibold">{check.works ? 'Ways to do even better' : 'Other ideas'}</p>
           <ul className="mt-2 space-y-2 text-[15px] leading-relaxed">
-            {check.ideas.map((t) => <li key={t} className="flex gap-3"><Icon name="spark" className="mt-1 h-4 w-4 shrink-0 text-brass" />{t}</li>)}
+            {check.ideas.map((t) => (
+              <li key={t.text} className="flex gap-3"><Icon name="spark" className="mt-1 h-4 w-4 shrink-0 text-brass" />
+                <span>{t.text}
+                  {t.liquidation && <button className="mt-2 flex items-center gap-1.5 rounded-lg border border-clay/50 bg-clay/10 px-3 py-1.5 text-sm font-semibold text-clay hover:bg-clay/20"
+                    onClick={() => { const l = t.liquidation!; update((d) => { (d.liquidations ??= []).push({ id: uid(), year: new Date().getFullYear(), asset: l.asset, pct: l.pct }); }); }}>
+                    <span className="font-display text-base leading-none">$</span>Add liquidation event to my plan</button>}
+                </span>
+              </li>
+            ))}
           </ul>
           <p className="mt-3 text-[11px] text-muted">Each idea was tested against your numbers. General information, not financial advice.</p>
         </div>

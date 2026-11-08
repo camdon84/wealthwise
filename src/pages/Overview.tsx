@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
-import { Icon } from '../components/ui';
 import { project, position } from '../lib/calc';
 import { money } from '../lib/format';
 import type { Quotes } from '../lib/calc';
-import { MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
+import { CashFlowChart, CashFlowKey, MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
+import { Icon, Segmented } from '../components/ui';
 import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { NewsPanel, WisePanel } from '../components/Assistants';
 import { RateWatch } from '../components/RateWatch';
@@ -19,6 +19,7 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
   const progress = proj.runsOutAge == null ? 1 : Math.max(0, Math.min(1, (proj.runsOutAge - p.goals.retirementAge) / span));
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
   const [hidden, setHidden] = useState<string[]>([]);
+  const [view, setView] = useState<'worth' | 'flow'>('worth');
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
@@ -48,11 +49,17 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
               </div>
               <div className="flex flex-col items-end gap-3">
                 <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
-                <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} />
+                <Segmented size="sm" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} />
+                {view === 'worth' && <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} />}
               </div>
             </div>
-            <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} hidden={hidden} runsOutYear={proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null} /></div>
-            <MarkerKey points={proj.points} />
+            {view === 'worth' ? (<>
+              <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} hidden={hidden} runsOutYear={proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null} /></div>
+              <MarkerKey points={proj.points} />
+            </>) : (<>
+              <div className="mt-4 -ml-2"><CashFlowChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} /></div>
+              <CashFlowKey />
+            </>)}
             <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} /> Projected from your current position to age {p.goals.lifeExpectancy ?? 90}, using the assumptions in your plan. Markers show when your equity could fund each new purchase.</p>
           </div>
           <div className="grid grid-cols-2 gap-px border-t border-line bg-line lg:grid-cols-1 lg:border-l lg:border-t-0">

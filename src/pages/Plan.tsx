@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
-import { pmt, position, project, propertyStats, requiredShareMonthly, type Quotes } from '../lib/calc';
-import { maxShareMonthly, planCheck } from '../lib/planCheck';
+import { pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, type Quotes } from '../lib/calc';
+import { maxShareMonthly, planCheck, saleAfterTax } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { wiseInsights } from '../lib/insights';
 import { money } from '../lib/format';
-import { plannedPurchase } from '../lib/defaults';
+import { plannedPurchase, uid } from '../lib/defaults';
 import { useCashRate } from '../lib/rates';
-import type { Assumptions, PlannedPurchase, Property } from '../lib/types';
-import { MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
+import type { Assumptions, Gift, Liquidation, PlannedPurchase, Property } from '../lib/types';
+import { CashFlowChart, CashFlowKey, MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
 import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { useWiseTake } from '../components/Assistants';
 import { Field, Icon, MoneyInput, NumInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
 
-type Tab = 'goals' | 'assumptions' | 'timeline' | 'shares' | 'projections';
+type Tab = 'goals' | 'assumptions' | 'timeline' | 'shares' | 'liquidations' | 'gifts' | 'projections';
 
 export function Plan({ quotes }: { quotes: Quotes }) {
   const [tab, setTab] = useState<Tab>(() => { const t = useNavIntent.getState().planTab as Tab | null; useNavIntent.getState().set({ planTab: null }); return t ?? 'goals'; });
@@ -22,7 +22,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Your plan</h1><p className="text-muted">Set where you want to end up, check the assumptions, and see how it plays out.</p></div>
         <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Plan section">
-          <Segmented label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property portfolio' }, { value: 'shares', label: 'Shares' }]} />
+          <Segmented label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property portfolio' }, { value: 'shares', label: 'Shares' }, { value: 'liquidations', label: 'Liquidation events' }, { value: 'gifts', label: 'Gifts' }]} />
           <button role="tab" aria-selected={tab === 'projections'} onClick={() => setTab('projections')}
             className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${tab === 'projections'
               ? 'bg-brass text-ground shadow-[0_6px_20px_-6px_rgb(var(--brass)/0.7)] ring-2 ring-brass/40'
@@ -31,17 +31,19 @@ export function Plan({ quotes }: { quotes: Quotes }) {
           </button>
         </div>
       </div>
-      {tab === 'goals' && <Goals quotes={quotes} />}
+      {tab === 'goals' && <Goals quotes={quotes} go={setTab} />}
       {tab === 'assumptions' && <AssumptionsTab />}
       {tab === 'timeline' && <Timeline quotes={quotes} />}
       {tab === 'shares' && <SharesPlan quotes={quotes} />}
+      {tab === 'liquidations' && <LiquidationsTab quotes={quotes} />}
+      {tab === 'gifts' && <GiftsTab />}
       {tab === 'projections' && <Projections quotes={quotes} />}
     </div>
   );
 }
 
 /* ---------- Goals ---------- */
-function Goals({ quotes }: { quotes: Quotes }) {
+function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const g = p.goals;
@@ -55,9 +57,10 @@ function Goals({ quotes }: { quotes: Quotes }) {
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <Field label="Stop working at age">{(id) => <NumInput id={id} value={g.retirementAge} onChange={(v) => update((d) => { d.goals.retirementAge = v ?? 60; })} />}</Field>
           <Field label="Planning to live to">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} />}</Field>
-          <Field label="Properties owned by retirement" hint={`You own ${p.properties.length} now. Set prices in Property portfolio.`}>{(id) => <NumInput id={id} value={g.targetProperties} onChange={(v) => update((d) => { d.goals.targetProperties = v ?? 0; })} min={0} max={15} />}</Field>
-          <Field label="Share portfolio value at retirement" hint="In today’s money. Leave blank if you don’t have a retirement goal. Or set a monthly amount in Shares.">{(id) => <MoneyInput id={id} value={g.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
-          <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working, in today’s money. The plan sells shares and properties if it needs to." className="sm:col-span-2">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
+          <LinkedValue label="Properties owned by retirement" value={`${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}`} hint="Update your property goal on the Property portfolio tab." tabLabel="Property portfolio" onGo={() => go('timeline')} />
+          <LinkedValue label="Share portfolio value at retirement" value={g.sharesTarget ? `${money(g.sharesTarget)}` : 'No goal set'} hint="Update your share plan on the Shares tab." tabLabel="Shares" onGo={() => go('shares')} />
+          <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working, in today’s money. The plan sells shares and properties if it needs to.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
+          <Field label="Cash to keep on hand in retirement" hint="The least you want in the bank at any time once you stop work, in today’s money. It replaces your emergency cash buffer from then on.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder={String(Math.round(p.finances.buffer ?? recommendedBuffer(p)))} />}</Field>
         </div>
       </section>
 
@@ -74,6 +77,26 @@ function Goals({ quotes }: { quotes: Quotes }) {
         {take === 'loading' && <div className="mt-5 space-y-2"><div className="h-3 w-3/4 animate-pulse rounded bg-line" /><div className="h-3 w-full animate-pulse rounded bg-line" /></div>}
         <p className="mt-4 text-[11px] text-muted">Estimates from your figures and assumptions. General information, not financial advice.</p>
       </section>
+    </div>
+  );
+}
+
+/** A goal that's set on another tab: shown here, read-only, with a pointer to where to change it. */
+function LinkedValue({ label, value, hint, tabLabel, onGo }: { label: string; value: string; hint: string; tabLabel: string; onGo: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <p className="field-label">{label}</p>
+      <button type="button" className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-line bg-raised/60 px-3.5 py-2.5 text-left text-ink hover:border-brass/60" onClick={() => setOpen((o) => !o)} aria-expanded={open} title={hint}>
+        <span>{value}</span><Icon name="plan" className="h-4 w-4 text-muted" />
+      </button>
+      <p className="mt-1.5 text-xs text-muted">{hint}</p>
+      {open && (
+        <div role="dialog" className="absolute left-0 right-0 top-[4.6rem] z-20 rounded-xl border border-brass/50 bg-surface p-3 text-sm shadow-xl">
+          <p>This is set on the {tabLabel} tab, so it always matches your plan there.</p>
+          <div className="mt-2 flex gap-2"><button className="btn-primary py-1.5 text-sm" onClick={onGo}>Go to {tabLabel}</button><button className="btn-ghost py-1.5 text-sm" onClick={() => setOpen(false)}>Close</button></div>
+        </div>
+      )}
     </div>
   );
 }
@@ -143,7 +166,18 @@ function Timeline({ quotes }: { quotes: Quotes }) {
   return (
     <div className="space-y-6">
       <section className="panel p-5 sm:p-6">
-        <div><h2 className="font-display text-xl font-semibold">Your property portfolio</h2><p className="text-sm text-muted">From what you own now to {p.goals.targetProperties} properties by {retireAge}. Open a property to set its loan plan. Change the number in Goals.</p></div>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div><h2 className="font-display text-xl font-semibold">Your property portfolio</h2><p className="text-sm text-muted">From what you own now to {p.goals.targetProperties} properties by {retireAge}. Open a property to set its loan plan.</p></div>
+          <div>
+            <p className="field-label">Properties I want to own by {retireAge}</p>
+            <div className="flex items-center gap-2">
+              <button className="btn-quiet h-10 w-10 justify-center p-0 text-lg" aria-label="One fewer property" disabled={p.goals.targetProperties <= p.properties.length} onClick={() => update((d) => { d.goals.targetProperties = Math.max(d.properties.length, d.goals.targetProperties - 1); })}>−</button>
+              <div className="w-20"><NumInput value={p.goals.targetProperties} onChange={(v) => update((d) => { d.goals.targetProperties = Math.max(d.properties.length, Math.min(15, v ?? d.properties.length)); })} min={p.properties.length} max={15} /></div>
+              <button className="btn-quiet h-10 w-10 justify-center p-0 text-lg" aria-label="One more property" disabled={p.goals.targetProperties >= 15} onClick={() => update((d) => { d.goals.targetProperties = Math.min(15, d.goals.targetProperties + 1); })}>+</button>
+            </div>
+            <p className="mt-1 text-xs text-muted">You own {p.properties.length} now. This is also your goal on the Goals tab.</p>
+          </div>
+        </div>
         <ol className="relative mt-8 space-y-4 border-l-2 border-line pl-8">
           {p.properties.map((pr, i) => (
             <OwnedRow key={pr.id} pr={pr} n={i + 1} open={open === pr.id} onToggle={() => toggle(pr.id)} retireAge={retireAge} startAge={startAge} />
@@ -260,6 +294,108 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
   );
 }
 
+/** Retirement at a glance, beside the Your Wise Future chart (today's money). */
+function RetirementMetrics({ proj }: { proj: ReturnType<typeof project> }) {
+  const p = useApp((s) => s.profile)!;
+  const life = p.goals.lifeExpectancy ?? 90;
+  const at = proj.points.find((x) => x.year === proj.retireYear);
+  const i = at ? at.year - proj.points[0].year : 0;
+  const d = Math.pow(1 + p.assumptions.inflation / 100, i);
+  const c = (v: number) => money(v / d, { compact: true });
+  const next = proj.points.find((x) => x.year === proj.retireYear + 1) ?? at; // first full year after any retirement sales
+  const propMonthly = next ? next.investNet / 12 / Math.pow(1 + p.assumptions.inflation / 100, i + 1) : 0;
+  const investKept = next ? next.properties - p.properties.filter((x) => x.use === 'home').length : 0;
+  const tile = (label: string, value: string, sub: string, tone = '') => (
+    <div className="bg-surface p-5"><p className="text-xs text-muted">{label}</p><p className={`mt-0.5 font-display text-2xl font-semibold ${tone}`}>{value}</p><p className="text-xs text-muted">{sub}</p></div>
+  );
+  return (
+    <div className="grid grid-cols-2 gap-px border-t border-line bg-line lg:grid-cols-1 lg:border-l lg:border-t-0">
+      <div className="col-span-2 bg-raised px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted lg:col-span-1">At retirement ({p.goals.retirementAge}) · today’s money</div>
+      {tile('Yearly income after retirement', money(p.goals.passiveIncome, { compact: true }), proj.runsOutAge == null ? `Lasts past ${life}` : `Runs out at ${proj.runsOutAge}`, proj.runsOutAge == null ? '' : 'text-clay')}
+      {at && tile(p.household.hasPartner ? 'Combined net worth' : 'Net worth', c(at.netWorth), `${c(at.super)} in super · ${c(at.shares)} in shares`, 'text-gum')}
+      {at && tile('Investment property cash flow', investKept > 0 ? `${propMonthly >= 0 ? '' : '−'}${money(Math.abs(propMonthly))}` : '$0', investKept > 0 ? `a month from the ${investKept} investment ${investKept === 1 ? 'property' : 'properties'} you keep, after loans and costs` : 'No investment properties kept. Set one to be paid off by retirement to keep its rent.', propMonthly < 0 ? 'text-clay' : '')}
+      {at && tile('Super paid out in the first year', c(at.superDrawn), at.age >= 60 ? 'Super pays your income first' : `Super opens at 60, ${60 - at.age} ${60 - at.age === 1 ? 'year' : 'years'} after you stop`)}
+      {tile('Cash on hand', money(p.goals.retireCash ?? p.finances.buffer ?? 0, { compact: true }), 'kept in the bank at all times. Set it in Goals.')}
+    </div>
+  );
+}
+
+/* ---------- Liquidation events ---------- */
+function LiquidationsTab({ quotes }: { quotes: Quotes }) {
+  const p = useApp((s) => s.profile)!;
+  const update = useApp((s) => s.update);
+  const list = p.liquidations ?? [];
+  const y0 = new Date().getFullYear();
+  const lastYear = y0 + Math.max(1, (p.goals.lifeExpectancy ?? 90) - (p.household.you.age ?? 35));
+  const set = (id: string, patch: Partial<Liquidation>) => update((d) => { Object.assign(d.liquidations!.find((x) => x.id === id)!, patch); });
+  const hasCrypto = p.holdings.some((h) => h.kind === 'crypto' || h.exchange === 'CRYPTO');
+  const hasShares = p.holdings.some((h) => !(h.kind === 'crypto' || h.exchange === 'CRYPTO'));
+  return (
+    <section className="panel p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><h2 className="font-display text-xl font-semibold">Liquidation events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Planned sales of part of your crypto or shares, to free up cash for a deposit or anything else. The money goes into your savings after an estimate of capital gains tax. They show on your charts as a red $.</p></div>
+        <button className="btn-primary" disabled={!hasCrypto && !hasShares} onClick={() => update((d) => { (d.liquidations ??= []).push({ id: uid(), year: y0, asset: hasCrypto ? 'crypto' : 'shares', pct: 50 }); })}><Icon name="plus" className="h-4 w-4" />Add a liquidation event</button>
+      </div>
+      {list.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No liquidation events yet. Add one here, or from a suggestion in Your Wise Future.</p> : (
+        <ul className="mt-6 space-y-3">
+          {list.map((lq) => {
+            const est = saleAfterTax(p, quotes, lq.asset, lq.pct / 100);
+            return (
+              <li key={lq.id} className="rounded-xl border border-line p-4">
+                <div className="flex flex-wrap items-end gap-3">
+                  <span className="mb-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-clay font-display font-bold text-white">$</span>
+                  <div className="w-44"><Field label="Year">{(id) => <Select id={id} value={String(lq.year)} onChange={(v) => set(lq.id, { year: Number(v) })} options={Array.from({ length: lastYear - y0 + 1 }, (_, j) => y0 + j).map((y) => ({ value: String(y), label: y === y0 ? `This year (${y})` : String(y) }))} />}</Field></div>
+                  <div className="w-36"><Field label="Sell">{(id) => <Select id={id} value={lq.asset} onChange={(v) => set(lq.id, { asset: v as Liquidation['asset'] })} options={[{ value: 'crypto', label: 'Crypto' }, { value: 'shares', label: 'Shares' }]} />}</Field></div>
+                  <div className="w-36"><Field label="How much">{(id) => <Select id={id} value={String(lq.pct)} onChange={(v) => set(lq.id, { pct: Number(v) })} options={[10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 100].map((v) => ({ value: String(v), label: v === 100 ? 'All of it' : `${v}%` }))} />}</Field></div>
+                  <div className="min-w-[12rem] flex-1"><Field label="Note (optional)">{(id) => <TextInput id={id} value={lq.note ?? ''} onChange={(v) => set(lq.id, { note: v })} placeholder="e.g. Deposit for property 2" />}</Field></div>
+                  <button className="btn-ghost mb-0.5 p-2" aria-label="Remove liquidation event" onClick={() => update((d) => { d.liquidations = d.liquidations!.filter((x) => x.id !== lq.id); })}><Icon name="trash" className="h-4 w-4" /></button>
+                </div>
+                <p className="mt-3 text-sm text-muted">{est ? `At today’s prices: about ${money(est.gross, { compact: true })}, less about ${money(est.tax, { compact: true })} capital gains tax, leaves ${money(est.net, { compact: true })}. The plan uses the value in ${lq.year}.` : `You don’t hold any ${lq.asset} right now.`}</p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p className="mt-5 text-[11px] text-muted">Capital gains tax is estimated at your marginal rate with the 50% discount for anything held over 12 months. Crypto left out of your plan is valued at today’s price. An accountant can help you time a sale. General information, not financial advice.</p>
+    </section>
+  );
+}
+
+/* ---------- Gifts and inheritances ---------- */
+function GiftsTab() {
+  const p = useApp((s) => s.profile)!;
+  const update = useApp((s) => s.update);
+  const list = p.gifts ?? [];
+  const y0 = new Date().getFullYear();
+  const lastYear = y0 + Math.max(1, (p.goals.lifeExpectancy ?? 90) - (p.household.you.age ?? 35));
+  const set = (id: string, patch: Partial<Gift>) => update((d) => { Object.assign(d.gifts!.find((x) => x.id === id)!, patch); });
+  return (
+    <section className="panel p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><h2 className="font-display text-xl font-semibold">Gifts and inheritances</h2><p className="mt-1 max-w-2xl text-sm text-muted">Money you expect from family, like a parent helping with a deposit or a future inheritance. It goes into your savings in that year, so it can bring a purchase forward.</p></div>
+        <button className="btn-primary" onClick={() => update((d) => { (d.gifts ??= []).push({ id: uid(), year: y0 + 1, amount: 0, from: '', kind: 'gift' }); })}><Icon name="plus" className="h-4 w-4" />Add a gift or inheritance</button>
+      </div>
+      {list.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">Nothing here yet. If someone has said they’ll help, add it so your plan can count on it.</p> : (
+        <ul className="mt-6 space-y-3">
+          {list.map((gft) => (
+            <li key={gft.id} className="rounded-xl border border-line p-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="w-36"><Field label="Type">{(id) => <Select id={id} value={gft.kind} onChange={(v) => set(gft.id, { kind: v as Gift['kind'] })} options={[{ value: 'gift', label: 'Gift' }, { value: 'inheritance', label: 'Inheritance' }]} />}</Field></div>
+                <div className="min-w-[10rem] flex-1"><Field label="From">{(id) => <TextInput id={id} value={gft.from} onChange={(v) => set(gft.id, { from: v })} placeholder="e.g. Mum and Dad" />}</Field></div>
+                <div className="w-44"><Field label="Amount">{(id) => <MoneyInput id={id} value={gft.amount || null} onChange={(v) => set(gft.id, { amount: v ?? 0 })} />}</Field></div>
+                <div className="w-44"><Field label="Year">{(id) => <Select id={id} value={String(gft.year)} onChange={(v) => set(gft.id, { year: Number(v) })} options={Array.from({ length: lastYear - y0 + 1 }, (_, j) => y0 + j).map((y) => ({ value: String(y), label: y === y0 ? `This year (${y})` : String(y) }))} />}</Field></div>
+                <button className="btn-ghost mb-0.5 p-2" aria-label="Remove" onClick={() => update((d) => { d.gifts = d.gifts!.filter((x) => x.id !== gft.id); })}><Icon name="trash" className="h-4 w-4" /></button>
+              </div>
+              <div className="mt-3"><Field label="What it’s for (optional)">{(id) => <TextInput id={id} value={gft.note ?? ''} onChange={(v) => set(gft.id, { note: v })} placeholder="e.g. Towards the deposit on our next property" />}</Field></div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-5 text-[11px] text-muted">Gifts in Australia aren’t usually taxed, but some lenders ask for a gift letter. Amounts are in the dollars of the year you expect them.</p>
+    </section>
+  );
+}
+
 /* ---------- Shares plan ---------- */
 function SharesPlan({ quotes }: { quotes: Quotes }) {
   const p = useApp((s) => s.profile)!;
@@ -295,7 +431,12 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
         <p className="mt-5 text-sm">Plan your shares one of two ways: set a goal for retirement, or set how much you’ll invest each month. We’ll work out the other.</p>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <Field label="Retirement goal" hint="What you’d like your shares to be worth when you stop work, in today’s money. Leave blank if you don’t have one.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
-          <Field label="Monthly investment" hint={auto && p.goals.sharesTarget ? 'Worked out from your goal. Type an amount to set your own instead.' : 'The amount goes up with inflation each year.'}>{(id) => <MoneyInput id={id} value={auto ? (p.goals.sharesTarget ? Math.round(required) : null) : p.goals.shareMonthly ?? null} onChange={(v) => update((d) => { d.goals.shareMonthly = v ?? 0; })} suffix="/ month" />}</Field>
+          <Field label="Monthly investment" hint={auto && p.goals.sharesTarget ? 'Worked out from your goal. Type an amount to set your own instead.' : 'The amount goes up with inflation each year.'}>{(id) => <MoneyInput id={id} value={auto ? (p.goals.sharesTarget ? Math.round(required) : null) : p.goals.shareMonthly ?? null} onChange={(v) => {
+            // Typing a monthly amount works the retirement goal out from it, so the two boxes always agree
+            const x: typeof p = JSON.parse(JSON.stringify(p)); x.goals.shareMonthly = v ?? 0;
+            const reach = project(x, quotes).sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years);
+            update((d) => { d.goals.shareMonthly = v ?? 0; d.goals.sharesTarget = v ? Math.round(reach / 1000) * 1000 : null; });
+          }} suffix="/ month" />}</Field>
         </div>
         {(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).length > 0 && (
           <div className="mt-4 rounded-xl border border-line p-3">
@@ -402,7 +543,7 @@ function ShareTradeOff({ quotes, current, required, cap, onUse }: { quotes: Quot
 
 /* ---------- Your Wise Future ---------- */
 const EVENT_STYLE: Record<string, { icon: string; cls: string }> = {
-  buy: { icon: 'property', cls: 'bg-brass/15 text-brass' }, pay: { icon: 'arrow', cls: 'bg-gum/15 text-gum' }, sell: { icon: 'arrow', cls: 'bg-sky/15 text-sky' }, debt: { icon: 'check', cls: 'bg-gum/15 text-gum' },
+  buy: { icon: 'property', cls: 'bg-brass/15 text-brass' }, gift: { icon: 'family', cls: 'bg-gum/15 text-gum' }, liquidate: { icon: 'coin', cls: 'bg-clay/15 text-clay' }, pay: { icon: 'arrow', cls: 'bg-gum/15 text-gum' }, sell: { icon: 'arrow', cls: 'bg-sky/15 text-sky' }, debt: { icon: 'check', cls: 'bg-gum/15 text-gum' },
   kids: { icon: 'family', cls: 'bg-sage/20 text-sage' }, retire: { icon: 'spark', cls: 'bg-brass text-ground' }, super: { icon: 'plan', cls: 'bg-gum/15 text-gum' },
   shares: { icon: 'shares', cls: 'bg-sky/15 text-sky' }, runout: { icon: 'x', cls: 'bg-clay/15 text-clay' }, cost: { icon: 'details', cls: 'bg-line text-ink' }, goal: { icon: 'check', cls: 'bg-gum/15 text-gum' },
 };
@@ -413,22 +554,34 @@ function Projections({ quotes }: { quotes: Quotes }) {
   const proj = check.proj;
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
   const [hidden, setHidden] = useState<string[]>([]);
+  const [view, setView] = useState<'worth' | 'flow'>('worth');
   const pts = proj.points;
   const runsOutYear = proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null;
   return (
     <div className="space-y-6">
       <section className="panel overflow-hidden">
         <div className="h-1 bg-gradient-to-r from-gum via-brass to-sky" />
-        <div className="p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h2 className="font-display text-2xl font-semibold">Your Wise Future</h2>
-              <p className={`text-sm font-medium ${proj.runsOutAge != null ? 'text-clay' : 'text-gum'}`}>{proj.runsOutAge != null ? `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money runs out at ${proj.runsOutAge}.` : `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money lasts to ${p.goals.lifeExpectancy ?? 90}.`}</p></div>
-            <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="font-display text-2xl font-semibold">Your Wise Future</h2>
+                <p className={`text-sm font-medium ${proj.runsOutAge != null ? 'text-clay' : 'text-gum'}`}>{proj.runsOutAge != null ? `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money runs out at ${proj.runsOutAge}.` : `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money lasts to ${p.goals.lifeExpectancy ?? 90}.`}</p></div>
+              <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+              <Segmented size="sm" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} />
+              {view === 'worth' && <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} />}
+            </div>
+            <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} />{proj.cryptoExcluded > 0 && ` Crypto (${money(proj.cryptoExcluded, { compact: true })} today) is left out because its future value can’t be estimated.`}</p>
+            {view === 'worth' ? (<>
+              <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={340} real={dollars === 'real'} hidden={hidden} runsOutYear={runsOutYear} /></div>
+              <MarkerKey points={pts} />
+            </>) : (<>
+              <div className="mt-4 -ml-2"><CashFlowChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={340} real={dollars === 'real'} /></div>
+              <CashFlowKey />
+            </>)}
           </div>
-          <div className="mt-3 flex justify-end"><SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} /></div>
-          <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} />{proj.cryptoExcluded > 0 && ` Crypto (${money(proj.cryptoExcluded, { compact: true })} today) is left out because its future value can’t be estimated.`}</p>
-          <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={320} real={dollars === 'real'} hidden={hidden} runsOutYear={runsOutYear} /></div>
-          <MarkerKey points={pts} />
+          <RetirementMetrics proj={proj} />
         </div>
       </section>
 

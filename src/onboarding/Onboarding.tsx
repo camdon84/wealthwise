@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useApp } from '../lib/store';
 import { useQuotes } from '../lib/hooks';
-import { afterTax, hecsAnnual, hecsCompulsory, livingCosts, position, propertyStats } from '../lib/calc';
+import { afterTax, recommendedBuffer, hecsAnnual, hecsCompulsory, livingCosts, position, propertyStats } from '../lib/calc';
 import { defaultCurrency, money, num, price } from '../lib/format';
 import { DEBT_RATE, LIVING_CATEGORIES, emptyDebt, emptyDependant, emptyProperty, uid } from '../lib/defaults';
 import type { Debt, Holding, Profile, Property } from '../lib/types';
@@ -350,7 +350,12 @@ export function CashSuper({ withDates }: { thorough: boolean; withDates?: boolea
           <p className="mt-3 text-sm text-clay">{diff > 0 ? `${money(diff)} of your total isn’t in either box yet.` : `These add up to ${money(split)}, which is ${money(-diff)} more than your total.`} <button className="underline" onClick={() => update((d) => { d.finances.cash = split; })}>Use {money(split)} as the total</button></p>
         )}
       </div>
-      <div className="max-w-sm"><Field label="Emergency buffer you want to keep" hint="We won’t count this toward deposits or debt payoff ideas.">{(id) => <MoneyInput id={id} value={f.buffer} onChange={(v) => update((d) => { d.finances.buffer = v; })} />}</Field></div>
+      <div className="max-w-xl">
+        <div className="max-w-sm"><Field label="Emergency cash buffer you want to keep" hint="Kept aside in savings. We won’t use it for deposits, shares or paying off debt.">{(id) => <MoneyInput id={id} value={f.buffer} onChange={(v) => update((d) => { d.finances.buffer = v; })} />}</Field></div>
+        {f.buffer != null && f.buffer < recommendedBuffer(p) && (
+          <p role="status" className="mt-2 flex gap-2 rounded-lg bg-brass/10 px-3 py-2 text-sm"><Icon name="spark" className="mt-0.5 h-4 w-4 shrink-0 text-brass" />Based on your age and current financial situation, we recommend keeping at least {money(recommendedBuffer(p))} in savings as an emergency reserve.</p>
+        )}
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {(['you', 'partner'] as const).filter((w) => w === 'you' || hh.hasPartner).map((who) => (
           <Field key={who} label={`${hh[who].name || (who === 'you' ? 'Your' : 'Partner')}${hh[who].name ? '’s' : ''} super balance`} hint={withDates ? <AsOf date={hh[who].superAsOf} onToday={() => update((d) => { d.household[who].superAsOf = today(); })} /> : undefined}>

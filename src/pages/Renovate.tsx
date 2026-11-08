@@ -34,7 +34,7 @@ export function Renovate() {
   const [year, setYear] = useState(thisYear + 1);
   const [rentUp, setRentUp] = useState<number | null>(null);
   const pr = p.properties.find((x) => x.id === propId);
-  if (!pr) return <div className="space-y-6"><h1 className="font-display text-3xl font-semibold sm:text-4xl">Renovator</h1><div className="panel p-10 text-center"><p className="font-medium">Add a property first</p><p className="mt-1 text-sm text-muted">The Renovator works out what a renovation could add to one of your properties.</p></div></div>;
+  if (!pr) return <div className="space-y-6"><h1 className="font-display text-3xl font-semibold sm:text-4xl">Renovator Centre</h1><div className="panel p-10 text-center"><p className="font-medium">Add a property first</p><p className="mt-1 text-sm text-muted">The Renovator works out what a renovation could add to one of your properties.</p></div></div>;
 
   const s = propertyStats(pr, p.assumptions.lvr);
   const rows = ITEMS.map((it) => ({ ...it, state: picked[it.key] ?? { on: false, budget: it.budget, mult: it.mult } }));
@@ -52,7 +52,7 @@ export function Renovate() {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Renovator</h1><p className="text-muted">Pick a property and the work you’re thinking about. See what it could add in value and usable equity.</p></div>
+      <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Renovator Centre</h1><p className="text-muted">Pick a property and the work you’re thinking about. See what it could add in value and usable equity.</p></div>
 
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Property">
         {p.properties.map((x) => (

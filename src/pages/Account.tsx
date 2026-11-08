@@ -15,6 +15,7 @@ export function Account() {
         <p className="font-medium">You</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <Field label="First name">{(id) => <TextInput id={id} value={hh.you.name} onChange={(v) => update((d) => { d.household.you.name = v; })} />}</Field>
+          <Field label="Last name">{(id) => <TextInput id={id} value={hh.you.lastName ?? ''} onChange={(v) => update((d) => { d.household.you.lastName = v; })} />}</Field>
           <Field label="Age">{(id) => <NumInput id={id} value={hh.you.age} onChange={(v) => update((d) => { d.household.you.age = v; })} />}</Field>
           <div><p className="field-label">Email</p><p className="py-2.5 text-[15px]">{session.demo ? 'Demo account' : session.email}</p></div>
         </div>
@@ -24,6 +25,7 @@ export function Account() {
         {hh.hasPartner && (
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <Field label="Partner’s first name">{(id) => <TextInput id={id} value={hh.partner.name} onChange={(v) => update((d) => { d.household.partner.name = v; })} />}</Field>
+            <Field label="Partner’s last name">{(id) => <TextInput id={id} value={hh.partner.lastName ?? ''} onChange={(v) => update((d) => { d.household.partner.lastName = v; })} />}</Field>
             <Field label="Partner’s age">{(id) => <NumInput id={id} value={hh.partner.age} onChange={(v) => update((d) => { d.household.partner.age = v; })} />}</Field>
           </div>
         )}

@@ -4,6 +4,7 @@ export type Structure = 'personal' | 'joint' | 'trust' | 'company' | 'smsf';
 
 export interface Person {
   name: string;
+  lastName?: string;
   age: number | null;
   salary: number | null; // gross annual
   employment: 'payg' | 'self' | 'not-working';
@@ -20,6 +21,8 @@ export interface Dependant {
   id: string;
   name: string;
   age: number | null;
+  schoolStartYear?: number | null; // when school fees start
+  schoolDone?: boolean; // already finished school: no fees
   monthlyCosts: number | null; // food, clothing, phone etc.
   childcareMonthly: number | null;
   activitiesMonthly: number | null;
@@ -116,6 +119,7 @@ export interface Goals {
   shareMonthly?: number | null; // planned monthly share investment; null = whatever reaches the target
   shareStartAfter?: number | null; // don't start the share plan until this many planned purchases are bought
   passiveIncome: number; // today's dollars p.a.
+  retireCash?: number | null; // cash to keep on hand in retirement, today's money (replaces the emergency buffer once retired)
   targetProperties: number;
   risk: number; // 1-5
   events: LifeEvent[];
@@ -166,6 +170,8 @@ export interface Profile {
   documents?: DocRecord[];
   eofy?: { fy: string; done: string[] }; // end-of-financial-year update checklist
   renovations?: Renovation[];
+  liquidations?: Liquidation[];
+  gifts?: Gift[];
   cryptoGrowth?: number | null;
   cryptoInPlan?: boolean; // opted in: crypto grows at cryptoGrowth in the plan // the user's own guess, only used on the Crypto page
 
@@ -192,3 +198,8 @@ export interface Renovation {
   cost: number; uplift: number; rentPerWeek: number; // today's money
   done?: boolean;
 }
+
+/** A planned sale of part of the crypto or share portfolio, to free up cash. */
+export interface Liquidation { id: string; year: number; asset: 'crypto' | 'shares'; pct: number; note?: string }
+/** Money expected from family: a gift or an inheritance. Amount is in the dollars of that year. */
+export interface Gift { id: string; year: number; amount: number; from: string; kind: 'gift' | 'inheritance'; note?: string }

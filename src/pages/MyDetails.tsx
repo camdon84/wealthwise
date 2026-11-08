@@ -5,7 +5,7 @@ import { money } from '../lib/format';
 import { emptyDependant } from '../lib/defaults';
 import type { Dependant } from '../lib/types';
 import { CashSuper, Income, Spending } from '../onboarding/Onboarding';
-import { Field, Icon, MoneyInput, NumInput, Segmented, TextInput } from '../components/ui';
+import { Field, Icon, MoneyInput, NumInput, Segmented, Select, TextInput } from '../components/ui';
 
 type Tab = 'income' | 'home' | 'cash';
 
@@ -25,6 +25,8 @@ export function MyDetails() {
     </div>
   );
 }
+
+const thisYear = new Date().getFullYear();
 
 export function Dependants() {
   const p = useApp((s) => s.profile)!;
@@ -57,7 +59,14 @@ export function Dependants() {
                 <Field label="Everyday costs" hint="Food, clothes, phone, pocket money">{(id) => <MoneyInput id={id} value={dep.monthlyCosts} onChange={(v) => set(dep.id, { monthlyCosts: v })} suffix="/ mo" />}</Field>
                 <Field label="Childcare">{(id) => <MoneyInput id={id} value={dep.childcareMonthly} onChange={(v) => set(dep.id, { childcareMonthly: v })} suffix="/ mo" />}</Field>
                 <Field label="Sport and activities">{(id) => <MoneyInput id={id} value={dep.activitiesMonthly} onChange={(v) => set(dep.id, { activitiesMonthly: v })} suffix="/ mo" />}</Field>
-                <Field label="School fees" className="sm:col-span-2">{(id) => <MoneyInput id={id} value={dep.schoolFeesYearly} onChange={(v) => set(dep.id, { schoolFeesYearly: v })} suffix="/ year" />}</Field>
+                <Field label="School fees">{(id) => <MoneyInput id={id} value={dep.schoolFeesYearly} onChange={(v) => set(dep.id, { schoolFeesYearly: v })} suffix="/ year" />}</Field>
+                <div>
+                  <Field label="Expected year to start school" hint={dep.schoolDone ? 'No school fees in the plan.' : (() => { const y = dep.schoolStartYear ?? (dep.age != null ? thisYear + 5 - dep.age : null); return y == null ? 'Fees count from now.' : y <= thisYear ? y + 12 < thisYear ? 'Finished school: no fees in the plan.' : `At school now: fees run to ${y + 12}.` : `Expected to start school in ${y - thisYear} ${y - thisYear === 1 ? 'year’s' : 'years’'} time. Fees run ${y} to ${y + 12}.`; })()}>
+                    {(id) => <Select id={id} value={String(dep.schoolStartYear ?? (dep.age != null ? thisYear + 5 - dep.age : thisYear))} onChange={(v) => set(dep.id, { schoolStartYear: Number(v) })}
+                      options={Array.from({ length: 36 }, (_, j) => thisYear - 18 + j).map((y) => ({ value: String(y), label: y < thisYear ? `${y} (started)` : String(y) }))} />}
+                  </Field>
+                  <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[rgb(var(--brass))]" checked={!!dep.schoolDone} onChange={(e) => set(dep.id, { schoolDone: e.target.checked })} />My child has already finished school</label>
+                </div>
               </div>
               <p className="mt-4 border-t border-line pt-3 text-sm">About <span className="font-semibold">{money(monthly)} a month</span>{dep.age != null && <span className="text-muted">, for another {Math.max(0, dep.supportUntil - dep.age)} years</span>}</p>
             </section>
