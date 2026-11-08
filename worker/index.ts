@@ -432,6 +432,14 @@ async function wiseRoute(req: Request, env: Env) {
   const fresh = (new URL(req.url).searchParams.get('fresh') || '').replace(/\D/g, '').slice(0, 15);
   const key = `wise:${mode ?? ''}:${fresh}:${await sha256(text)}`;
   const data = await cached(env, key, 7 * 864e5, async () => {
+    if (mode === 'ideas') {
+      const sys = `You are Wise, the assistant inside WealthWise, an Australian property and wealth planning app. You get a household's plan: their goals, whether the plan works, the problems and fixes the app found (already calculated exactly), and ideas they've already been shown.
+Suggest up to 3 NEW options worth exploring in their plan that aren't already in ideasAlreadyShown, for example timing of purchases, a different retirement age, offset or debt strategy, renovating, rentvesting, a gift or liquidation event, or adjusting the share plan. Phrase each as a question or option to consider, not an instruction.
+Rules: use ONLY numbers given, never calculate new ones; general information, not personal financial advice; never tell them to buy, sell or borrow; never name a lender, fund or stock.
+Reply with JSON only: {"summary":"one short sentence","ideas":[{"title":"max 8 words","body":"1-2 sentences, max 40 words"}]}`;
+      const out = await askAI(env, sys, JSON.stringify(facts));
+      return { summary: String(out?.summary || 'Some options to consider.').slice(0, 300), ideas: (Array.isArray(out?.ideas) ? out.ideas : []).slice(0, 3).map((i: any) => ({ title: String(i.title || '').slice(0, 80), body: String(i.body || '').slice(0, 300) })).filter((i: any) => i.title) };
+    }
     const lead = firstLook
       ? `This is the household's first look straight after finishing setup. Lead with their quickest wins, especially debts: compare each debt's interest rate with their savings, offset and home loan rate, and point out where paying down or restructuring high-interest debt would save money (the app's observations include the exact savings). Then one line on how they track against their goal.\n`
       : mode === 'goals'
