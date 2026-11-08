@@ -222,6 +222,7 @@ export interface Projection {
   points: YearPoint[]; purchases: { year: number; price: number; id?: string }[]; shortfallYear: number | null; sharesAtRetire: number; buffer: number; retireYear: number; block: PurchaseBlock | null;
   events: PlanEvent[]; runsOutAge: number | null; shareMonthly: number; requiredShareMonthly: number; cryptoExcluded: number;
   cashSharesTax: number; // capital gains tax paid selling spare-cash shares for deposits
+  sales: { year: number; age: number; name: string; net: number; reason: 'loan' | 'income' }[]; // properties the plan sells by itself; net in today's money
 }
 
 const FALLBACK_DEBT_RATE: Record<string, number> = { car: 9.5, personal: 12.5, 'credit-card': 20.99, other: 10 };
@@ -291,6 +292,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   // Cash plan (Cash tab): where accessible cash sits, and spare cash above the cap invested in shares until a purchase needs it
   const cp = p.cashPlan?.active ? p.cashPlan : null;
   let sweepBal = 0, sweepCost = 0, sweepSaid = false, cashSharesTax = 0;
+  const sales: Projection['sales'] = [];
   const mtrOf = (inc: number) => (incomeTax(inc + 1000) - incomeTax(inc)) / 1000;
   const reqMonthly = requiredShareMonthly(p, shares);
   const shareMonthly = p.goals.shareMonthly == null ? reqMonthly : n(p.goals.shareMonthly);
@@ -504,11 +506,12 @@ export function project(p: Profile, quotes: Quotes): Projection {
         if (gross >= shares * 0.999 && shares > 1000 && !sharesGoneSaid) { sharesGoneSaid = true; say(year, 'sell', 'Your share portfolio is fully sold down by now.'); }
         shareCost *= 1 - gross / shares; shares -= gross; cash += gross * (1 - gainShare * CGT_RATE); saleIn += gross * (1 - gainShare * CGT_RATE);
       };
-      const sellProperty = (idx: number, why: string) => {
+      const sellProperty = (idx: number, why: string, reason: 'loan' | 'income') => {
         const s = sims[idx];
         const proceeds = s.value * (1 - SELL_COSTS) - s.debt - Math.max(0, s.value - s.cost) * CGT_RATE;
         sims.splice(idx, 1);
         cash += proceeds; saleIn += Math.max(0, proceeds); sold.push(s.name);
+        sales.push({ year, age, name: s.name, net: proceeds / infl(i), reason });
         say(year, 'sell', `Sell ${s.name} for about ${fmt(s.value / infl(i))} (in today’s money)${why}, freeing about ${fmt(proceeds / infl(i))} after the loan, selling costs and tax.`);
       };
 
@@ -537,7 +540,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
           sharesAtRetire = shares;
           // Stopping work: investments that still carry a loan (and weren't set to be paid off) are sold
           const at = events.length;
-          for (let k = sims.length - 1; k >= 0; k--) if (sims[k].invest && !sims[k].payOff && sims[k].debt > 1000) sellProperty(k, ' at retirement, as it still has a loan and isn’t set to be paid off');
+          for (let k = sims.length - 1; k >= 0; k--) if (sims[k].invest && !sims[k].payOff && sims[k].debt > 1000) sellProperty(k, ' at retirement, as it still has a loan and isn’t set to be paid off', 'loan');
           const snap = `After that you’d have about ${fmt(sup / infl(i))} in super, ${fmt(shares / infl(i))} in shares, ${cryptoBal > 1000 ? `${fmt(cryptoBal / infl(i))} in crypto, ` : ''}${fmt(Math.max(0, cash) / infl(i))} in cash and ${sims.length} ${sims.length === 1 ? 'property' : 'properties'} (today’s money).`;
           const sold = events.length - at;
           say(year, 'retire', `Stop working at ${retireAge}.${sold ? ` ${sold === 1 ? 'One property is' : `${sold} properties are`} sold (below). ${snap}` : ` ${snap.replace('After that you’d', 'You’d')}`} From here you live on ${fmt(p.goals.passiveIncome)} a year (in today’s money).`);
@@ -572,7 +575,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         while (cash < floor - 1) {
           const idx = sims.map((s, k) => ({ s, k })).filter((x) => x.s.invest).map((x) => x.k).pop(); // newest investment first
           if (idx == null) break;
-          sellProperty(idx, '');
+          sellProperty(idx, '', 'income');
         }
         // Spare cash (extra super drawn, rent, sale money) is invested in shares rather than left idle
         if (cash > floor * 1.25) {
@@ -667,7 +670,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   }
   if (runsOutAge == null) say(y0 + (endAge - startAge), 'goal', `Your money lasts to ${endAge}, with about ${fmt((points[points.length - 1].netWorth) / infl(endAge - startAge))} (in today’s money) left over.`);
   events.sort((x, y) => x.year - y.year);
-  return { points, purchases, retireYear, block: purchases.length + p.properties.length >= p.goals.targetProperties ? null : block, events, runsOutAge, shortfallYear, sharesAtRetire, buffer, shareMonthly, requiredShareMonthly: reqMonthly, cryptoExcluded, cashSharesTax };
+  return { points, purchases, retireYear, block: purchases.length + p.properties.length >= p.goals.targetProperties ? null : block, events, runsOutAge, shortfallYear, sharesAtRetire, buffer, shareMonthly, requiredShareMonthly: reqMonthly, cryptoExcluded, cashSharesTax, sales };
 }
 
 const fmt = (v: number) => {

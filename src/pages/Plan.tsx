@@ -508,7 +508,7 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
   const sharesNow = holdingValue(p, quotes, 'shares');
   const cryptoNow = holdingValue(p, quotes, 'crypto');
   // Sales the engine makes by itself (e.g. investment properties sold in retirement), shown read-only
-  const auto = useMemo(() => project(p, quotes).events.filter((e) => e.kind === 'sell'), [p, quotes]);
+  const auto = useMemo(() => project(p, quotes).sales, [p, quotes]);
   const round1k = (v: number) => Math.round(v / 1000) * 1000;
   const what = [
     ...(sharesNow > 0 ? [{ value: 'shares', label: 'Shares' }] : []),
@@ -584,12 +584,19 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
         </ul>
       )}
       {auto.length > 0 && (
-        <div className="mt-6 rounded-xl border border-dashed border-line p-4">
-          <p className="font-semibold">Sales your plan already makes</p>
-          <p className="mt-1 text-sm text-muted">Your plan makes these on its own, for example selling an investment property in retirement to pay your income. They show on your charts as <span className="inline-block h-3 w-3 translate-y-0.5 rounded-full border-2 border-clay bg-surface" aria-label="a hollow red dot" /> Sell. To change them, adjust your retirement income on the Goals tab or each property’s “pay off by retirement” setting on the Property Portfolio tab.</p>
-          <ul className="mt-3 space-y-2">
+        <div className="mt-6 rounded-xl border border-line p-4">
+          <p className="font-semibold">Property sales already in your plan</p>
+          <ul className="mt-3 space-y-3">
             {auto.map((e, k) => (
-              <li key={k} className="flex gap-3 text-sm"><span className="w-12 shrink-0 font-display font-semibold tabular-nums">{e.year}</span><span className="text-muted">Age {e.age}</span><span className="min-w-0 flex-1">{e.text}</span></li>
+              <li key={k} className="flex gap-3">
+                <span className="mt-0.5 inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-clay bg-surface" aria-hidden="true" />
+                <div className="text-sm">
+                  <p><span className="font-semibold">{e.year} (age {e.age}):</span> {e.name} is sold. You’d get about {money(e.net, { compact: true })} (in today’s money) after the loan, selling costs and tax.</p>
+                  <p className="text-muted">{e.reason === 'loan'
+                    ? <>Why: it still has a loan when you stop work and isn’t set to be paid off. To keep it, tick “pay off by retirement” for it on the Property Portfolio tab.</>
+                    : <>Why: by then your savings, super and shares have run low, so it’s sold to keep paying your retirement income.</>}</p>
+                </div>
+              </li>
             ))}
           </ul>
         </div>
