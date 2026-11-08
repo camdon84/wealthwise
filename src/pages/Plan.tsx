@@ -507,6 +507,8 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
   const set = (id: string, patch: Partial<Liquidation>) => update((d) => { Object.assign(d.liquidations!.find((x) => x.id === id)!, patch); });
   const sharesNow = holdingValue(p, quotes, 'shares');
   const cryptoNow = holdingValue(p, quotes, 'crypto');
+  // Sales the engine makes by itself (e.g. investment properties sold in retirement), shown read-only
+  const auto = useMemo(() => project(p, quotes).events.filter((e) => e.kind === 'sell'), [p, quotes]);
   const round1k = (v: number) => Math.round(v / 1000) * 1000;
   const what = [
     ...(sharesNow > 0 ? [{ value: 'shares', label: 'Shares' }] : []),
@@ -526,7 +528,7 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
   return (
     <section className="panel p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 className="font-display text-xl font-semibold">Liquidation Events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Planned sales of shares, crypto or a property you own, to free up cash for a deposit or anything else. The money goes into your savings after selling costs, any loan and an estimate of capital gains tax. They show on your charts as a red $.</p></div>
+        <div><h2 className="font-display text-xl font-semibold">Liquidation Events</h2><p className="mt-1 max-w-2xl text-sm text-muted">Plan the sale of shares, crypto or a property you own. Selling shares or crypto can free up capital for another property purchase, and selling any of your assets can strengthen your cash reserves. The money goes into your interest-earning or offset accounts, after selling costs, any loan and an estimate of capital gains tax. Liquidation events show on your charts as <span className="inline-flex h-4 w-4 translate-y-0.5 items-center justify-center rounded-full bg-clay font-display text-[10px] font-bold leading-none text-white" aria-label="a red dollar sign">$</span>.</p></div>
         <button className="btn-primary" disabled={what.length === 0} onClick={add}><Icon name="plus" className="h-4 w-4" />Add a liquidation event</button>
       </div>
       {list.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">No liquidation events yet. Add one here, or from a suggestion in Your Wise Future.</p> : (
@@ -580,6 +582,17 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
             );
           })}
         </ul>
+      )}
+      {auto.length > 0 && (
+        <div className="mt-6 rounded-xl border border-dashed border-line p-4">
+          <p className="font-semibold">Sales your plan already makes</p>
+          <p className="mt-1 text-sm text-muted">Your plan makes these on its own, for example selling an investment property in retirement to pay your income. They show on your charts as <span className="inline-block h-3 w-3 translate-y-0.5 rounded-full border-2 border-clay bg-surface" aria-label="a hollow red dot" /> Sell. To change them, adjust your retirement income on the Goals tab or each property’s “pay off by retirement” setting on the Property Portfolio tab.</p>
+          <ul className="mt-3 space-y-2">
+            {auto.map((e, k) => (
+              <li key={k} className="flex gap-3 text-sm"><span className="w-12 shrink-0 font-display font-semibold tabular-nums">{e.year}</span><span className="text-muted">Age {e.age}</span><span className="min-w-0 flex-1">{e.text}</span></li>
+            ))}
+          </ul>
+        </div>
       )}
       <p className="mt-5 text-[11px] text-muted">Capital gains tax is estimated at your marginal rate with the 50% discount for anything held over 12 months; your home is exempt. Your plan uses the values in the year of the sale, so the figures there may differ from these. An accountant can help you time a sale. General information, not financial advice.</p>
       <p className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-[11px] text-ink ring-1 ring-brass/30">{CGT_2027_NOTE}</p>
