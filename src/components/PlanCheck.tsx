@@ -109,8 +109,14 @@ function PlanIdeas({ check }: { check: PlanCheck }) {
   const [note, setNote] = useState('');
   const now = Date.now();
   const hidden = (k: string) => { const d = st?.dismissed?.[k]; return !!(d && now - d < SIX_MONTHS && d > (st?.refreshedAt ?? 0)); };
-  const tested = check.ideas.filter((t) => !hidden(ideaKey(t.text)));
-  const ai = (st?.ai ?? []).filter((x) => !hidden(`ai:${x.id}`));
+  // At most 6 at a time: Wise's newest first, then tested ideas, keeping one liquidation idea if there is one
+  const MAX = 6;
+  const allTested = check.ideas.filter((t) => !hidden(ideaKey(t.text)));
+  const ai = (st?.ai ?? []).filter((x) => !hidden(`ai:${x.id}`)).slice(0, 3);
+  let tested = allTested.slice(0, Math.max(0, MAX - ai.length));
+  const liq = allTested.find((t) => t.liquidation);
+  if (liq && !tested.includes(liq)) tested = [...tested.slice(0, Math.max(0, tested.length - 1)), liq];
+  if (liq && !tested.length) tested = [liq];
   const dismiss = (k: string) => update((d) => { ((d.planIdeas ??= {}).dismissed ??= {})[k] = Date.now(); });
 
   const generate = async () => {
@@ -152,7 +158,7 @@ function PlanIdeas({ check }: { check: PlanCheck }) {
       <p className="text-sm font-semibold">Have you thought about these options?</p>
       {tested.length + ai.length === 0 ? <p className="mt-2 text-sm text-muted">No ideas to show right now.</p> : (
         <ul className={`mt-2 space-y-3 text-[15px] leading-relaxed transition-opacity ${busy ? 'opacity-40' : ''}`}>
-          {ai.map((x) => (
+          {ai.slice(0, MAX - tested.length).map((x) => (
             <li key={x.id} className="flex gap-3"><Icon name="spark" className="mt-1 h-4 w-4 shrink-0 text-brass" />
               <span><span className="mr-1.5 rounded bg-brass/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brass">Wise</span><span className="font-medium">{x.title}.</span> <span className="text-muted">{x.body}</span></span>
               <Dismiss k={`ai:${x.id}`} />

@@ -268,6 +268,11 @@ async function api(req: Request, env: Env, path: string) {
   if (path === '/api/documents/read' && method === 'POST') return readDocument(req, env);
   if (path === '/api/geocode' && method === 'GET') return geocode(req, env);
   if (path === '/api/renovate-image' && method === 'POST') return renovateImage(req, env);
+  if (path === '/api/savings-rates-probe' && method === 'GET') {
+    const res = await fetch('https://www.rba.gov.au/statistics/tables/csv/f4-data.csv', { headers: { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' } });
+    const lines = latin1(await res.arrayBuffer()).split(/\r?\n/);
+    return json({ status: res.status, head: lines.slice(0, 12), tail: lines.filter((l) => /^\d/.test(l)).slice(-3) }, 200, { 'cache-control': 'no-store' });
+  }
   if (path === '/api/cpi' && method === 'GET') {
     const data = await cpi(env);
     return data ? json(data, 200, { 'cache-control': 'public, max-age=3600' }) : fail('Inflation figures unavailable right now.', 503);
