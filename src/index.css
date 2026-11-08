@@ -88,3 +88,7 @@ input[type=range] { accent-color: rgb(var(--brass)); }
 .plan-locked input, .plan-locked select, .plan-locked textarea, .plan-locked [role='radiogroup'], .plan-locked .btn-primary, .plan-locked .btn-quiet { opacity: 0.55; cursor: not-allowed; }
 
 .dark .panel { background-image: linear-gradient(180deg, rgb(234 229 216) 0%, rgb(221 215 200) 100%); }
+
+/* Sideways-scrolling rows on phones (tab bars): scrollable, no visible scrollbar */
+.no-scrollbar { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

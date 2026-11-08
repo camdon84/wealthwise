@@ -38,7 +38,7 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
       title: onTrack ? `${money(p.goals.passiveIncome, { compact: true })} a year from ${p.goals.retirementAge} looks affordable` : `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money runs out at ${proj.runsOutAge}`,
       body: onTrack
         ? `Paid from rent, savings, super and, if needed, selling shares and investment properties, your money lasts past ${life} with about ${money(Math.max(0, leftReal), { compact: true })} in today's money to spare.`
-        : `After rent, savings, super and selling shares and investment properties, the plan can't keep paying ${money(p.goals.passiveIncome, { compact: true })} a year past ${proj.runsOutAge}. A lower yearly income, a later stop-work age or a bigger share plan would stretch it. Try them in the plan.`,
+        : `After rent, savings, super and selling shares and investment properties, the plan can't keep paying ${money(p.goals.passiveIncome, { compact: true })} a year past ${proj.runsOutAge}. A lower yearly income or a bigger share plan would stretch it. Try them in the plan.`,
       figure: onTrack ? `${life}+` : `${proj.runsOutAge}`, figureLabel: onTrack ? 'money lasts past' : 'money runs out at age',
     });
   }
@@ -267,6 +267,31 @@ export function rankInsights(all: Insight[], st: InsightState | undefined, now =
   return { visible: sorted.slice(0, MAX_INSIGHTS), queued: Math.max(0, sorted.length - MAX_INSIGHTS), dismissed: all.length - live.length };
 }
 
+/**
+ * The plan settings Wise needs so it doesn't suggest something they've already done: the share plan (and whether
+ * it waits for a purchase) and each planned purchase with the year it fits.
+ */
+export function planSettings(p: Profile, proj: { purchases: { year: number }[]; shareMonthly: number }) {
+  const owned = p.properties.length;
+  const hold = p.goals.shareStartAfter ?? 0;
+  return {
+    sharePlan: {
+      perMonthTodayDollars: Math.round(proj.shareMonthly / 50) * 50,
+      ownAmount: p.goals.shareMonthly != null,
+      alreadyOnHoldUntilPropertyNumber: hold > 0 ? owned + hold : null,
+      startsInYear: hold > 0 ? proj.purchases[hold - 1]?.year ?? null : new Date().getFullYear(),
+    },
+    plannedPurchases: (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - owned)).map((pp, k) => ({
+      name: pp.label || `Property ${owned + k + 1}`,
+      priceTodayDollars: Math.round(pp.price / 5000) * 5000,
+      wantedBefore: pp.buyBy ?? 'as soon as possible',
+      earliestYearItFits: proj.purchases[k]?.year ?? null,
+      interestOnlyFirst5Years: !!pp.ioFirst5,
+      paidOffByRetirement: !!pp.payOff,
+    })),
+  };
+}
+
 /* Facts for Wise's AI write-up. Figures are rounded so small price moves don't trigger a new write-up. */
 export function wiseFacts(p: Profile, quotes: Quotes, insights: Insight[]) {
   const pos = position(p, quotes);
@@ -277,7 +302,7 @@ export function wiseFacts(p: Profile, quotes: Quotes, insights: Insight[]) {
   return {
     household: { age: p.household.you.age, partner: p.household.hasPartner, dependants: p.household.dependants.length, state: p.household.state },
     wealthFocus: p.goals.wealthFocus ?? 'balanced',
-    goal: { stopWorkAge: p.goals.retirementAge, incomeWantedTodayDollars: p.goals.passiveIncome, propertiesWanted: p.goals.targetProperties, sharePortfolioWantedTodayDollars: p.goals.sharesTarget ?? null },
+    goal: { stopWorkAge: p.goals.retirementAge, stopWorkYear: proj.retireYear, incomeWantedTodayDollars: p.goals.passiveIncome, propertiesWanted: p.goals.targetProperties, sharePortfolioWantedTodayDollars: p.goals.sharesTarget ?? null },
     today: {
       netWorth: r(pos.netWorth, 5000), usableEquity: r(pos.usable, 5000), borrowingCapacity: r(pos.bc.capacity, 10000), leftOverEachMonth: r(pos.monthlySurplus, 100),
       cash: r(pos.cash), super: r(pos.superBal, 5000), sharesValue: r(pos.shares.value, 5000),
@@ -286,6 +311,7 @@ export function wiseFacts(p: Profile, quotes: Quotes, insights: Insight[]) {
     debts: p.finances.debts.filter((d) => d.kind !== 'credit-card' && (d.balance ?? 0) > 0).map((d) => ({ type: d.kind, owing: r(d.balance ?? 0, 100), ratePercent: d.kind === 'hecs' ? 'indexation only' : d.rate ?? null })),
     homeLoanRatePercent: p.properties.find((x) => x.use === 'home')?.loans[0]?.rate ?? null,
     spareCashAboveEmergencyBuffer: r(Math.max(0, (p.finances.cash ?? 0) - (p.finances.buffer ?? 0)), 500),
+    ...planSettings(p, proj),
     projection: { yearlySpendGoalTodayDollars: r(p.goals.passiveIncome), moneyRunsOutAtAge: proj.runsOutAge, moneyLastsPastLifeExpectancy: proj.runsOutAge == null, plannedPurchaseYears: proj.purchases.map((x) => x.year), shareInvestmentPerMonth: r(proj.shareMonthly), cryptoExcludedFromProjection: r(proj.cryptoExcluded) },
     observations: insights.map((i) => i.title),
     goalChecks: goalAnalysisLines(p, quotes),
@@ -328,10 +354,43 @@ export function goalAnalysis(p: Profile, quotes: Quotes) {
   const life = p.goals.lifeExpectancy ?? 90;
   lines.push(proj.runsOutAge == null
     ? { tone: 'good', text: `Living on ${money(p.goals.passiveIncome, { compact: true })} a year from ${p.goals.retirementAge}, your money lasts past ${life}. See Your Wise Future for how it’s paid.` }
-    : { tone: 'warn', text: `Living on ${money(p.goals.passiveIncome, { compact: true })} a year from ${p.goals.retirementAge}, your money runs out at ${proj.runsOutAge}, even after selling shares and investment properties. A lower yearly income, a later stop-work age or a bigger share plan would stretch it.` });
+    : { tone: 'warn', text: `Living on ${money(p.goals.passiveIncome, { compact: true })} a year from ${p.goals.retirementAge}, your money runs out at ${proj.runsOutAge}, even after selling shares and investment properties. A lower yearly income or a bigger share plan would stretch it.` });
   return { owned, projectedProps, sharesAtRetireReal, requiredYearly, spareYearly, incomeReal, lines, proj };
 }
 
 /** Ideas WealthWise never gives: more work in any form, or structures and strategies the app can't model yet (trusts, SMSFs, salary sacrifice…). Hides any the AI slips through, including ones saved earlier. */
 const WORK_IDEA = /\btrusts?\b|company structure|\bsmsf\b|self[- ]managed super|ownership structure|bucket company|salary sacrific|extra (super )?contribution|concessional contribution|debt recycl|insurance|refinanc|rent[- ]?vest|part[- ]?time|consult|side[- ]?(hustle|business|gig|income)|second job|freelanc|gig work|(keep|continue|start) working|work(ing)? (longer|after|past|beyond|into)|delay(ing)? (your )?retire|retir(e|ing) later|later retire|(older|higher|later) (retirement )?age|postpone (your )?retire|return to work|extra (hours|shifts)|overtime|pay rise|ask for a raise/i;
 export const notWorkIdea = (i: { title?: string; body?: string }) => !WORK_IDEA.test(`${i.title ?? ''} ${i.body ?? ''}`);
+
+/** False when an AI idea suggests delaying or postponing a property purchase. People want to buy as soon as they can. */
+export const notDelayIdea = (i: { title?: string; body?: string }) => !/\b(delay\w*|postpon\w*|defer\w*|push(ing)? back|hold(ing)? off on (buying|the|your next|property))\b[^.]{0,60}\b(property|purchase|buy\w*)|\b(property|purchase)\b[^.]{0,30}\b(later|delay\w*|postpon\w*)\b/i.test(`${i.title ?? ''} ${i.body ?? ''}`);
+
+/** False when an AI idea suggests cutting or pausing the share plan for a deposit when the share plan already waits for that purchase. */
+export const respectsShareHold = (p: Profile) => (i: { title?: string; body?: string }) => {
+  if (!(p.goals.shareStartAfter ?? 0)) return true;
+  return !/\b(lower\w*|reduc\w*|pause\w*|paus\w*|cut\w*|halv\w*|hold(ing)? off|re-?balanc\w*|redirect\w*|divert\w*)\b[^.]{0,60}\bshare/i.test(`${i.title ?? ''} ${i.body ?? ''}`);
+};
+
+/** Every check an AI idea has to pass before it's shown. */
+export const wiseIdeaOk = (p: Profile, stopYear: number) => {
+  const buys = buysBeforeRetiring(stopYear), hold = respectsShareHold(p);
+  return (i: { title?: string; body?: string }) => notWorkIdea(i) && notDelayIdea(i) && buys(i) && hold(i);
+};
+
+/** The calendar year they stop work, the same way the projection works it out. */
+export const stopWorkYear = (p: Profile) => {
+  const age = p.household.you.age ?? 35;
+  return new Date().getFullYear() + Math.max(1, p.goals.retirementAge - age);
+};
+/**
+ * False when an AI idea talks about buying a property in or after the year they stop work. Purchases only happen
+ * while they're working, so an idea like that can't be modelled. A backstop for the AI's instructions.
+ */
+export const buysBeforeRetiring = (stopYear: number) => (i: { title?: string; body?: string }) => {
+  const t = `${i.title ?? ''} ${i.body ?? ''}`;
+  if (/\b(buy|buying|purchas\w*|add(ing)? (a|another|one more) property)\b[^.]{0,40}\b(in|during|after|into) (your )?retirement\b/i.test(t)) return false;
+  if (/\b(once|after) you(’|')?(ve)? (stop(ped)? work|retire[ds]?)\b[^.]{0,40}\b(buy|purchas)/i.test(t)) return false;
+  const near = /\b(?:buy|buying|bought|purchas\w*|settle\w*)\b[^.]{0,50}?\b(20\d\d)\b|\b(20\d\d)\s+(?:purchase|buy)/gi;
+  for (const m of t.matchAll(near)) if (Number(m[1] ?? m[2]) >= stopYear) return false;
+  return true;
+};

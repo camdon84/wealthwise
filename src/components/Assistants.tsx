@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Profile } from '../lib/types';
 import type { Quotes } from '../lib/calc';
-import { insightKey, notWorkIdea, rankInsights, wiseFacts, wiseInsights, type Insight } from '../lib/insights';
+import { insightKey, notWorkIdea, rankInsights, stopWorkYear, wiseIdeaOk, wiseFacts, wiseInsights, type Insight } from '../lib/insights';
 import { equitySpot, loadBriefing, propertyPulse, type Briefing } from '../lib/briefings';
 import { Icon, Segmented } from './ui';
 import { useApp, useNavIntent } from '../lib/store';
@@ -17,9 +17,9 @@ export const ASK = { broker: 'Ask your mortgage broker', adviser: 'Ask a license
 const liveMode = (import.meta as any).env?.VITE_STORAGE === 'api';
 const wiseMemo = new Map<string, Promise<{ summary: string; ideas: { title: string; body: string }[] } | null>>();
 
-export function useWiseTake(profile: Profile, quotes: Quotes, insights: Insight[], mode?: 'first-look' | 'goals', fresh?: number) {
+export function useWiseTake(profile: Profile, quotes: Quotes, insights: Insight[], mode?: 'first-look' | 'goals', fresh?: number, extra?: object) {
   const ready = profile.holdings.length === 0 || Object.keys(quotes).length > 0;
-  const body = useMemo(() => (ready ? JSON.stringify(wiseFacts(profile, quotes, insights)) : ''), [profile, quotes, insights, ready]);
+  const body = useMemo(() => (ready ? JSON.stringify({ ...wiseFacts(profile, quotes, insights), ...extra }) : ''), [profile, quotes, insights, ready, extra]);
   const [take, setTake] = useState<{ summary: string; ideas: { title: string; body: string }[] } | null | 'loading'>(liveMode ? 'loading' : null);
   useEffect(() => {
     if (!liveMode || !body) return;
@@ -28,7 +28,8 @@ export function useWiseTake(profile: Profile, quotes: Quotes, insights: Insight[
       const k = (mode ?? '') + (fresh ?? '') + body;
       const qs = [mode && `mode=${mode}`, fresh && `fresh=${fresh}`].filter(Boolean).join('&');
       if (!wiseMemo.has(k)) wiseMemo.set(k, fetch(`/api/wise${qs ? `?${qs}` : ''}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body }).then((r) => (r.ok ? r.json() : null)).catch(() => null));
-      wiseMemo.get(k)!.then((v) => on && setTake(v));
+      const ok = wiseIdeaOk(profile, stopWorkYear(profile));
+      wiseMemo.get(k)!.then((v) => on && setTake(v ? { ...v, ideas: (v.ideas ?? []).filter(ok) } : v));
     }, 800); // wait for typing to settle before asking for a new write-up
     return () => { on = false; clearTimeout(t); };
   }, [body, mode, fresh]);

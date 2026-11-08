@@ -5,7 +5,7 @@ import { money } from '../lib/format';
 import type { Quotes } from '../lib/calc';
 import { CashFlowChart, CashFlowKey, MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
 import { Icon, Segmented } from '../components/ui';
-import { DollarsToggle, LiveToAge } from '../components/ChartControls';
+import { ChartToolbar } from '../components/ChartControls';
 import { NewsPanel, WisePanel } from '../components/Assistants';
 import { RateWatch } from '../components/RateWatch';
 import { InflationUpdate } from '../components/InflationUpdate';
@@ -43,7 +43,7 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
       {reviewDue(p) && (
         <section className="flex flex-wrap items-center gap-4 rounded-2xl bg-brass/15 p-4 ring-1 ring-brass/50">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brass text-ground"><Icon name="calendar" className="h-5 w-5" /></span>
-          <div className="min-w-0 flex-1"><p className="font-semibold">It’s time for your yearly Wise review</p><p className="text-sm text-muted">Check your plan still fits, then update any automatic payments in Wise Actions.</p></div>
+          <div className="min-w-[13rem] flex-1"><p className="font-semibold">It’s time for your yearly Wise review</p><p className="text-sm text-muted">Check your plan still fits, then update any automatic payments in Wise Actions.</p></div>
           <button className="btn-primary" onClick={() => go('actions')}>Open Wise Actions</button>
         </section>
       )}
@@ -51,22 +51,17 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
       <section className="panel overflow-hidden">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="p-5 sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-sm text-muted">{p.household.hasPartner ? 'Your combined net worth' : 'Your current net worth'}</p>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><p className="font-display text-5xl font-semibold tracking-tight">{money(pos.netWorth)}</p><Segmented size="xs" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} /></div>
-                <p className="mt-1 text-sm text-muted">{money(pos.assets, { compact: true })} in assets, {money(pos.liabilities, { compact: true })} owing</p>
-              </div>
-              <div className="flex flex-col items-end gap-3">
-                <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
-                {view === 'worth' && <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} />}
-              </div>
+            <div>
+              <p className="text-sm text-muted">{p.household.hasPartner ? 'Your combined net worth' : 'Your current net worth'}</p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><p className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">{money(pos.netWorth)}</p><Segmented size="xs" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} /></div>
+              <p className="mt-1 text-sm text-muted">{money(pos.assets, { compact: true })} in assets, {money(pos.liabilities, { compact: true })} owing</p>
             </div>
+            <ChartToolbar dollars={dollars} setDollars={setDollars} series={view === 'worth' ? <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} /> : null} />
             {view === 'worth' ? (<>
-              <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} hidden={hidden} runsOutYear={proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null} /></div>
+              <div className="mt-2 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} hidden={hidden} runsOutYear={proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null} /></div>
               <MarkerKey points={proj.points} />
             </>) : (<>
-              <div className="mt-4 -ml-2"><CashFlowChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} /></div>
+              <div className="mt-2 -ml-2"><CashFlowChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} /></div>
               <CashFlowKey />
             </>)}
             <p className="mt-2 text-xs text-muted">Projected from your current position to age {p.goals.lifeExpectancy ?? 90}, using the assumptions in your plan. Markers show when your equity could fund each new purchase.</p>
@@ -74,7 +69,7 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
           <div className="grid grid-cols-2 gap-px border-t border-line bg-line lg:grid-cols-1 lg:border-l lg:border-t-0">
             <Kpi label="Usable equity today" value={money(pos.usable, { compact: true })} sub={`at ${p.assumptions.lvr}% LVR`} />
             <Kpi label="Borrowing capacity today" value={money(pos.bc.capacity, { compact: true })} sub="estimate, before a lender checks" />
-            <Kpi label="Left over cash each month" value={money(pos.monthlySurplus)} sub="after living costs and all repayments" />
+            <Kpi label="Left over cash each month" value={money(pos.monthlySurplus)} sub="after living costs and all repayments" wide />
             <div className="col-span-2 border-t-4 border-line bg-raised px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted lg:col-span-1">At retirement</div>
             {atRetire && <Kpi label={`${p.household.hasPartner ? 'Your combined net worth' : 'Your net worth'} at retirement age (${p.goals.retirementAge})`} value={money(atRetire.netWorth / Math.pow(1 + p.assumptions.inflation / 100, atRetire.year - proj.points[0].year), { compact: true })} sub={`in today’s money · ${money(atRetire.netWorth, { compact: true })} in ${atRetire.year} dollars`} accent />}
             <div className="bg-surface p-5">
@@ -94,9 +89,9 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
   );
 }
 
-function Kpi({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: boolean }) {
+function Kpi({ label, value, sub, accent, wide }: { label: string; value: string; sub: string; accent?: boolean; wide?: boolean }) {
   return (
-    <div className="bg-surface p-5">
+    <div className={`bg-surface p-5 ${wide ? 'col-span-2 lg:col-span-1' : ''}`}>
       <p className="text-xs text-muted">{label}</p>
       <p className={`font-display text-2xl font-semibold mt-0.5 ${accent ? 'text-gum' : ''}`}>{value}</p>
       <p className="text-xs text-muted mt-0.5">{sub}</p>

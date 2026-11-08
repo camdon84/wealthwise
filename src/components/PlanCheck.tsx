@@ -4,7 +4,7 @@ import { usePlanMode, usePlanProfile, usePlanUpdate } from '../lib/planContext';
 import { useApp } from '../lib/store';
 import { useEffect, useState } from 'react';
 import type { PlanIdea } from '../lib/planCheck';
-import { notWorkIdea } from '../lib/insights';
+import { notDelayIdea, notWorkIdea, planSettings, wiseIdeaOk } from '../lib/insights';
 import { uid } from '../lib/defaults';
 import { afterTax } from '../lib/calc';
 import { CGT_2027_NOTE, money } from '../lib/format';
@@ -42,7 +42,7 @@ export function PlanCheckBox(props: { check: PlanCheck; compact?: boolean; take?
 /** Wise's one-paragraph read of the plan, under the dot points. */
 function WiseRead({ take }: { take?: Take }) {
   if (take === 'loading') return <div className="mt-3 space-y-2" aria-label="Wise is reading your plan"><div className="h-3 w-3/4 animate-pulse rounded bg-line" /><div className="h-3 w-2/3 animate-pulse rounded bg-line" /></div>;
-  if (!take?.summary || !notWorkIdea({ body: take.summary })) return null;
+  if (!take?.summary || !notWorkIdea({ body: take.summary }) || !notDelayIdea({ body: take.summary })) return null;
   return <p className="mt-3 border-t border-line/70 pt-3 text-[15px] leading-relaxed"><span className="mr-1.5 rounded bg-brass/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brass">Wise</span>{take.summary}</p>;
 }
 
@@ -55,7 +55,7 @@ function LockNudge() {
   return (
     <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-sky/40 bg-sky/10 p-4" aria-label="Lock your plan">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky text-surface"><Icon name="lock" className="h-4 w-4" /></span>
-      <p className="min-w-0 flex-1 text-[15px] leading-relaxed">Now that your plan is complete, it’s a good time to lock it in. To try different scenarios, you can always use Forecast mode.</p>
+      <p className="min-w-[13rem] flex-1 text-[15px] leading-relaxed">Now that your plan is complete, it’s a good time to lock it in. To try different scenarios, you can always use Forecast mode.</p>
       <button className="inline-flex items-center gap-1.5 rounded-lg border border-sky/50 bg-surface px-3 py-1.5 text-sm font-semibold hover:bg-sky/15" onClick={() => update((d) => { d.planLocked = true; d.cpiBase = undefined; })}><Icon name="lock" className="h-4 w-4" />Lock my plan</button>
     </section>
   );
@@ -64,7 +64,7 @@ function LockNudge() {
 function PlanCheckResult({ check, compact, take }: { check: PlanCheck; compact?: boolean; take?: Take }) {
   if (check.works) {
     return (
-      <section className={compact ? 'rounded-2xl border border-gum/40 bg-gum/10 p-4' : 'panel border-l-4 border-l-gum p-5 sm:p-6'} aria-label="Plan check">
+      <section className={compact ? 'rounded-2xl border border-gum/40 bg-gum/10 p-3.5 sm:p-4' : 'panel border-l-4 border-l-gum p-5 sm:p-6'} aria-label="Plan check">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gum text-surface"><Icon name="check" className="h-5 w-5" /></span>
           <h2 className="font-display text-lg font-semibold">This plan works on your numbers</h2>
@@ -78,7 +78,7 @@ function PlanCheckResult({ check, compact, take }: { check: PlanCheck; compact?:
     );
   }
   return (
-    <section role="alert" className={compact ? 'rounded-2xl border border-clay/50 bg-clay/10 p-4' : 'panel border-l-4 border-l-clay p-5 sm:p-6'} aria-label="Plan check">
+    <section role="alert" className={compact ? 'rounded-2xl border border-clay/50 bg-clay/10 p-3.5 sm:p-4' : 'panel border-l-4 border-l-clay p-5 sm:p-6'} aria-label="Plan check">
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay text-surface"><Icon name="x" className="h-5 w-5" /></span>
         <div><h2 className="font-display text-lg font-semibold">This plan doesn’t work yet</h2><p className="text-sm text-muted">Here’s what breaks, and what would fix it.</p></div>
@@ -88,7 +88,7 @@ function PlanCheckResult({ check, compact, take }: { check: PlanCheck; compact?:
       </ul>
       <WiseRead take={take} />
       {check.fixes.length > 0 && (
-        <div className="mt-4 rounded-xl bg-raised p-4 ring-1 ring-line">
+        <div className="mt-4 rounded-xl bg-raised p-3 ring-1 ring-line sm:p-4">
           <p className="text-sm font-semibold">We’d recommend</p>
           <ul className="mt-2 space-y-2 text-[15px] leading-relaxed">
             {check.fixes.map((t) => <li key={t} className="flex gap-3"><Icon name="arrow" className="mt-1 h-4 w-4 shrink-0 text-brass" />{t}</li>)}
@@ -110,6 +110,8 @@ const live = (import.meta as any).env?.VITE_STORAGE === 'api';
 const SIX_MONTHS = 182 * 864e5;
 let autoAsked = false; // one automatic refresh per visit
 /** Ideas are matched without their figures, so one that's been dismissed stays dismissed when the numbers move a little. */
+/** One idea: icon, text, Dismiss. On a phone Dismiss drops under the text so the text gets the full width. */
+const IDEA_ROW = 'grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]';
 const ideaKey = (t: string) => t.replace(/[\d$,.%]+/g, '#').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /** "Have you thought about these options?": tested ideas plus Wise's AI ideas, each dismissable for 6 months. */
@@ -128,7 +130,7 @@ function PlanIdeas({ check, take }: { check: PlanCheck; take?: Take }) {
   // Wise's ideas: the ones written for this plan as it stands, then any asked for with the button
   const fromTake = take && take !== 'loading' ? take.ideas.map((x) => ({ id: `take-${ideaKey(x.title)}`, title: x.title, body: x.body, at: 0 })) : [];
   const ai = [...fromTake, ...(st?.ai ?? [])].filter((x, k, all) => all.findIndex((y) => ideaKey(y.title) === ideaKey(x.title)) === k)
-    .filter((x) => !hidden(`ai:${x.id}`) && notWorkIdea(x)).slice(0, 3);
+    .filter((x) => !hidden(`ai:${x.id}`) && wiseIdeaOk(p, check.proj.retireYear)(x)).slice(0, 3);
   let tested = allTested.slice(0, Math.max(0, MAX - ai.length));
   const liq = allTested.find((t) => t.liquidation);
   if (liq && !tested.includes(liq)) tested = [...tested.slice(0, Math.max(0, tested.length - 1)), liq];
@@ -142,12 +144,13 @@ function PlanIdeas({ check, take }: { check: PlanCheck; take?: Take }) {
     if (live) {
       const facts = {
         wealthFocus: p.goals.wealthFocus ?? 'balanced',
-        goal: { stopWorkAge: p.goals.retirementAge, incomeWantedTodayDollars: p.goals.passiveIncome, propertiesWanted: p.goals.targetProperties, sharePortfolioWantedTodayDollars: p.goals.sharesTarget ?? null, shareInvestmentPerMonth: p.goals.shareMonthly ?? null },
+        goal: { stopWorkAge: p.goals.retirementAge, stopWorkYear: check.proj.retireYear, incomeWantedTodayDollars: p.goals.passiveIncome, propertiesWanted: p.goals.targetProperties, sharePortfolioWantedTodayDollars: p.goals.sharesTarget ?? null, shareInvestmentPerMonth: p.goals.shareMonthly ?? null },
+        ...planSettings(p, check.proj),
         planWorks: check.works, problems: check.problems, testedFixes: check.fixes, whatWorks: check.good,
         ideasAlreadyShown: [...check.ideas.map((x) => x.text), ...(st?.ai ?? []).map((x) => x.title)],
       };
       const r = await fetch(`/api/wise?mode=ideas&fresh=${t}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(facts) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-      fresh = (r?.ideas ?? []).filter(notWorkIdea).map((i: { title: string; body: string }, k: number) => ({ id: `${t}-${k}`, title: i.title, body: i.body, at: t }));
+      fresh = (r?.ideas ?? []).filter(wiseIdeaOk(p, check.proj.retireYear)).map((i: { title: string; body: string }, k: number) => ({ id: `${t}-${k}`, title: i.title, body: i.body, at: t }));
       if (!fresh.length) setNote('Wise couldn’t come up with anything new just now. Try again in a moment.');
     } else setNote('In the live app, Wise also writes new ideas for your plan here.');
     update((d) => {
@@ -168,22 +171,22 @@ function PlanIdeas({ check, take }: { check: PlanCheck; take?: Take }) {
   }, []);
 
   const addLiquidation = (t: PlanIdea) => { const l = t.liquidation!; planUpdate((d) => { (d.liquidations ??= []).push({ id: uid(), year: new Date().getFullYear(), asset: l.asset, pct: l.pct }); }); };
-  const Dismiss = ({ k }: { k: string }) => <button className="ml-auto shrink-0 self-start rounded-md px-2 py-0.5 text-xs text-muted ring-1 ring-line hover:text-ink" onClick={() => dismiss(k)} title="Hide this idea for 6 months">Dismiss</button>;
+  const Dismiss = ({ k }: { k: string }) => <button className="col-start-2 mt-1.5 justify-self-start rounded-md px-2 py-0.5 text-xs text-muted ring-1 ring-line hover:text-ink sm:col-start-3 sm:row-start-1 sm:mt-0 sm:justify-self-end" onClick={() => dismiss(k)} title="Hide this idea for 6 months">Dismiss</button>;
 
   return (
-    <div className="mt-4 rounded-xl bg-raised p-4 ring-1 ring-line">
+    <div className="mt-4 rounded-xl bg-raised p-3 ring-1 ring-line sm:p-4">
       <p className="text-sm font-semibold">Have you thought about these options?</p>
       {tested.length + ai.length === 0 ? <p className="mt-2 text-sm text-muted">No ideas to show right now.</p> : (
         <ul className={`mt-2 space-y-3 text-[15px] leading-relaxed transition-opacity ${busy ? 'opacity-40' : ''}`}>
           {ai.slice(0, MAX - tested.length).map((x) => (
-            <li key={x.id} className="flex gap-3"><Icon name="spark" className="mt-1 h-4 w-4 shrink-0 text-brass" />
-              <span><span className="mr-1.5 rounded bg-brass/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brass">Wise</span><span className="font-medium">{x.title}.</span> <span className="text-muted">{x.body}</span></span>
+            <li key={x.id} className={IDEA_ROW}><Icon name="spark" className="mt-1 h-4 w-4 shrink-0 text-brass" />
+              <span className="min-w-0"><span className="mr-1.5 rounded bg-brass/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brass">Wise</span><span className="font-medium">{x.title}.</span> <span className="text-muted">{x.body}</span></span>
               <Dismiss k={`ai:${x.id}`} />
             </li>
           ))}
           {tested.map((t) => (
-            <li key={t.text} className="flex gap-3"><Icon name="spark" className="mt-1 h-4 w-4 shrink-0 text-brass" />
-              <span>{t.text}
+            <li key={t.text} className={IDEA_ROW}><Icon name="spark" className="mt-1 h-4 w-4 shrink-0 text-brass" />
+              <span className="min-w-0">{t.text}
                 {t.liquidation && <button className="mt-2 flex items-center gap-1.5 rounded-lg border border-clay/50 bg-clay/10 px-3 py-1.5 text-sm font-semibold text-clay hover:bg-clay/20" onClick={() => addLiquidation(t)}>
                   <span className="font-display text-base leading-none">$</span>Add liquidation event to my plan</button>}
               </span>

@@ -75,7 +75,25 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
       {mine.length === 0 ? (
         <div className="panel p-10 text-center"><p className="font-medium">{crypto ? 'No crypto yet' : 'No shares yet'}</p><p className="mt-1 text-sm text-muted">{crypto ? 'Import your exchange’s trade history or log a trade to track a coin at live prices.' : 'Import your broker’s trade history or log a trade to start tracking.'}</p></div>
       ) : (
-        <div className="panel overflow-x-auto">
+        <>
+        {/* Phones: one compact row per holding, so value and gain aren't hidden off the side of a table */}
+        <ul className="panel divide-y divide-line sm:hidden">
+          {[...st.rows].sort((a, b) => b.value - a.value).map((r) => (
+            <li key={r.h.id}>
+              <button className="flex w-full items-start gap-3 px-4 py-3 text-left" onClick={() => setOpen(r.h.id)}>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold">{r.h.code} <span className="text-xs font-normal text-muted">{r.h.exchange}</span></span>
+                  <span className="block truncate text-xs text-muted">{num(r.h.units, 4)} units · {money(r.price, { cents: true })} <span className={r.dayChange >= 0 ? 'text-gum' : 'text-clay'}>{pct(r.dayChange, 2, true)} today</span></span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-medium">{money(r.value)}</span>
+                  <span className={`block text-xs ${r.gain >= 0 ? 'text-gum' : 'text-clay'}`}>{money(r.gain, { sign: true })} ({pct(r.gainPct, 1, true)})</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="panel hidden overflow-x-auto sm:block">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted"><tr className="border-b border-line">{['Holding', 'Units', 'Avg cost', 'Price', 'Today', 'Value', 'Gain', ''].map((h, i) => <th key={i} className={`px-4 py-3 font-medium ${i ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
             <tbody>
@@ -94,6 +112,7 @@ export function Investments({ quotes, asOf, mode = 'shares' }: { quotes: Quotes;
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {open && (() => { const r = st.rows.find((x) => x.h.id === open); return r ? (

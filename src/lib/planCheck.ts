@@ -109,21 +109,26 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
       const got = r.purchases[k];
       if (pp.buyBy && got && got.year >= pp.buyBy) fixes.push(`Change ${pp.label || `property ${owned + k + 1}`} to “Before ${got.year + 1}”.`);
     });
-    // Retiring later gives more years to buy
-    if (reached < g.targetProperties) for (let d = 1; d <= 6 && g.retirementAge + d <= 70; d++) {
-      if (owned + run((x) => { x.goals.retirementAge += d; }).purchases.length >= g.targetProperties) { fixes.push(`Keep working to ${g.retirementAge + d} to fit in all ${g.targetProperties} properties.`); break; }
-    }
   }
 
   // 3. Money lasting through retirement
   if (!lastsOk(r)) {
     problems.push(`At ${m(g.passiveIncome)} a year, your money runs out at ${r.runsOutAge}, well before ${life}.`);
     const maxIncome = bisect(0, g.passiveIncome, (v) => lastsOk(run((x) => { x.goals.passiveIncome = v; })), 14);
+    // Every fix keeps the stop-work age they chose: that's theirs to set, so we never suggest working longer.
+    const first = fixes.length;
+    const or = (t: string) => (fixes.length > first ? `Or ${t[0].toLowerCase()}${t.slice(1)}` : t);
     if (maxIncome != null && maxIncome > 10000) fixes.push(`Lower your yearly income after retirement to about ${m(round(maxIncome, 5000))}. That lasts to ${life}.`);
-    for (let d = 1; d <= 8 && g.retirementAge + d <= 72; d++) {
-      if (lastsOk(run((x) => { x.goals.retirementAge += d; }))) { fixes.push(`Or keep working to ${g.retirementAge + d}: more years of saving and fewer years to fund.`); break; }
+    // A bigger share plan while working: the smallest monthly amount (today's money) that makes the money last, still buying every property on time
+    const sharesFix = (v: number) => { const x = run((y) => { y.goals.shareMonthly = v; }); return lastsOk(x) && cashOk(x) && propsOk(p, x); };
+    const top = Math.max(1500, r.shareMonthly * 3);
+    if (sharesFix(top)) {
+      let lo = r.shareMonthly, hi = top;
+      for (let i = 0; i < 12; i++) { const mid = (lo + hi) / 2; if (sharesFix(mid)) hi = mid; else lo = mid; }
+      const need = Math.ceil(hi / 50) * 50;
+      if (need > r.shareMonthly + 50) fixes.push(or(`Invest about ${money(need)} a month in shares while you work, instead of ${m(r.shareMonthly)} (set “Monthly investment” in Shares). That lasts to ${life}.`));
     }
-    if (g.targetProperties > owned && lastsOk(run((x) => { x.goals.targetProperties = Math.max(owned, x.goals.targetProperties - 1); }))) fixes.push(`Or aim for ${g.targetProperties - 1} properties: the last purchase costs more than it adds by retirement.`);
+    if (g.targetProperties > owned && lastsOk(run((x) => { x.goals.targetProperties = Math.max(owned, x.goals.targetProperties - 1); }))) fixes.push(or(`Aim for ${g.targetProperties - 1} properties: the last purchase costs more than it adds by retirement.`));
   }
 
   // 4. Shares short of goal with a custom amount

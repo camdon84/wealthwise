@@ -15,7 +15,7 @@ export function MyDetails({ initialTab = 'income' }: { initialTab?: Tab }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">My Details</h1><p className="text-muted">Keep these up to date and your plan updates with them.</p></div>
-        <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: 'income', label: 'Work and Income' }, { value: 'home', label: 'Home and Living Costs' }, { value: 'cash', label: 'Cash, Superannuation and Debts' }, { value: 'dependants', label: 'Dependants' }]} />
+        <Segmented scroll="fit" label="Section" value={tab} onChange={setTab} options={[{ value: 'income', label: 'Work and Income' }, { value: 'home', label: 'Home and Living Costs' }, { value: 'cash', label: 'Cash, Superannuation and Debts' }, { value: 'dependants', label: 'Dependants' }]} />
       </div>
       {tab === 'dependants' ? <Dependants embedded /> : (
       <section className="panel p-5 sm:p-7">

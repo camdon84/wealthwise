@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CURRENCIES, parseMoney } from '../lib/format';
 
 export function Field({ label, hint, children, className = '' }: { label: string; hint?: ReactNode; children: (id: string) => ReactNode; className?: string }) {
@@ -54,7 +54,27 @@ export function Select<T extends string>({ id, value, onChange, options }: { id?
   );
 }
 
-export function Segmented<T extends string>({ value, onChange, options, size = 'md', label, stretch }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; size?: 'xs' | 'sm' | 'md'; label?: string; stretch?: boolean }) {
+/**
+ * A row of options. `scroll`: on phones and tablets the row scrolls sideways instead of squashing or overlapping
+ * (the chosen option scrolls into view); from `xl` it stretches to fill the width like `stretch`. `scroll="fit"` keeps its natural width when there's room.
+ */
+export function Segmented<T extends string>({ value, onChange, options, size = 'md', label, stretch, scroll }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; size?: 'xs' | 'sm' | 'md'; label?: string; stretch?: boolean; scroll?: boolean | 'fit' }) {
+  const row = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!scroll || !row.current) return;
+    const on = row.current.querySelector<HTMLElement>('[aria-checked="true"]');
+    if (on) row.current.scrollTo({ left: on.offsetLeft - (row.current.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' });
+  }, [scroll, value]);
+  if (scroll) return (
+    <div ref={row} role="radiogroup" aria-label={label} className={`no-scrollbar flex min-w-0 snap-x overflow-x-auto rounded-xl border border-line bg-raised p-1 ${scroll === 'fit' ? 'max-w-full' : 'w-full xl:flex-1'}`}>
+      {options.map((o) => (
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}
+          className={`shrink-0 snap-start whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors ${scroll === 'fit' ? '' : 'xl:flex-1'} ${value === o.value ? 'bg-surface text-ink shadow-sm ring-1 ring-line' : 'text-muted hover:text-ink'}`}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
   if (size === 'xs') return (
     <div role="radiogroup" aria-label={label} className="inline-flex rounded-full border border-line/70 p-0.5">
       {options.map((o) => (
@@ -69,7 +89,7 @@ export function Segmented<T extends string>({ value, onChange, options, size = '
     <div role="radiogroup" aria-label={label} className={`${stretch ? 'flex min-w-0 flex-1' : 'inline-flex'} rounded-xl border border-line bg-raised p-1`}>
       {options.map((o) => (
         <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}
-          className={`${stretch ? 'flex-1 whitespace-nowrap' : ''} rounded-lg ${size === 'sm' ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors ${value === o.value ? 'bg-surface text-ink shadow-sm ring-1 ring-line' : 'text-muted hover:text-ink'}`}>
+          className={`${stretch ? 'flex-1 whitespace-nowrap' : o.label.length <= 14 ? 'whitespace-nowrap' : ''} rounded-lg ${size === 'sm' ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors ${value === o.value ? 'bg-surface text-ink shadow-sm ring-1 ring-line' : 'text-muted hover:text-ink'}`}>
           {o.label}
         </button>
       ))}

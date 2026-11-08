@@ -12,7 +12,7 @@ import { plannedPurchase, uid } from '../lib/defaults';
 import { useCashRate } from '../lib/rates';
 import type { Assumptions, Forecast, Gift, Liquidation, PlanSnapshot, PlannedPurchase, Profile, Property } from '../lib/types';
 import { CashFlowChart, CashFlowKey, MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
-import { DollarsToggle, LiveToAge } from '../components/ChartControls';
+import { ChartToolbar } from '../components/ChartControls';
 import { useWiseTake } from '../components/Assistants';
 import { Field, Icon, MoneyInput, NumInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
 
@@ -51,16 +51,16 @@ export function Plan({ quotes }: { quotes: Quotes }) {
           <p className="text-muted">{forecasting ? 'Try changes here without touching your live plan. Save it, or make it your new Wise Future.' : 'Set where you want to end up, check the assumptions, and see how it plays out.'}</p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 xl:flex-nowrap" role="tablist" aria-label="Plan section">
-          <Segmented stretch label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property Portfolio' }, { value: 'shares', label: 'Shares' }, { value: 'cash', label: 'Cash Reserves' }, { value: 'liquidations', label: 'Liquidation Events' }, { value: 'gifts', label: 'Gifts' }]} />
+          <Segmented scroll label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property Portfolio' }, { value: 'shares', label: 'Shares' }, { value: 'cash', label: 'Cash Reserves' }, { value: 'liquidations', label: 'Liquidation Events' }, { value: 'gifts', label: 'Gifts' }]} />
           <button role="tab" aria-selected={tab === 'projections'} onClick={() => setTab('projections')}
-            className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${tab === 'projections'
+            className={`group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition-all sm:flex-none ${tab === 'projections'
               ? 'bg-brass text-ground shadow-[0_6px_20px_-6px_rgb(var(--brass)/0.7)] ring-2 ring-brass/40'
               : 'border border-brass/60 bg-brass/10 text-brass hover:bg-brass/20 hover:shadow-[0_4px_16px_-6px_rgb(var(--brass)/0.6)]'}`}>
             <Icon name="spark" className={`h-4 w-4 ${tab === 'projections' ? '' : 'transition-transform group-hover:rotate-45'}`} />{forecasting ? 'Forecast Future' : 'Your Wise Future'}
           </button>
           {!forecasting && (
             <button onClick={() => (locked ? setAsk({}) : liveUpdate((d) => { d.planLocked = true; d.cpiBase = undefined; }))} title={locked ? 'Your plan is locked. Click to unlock.' : 'Lock your plan so it can’t be changed by accident'}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold ${locked ? 'bg-ink text-surface' : 'border border-line text-muted hover:text-ink'}`}>
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-semibold ${locked ? 'bg-ink text-surface' : 'border border-line text-muted hover:text-ink'}`}>
               <Icon name={locked ? 'lock' : 'unlock'} className="h-4 w-4" />{locked ? 'Plan locked' : 'Lock my plan'}
             </button>
           )}
@@ -179,7 +179,9 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
   const g = p.goals;
   const check = useMemo(() => planCheck(p, quotes), [p, quotes]);
   const insights = useMemo(() => wiseInsights(p, quotes), [p, quotes]);
-  const take = useWiseTake(p, quotes, insights, 'goals');
+  // The Goals read leads with the app's own tested results, so it says something specific rather than restating the goals
+  const tested = useMemo(() => ({ planCheck: { works: check.works, problems: check.problems, testedFixes: check.fixes, whatWorks: check.good, testedIdeas: check.ideas.map((x) => x.text) } }), [check]);
+  const take = useWiseTake(p, quotes, insights, 'goals', undefined, tested);
   return (
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <section className="panel p-5 sm:p-6">
@@ -473,8 +475,8 @@ function RetirementMetrics({ proj }: { proj: ReturnType<typeof project> }) {
   const next = proj.points.find((x) => x.year === proj.retireYear + 1) ?? at; // first full year after any retirement sales
   const propMonthly = next ? next.investNet / 12 / Math.pow(1 + p.assumptions.inflation / 100, i + 1) : 0;
   const investKept = next ? next.properties - p.properties.filter((x) => x.use === 'home').length : 0;
-  const tile = (label: string, value: string, sub: string, tone = '') => (
-    <div className="bg-surface p-5"><p className="text-xs text-muted">{label}</p><p className={`mt-0.5 font-display text-2xl font-semibold ${tone}`}>{value}</p><p className="text-xs text-muted">{sub}</p></div>
+  const tile = (label: string, value: string, sub: string, tone = '', wide = false) => (
+    <div className={`bg-surface p-5 ${wide ? 'col-span-2 lg:col-span-1' : ''}`}><p className="text-xs text-muted">{label}</p><p className={`mt-0.5 font-display text-2xl font-semibold ${tone}`}>{value}</p><p className="text-xs text-muted">{sub}</p></div>
   );
   return (
     <div className="grid grid-cols-2 gap-px border-t border-line bg-line lg:grid-cols-1 lg:border-l lg:border-t-0">
@@ -483,7 +485,7 @@ function RetirementMetrics({ proj }: { proj: ReturnType<typeof project> }) {
       {at && tile(p.household.hasPartner ? 'Combined net worth' : 'Net worth', c(at.netWorth), `${c(at.super)} in super · ${c(at.shares)} in shares`, 'text-gum')}
       {at && tile('Investment property cash flow', investKept > 0 ? `${propMonthly >= 0 ? '' : '−'}${money(Math.abs(propMonthly))}` : '$0', investKept > 0 ? `a month from the ${investKept} investment ${investKept === 1 ? 'property' : 'properties'} you keep, after loans and costs` : 'No investment properties kept. Set one to be paid off by retirement to keep its rent.', propMonthly < 0 ? 'text-clay' : '')}
       {at && tile('Super paid out in the first year', c(at.superDrawn), at.age >= 60 ? 'Super pays your income first' : `Super opens at 60, ${60 - at.age} ${60 - at.age === 1 ? 'year' : 'years'} after you stop`)}
-      {tile('Cash on hand', money(p.goals.retireCash ?? RETIRE_CASH_MIN, { compact: true }), 'kept in the bank at all times. Set it in Goals.')}
+      {tile('Cash on hand', money(p.goals.retireCash ?? RETIRE_CASH_MIN, { compact: true }), 'kept in the bank at all times. Set it in Goals.', '', !!at /* fifth tile: full width on phones so there's no empty box */)}
     </div>
   );
 }
@@ -621,7 +623,7 @@ function GiftsTab() {
             if (saved) return (
               <li key={gft.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-line bg-raised/60 p-4">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gum/15 text-gum"><Icon name="check" className="h-4 w-4" /></span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-[10rem] flex-1">
                   <p className="font-medium">{money(gft.amount)} {gft.kind === 'inheritance' ? 'inheritance' : 'gift'}{gft.from ? ` from ${gft.from}` : ''}</p>
                   <p className="text-sm text-muted">{gft.year === y0 ? `This year (${y0})` : `In ${gft.year}`}{gft.note ? ` · ${gft.note}` : ''}</p>
                 </div>
@@ -867,19 +869,16 @@ function Projections({ quotes }: { quotes: Quotes }) {
         <div className="h-1 bg-gradient-to-r from-gum via-brass to-sky" />
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="p-5 sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
               <div><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h2 className="font-display text-2xl font-semibold">Your Wise Future</h2><Segmented size="xs" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} /></div>
                 <p className={`text-sm font-medium ${proj.runsOutAge != null ? 'text-clay' : 'text-gum'}`}>{proj.runsOutAge != null ? `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money runs out at ${proj.runsOutAge}.` : `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money lasts to ${p.goals.lifeExpectancy ?? 90}.`}</p></div>
-              <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
             </div>
-            <div className="mt-3 flex flex-wrap items-start justify-end gap-3">
-              {view === 'worth' && <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} />}
-            </div>
+            <ChartToolbar dollars={dollars} setDollars={setDollars} series={view === 'worth' ? <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} /> : null} />
             {view === 'worth' ? (<>
-              <div className="-ml-2"><WealthChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={340} real={dollars === 'real'} hidden={hidden} runsOutYear={runsOutYear} /></div>
+              <div className="mt-2 -ml-2"><WealthChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={340} real={dollars === 'real'} hidden={hidden} runsOutYear={runsOutYear} /></div>
               <MarkerKey points={pts} />
             </>) : (<>
-              <div className="-ml-2"><CashFlowChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={340} real={dollars === 'real'} /></div>
+              <div className="mt-2 -ml-2"><CashFlowChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={340} real={dollars === 'real'} /></div>
               <CashFlowKey />
             </>)}
           </div>

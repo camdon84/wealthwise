@@ -1,10 +1,11 @@
-import { usePlanProfile, usePlanUpdate } from '../lib/planContext';
+import type { ReactNode } from 'react';
+import { usePlanProfile } from '../lib/planContext';
 import { Segmented } from './ui';
 
 export type Dollars = 'real' | 'nominal';
 
-export function DollarsToggle({ value, onChange }: { value: Dollars; onChange: (v: Dollars) => void }) {
-  return <Segmented size="sm" label="Show values in" value={value} onChange={onChange} options={[{ value: 'real', label: 'Today’s money' }, { value: 'nominal', label: 'Future money' }]} />;
+export function DollarsToggle({ value, onChange, stretch }: { value: Dollars; onChange: (v: Dollars) => void; stretch?: boolean }) {
+  return <Segmented size="sm" stretch={stretch} label="Show values in" value={value} onChange={onChange} options={[{ value: 'real', label: 'Today’s money' }, { value: 'nominal', label: 'Future money' }]} />;
 }
 
 export function DollarsNote({ value }: { value: Dollars }) {
@@ -15,17 +16,17 @@ export function DollarsNote({ value }: { value: Dollars }) {
     : <>Shown in <strong className="font-medium text-ink">future money</strong>: each year is in that year’s own dollars, before inflation is taken out, so later figures look bigger than they’ll feel.</>;
 }
 
-export function LiveToAge() {
-  const p = usePlanProfile();
-  const update = usePlanUpdate();
-  const v = p.goals.lifeExpectancy ?? 90;
-  const min = Math.max((p.household.you.age ?? 30) + 5, p.goals.retirementAge + 1);
+/**
+ * The row straight above a chart: the series tick boxes on the left, today's or future money on the right.
+ * On a phone the money toggle runs full width above the tick boxes, so nothing lands in an odd spot and the chart keeps its full width.
+ */
+export function ChartToolbar({ dollars, setDollars, series }: { dollars: Dollars; setDollars: (v: Dollars) => void; series?: ReactNode }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-muted">
-      I’m planning to live to
-      <select className="rounded-lg border border-line bg-raised px-2 py-1 text-sm font-medium text-ink focus:border-brass focus:outline-none" value={v} onChange={(e) => update((d) => { d.goals.lifeExpectancy = Number(e.target.value); })}>
-        {Array.from({ length: 111 - min }, (_, i) => min + i).filter((a) => a <= 110).map((a) => <option key={a} value={a}>{a}</option>)}
-      </select>
-    </label>
+    <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+      <div className="flex sm:order-2">
+        <DollarsToggle value={dollars} onChange={setDollars} stretch />
+      </div>
+      <div className="min-w-0">{series}</div>
+    </div>
   );
 }

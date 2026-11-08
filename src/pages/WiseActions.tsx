@@ -59,13 +59,13 @@ export function WiseActions({ quotes, go }: { quotes: Quotes; go: (r: string) =>
       {changed.length > 0 && (
         <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-clay/50 bg-clay/10 p-4" role="alert">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay font-display text-lg font-bold text-white">!</span>
-          <p className="min-w-0 flex-1">Your Wise Plan has changed since you set {changed.length === 1 ? 'this one' : `these ${changed.length}`} up. Update {changed.length === 1 ? 'it' : 'them'} with your bank or broker, then tick {changed.length === 1 ? 'it' : 'them'} again: <strong>{changed.map((a) => a.title).join('; ')}</strong>.</p>
+          <p className="min-w-[13rem] flex-1">Your Wise Plan has changed since you set {changed.length === 1 ? 'this one' : `these ${changed.length}`} up. Update {changed.length === 1 ? 'it' : 'them'} with your bank or broker, then tick {changed.length === 1 ? 'it' : 'them'} again: <strong>{changed.map((a) => a.title).join('; ')}</strong>.</p>
         </section>
       )}
 
       <section className={`flex flex-wrap items-center gap-4 rounded-2xl p-4 ring-1 ${due ? 'bg-brass/15 ring-brass/50' : 'bg-raised ring-line'}`}>
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${due ? 'bg-brass text-ground' : 'bg-surface text-muted ring-1 ring-line'}`}><Icon name="calendar" className="h-5 w-5" /></span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[13rem] flex-1">
           <p className="font-semibold">{due ? 'It’s time for your yearly review' : 'Review your plan at least once a year'}</p>
           <p className="text-sm text-muted">{due
             ? 'Check your goals and figures are still right, then come back here and update any automatic payments that changed.'

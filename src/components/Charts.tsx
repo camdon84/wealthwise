@@ -1,6 +1,15 @@
 import { Area, AreaChart, Bar, CartesianGrid, ComposedChart, Line, LineChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { YearPoint } from '../lib/calc';
 import { money } from '../lib/format';
+import { useEffect, useState } from 'react';
+
+/** True on phone-width screens. Charts drop the small marker words there (the key under the chart names them) so they don't overlap. */
+export function useNarrow() {
+  const q = '(max-width: 639px)';
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => { const m = window.matchMedia(q); const on = () => setNarrow(m.matches); m.addEventListener('change', on); return () => m.removeEventListener('change', on); }, []);
+  return narrow;
+}
 
 const C = {
   equity: 'rgb(var(--gum))', shares: 'rgb(var(--sky))', super: 'rgb(var(--sage))', cash: 'rgb(var(--brass))',
@@ -50,8 +59,8 @@ export function toReal(points: YearPoint[], inflation: number): YearPoint[] {
 export function SeriesToggles({ hidden, onChange, crypto }: { hidden: string[]; onChange: (h: string[]) => void; crypto?: boolean }) {
   const list = wealthSeries.filter((s) => crypto || s.key !== 'crypto');
   return (
-    <div className="flex flex-col items-end gap-1">
-    <ul className="flex flex-wrap gap-x-2 gap-y-1" aria-label="Show or hide each part of the chart (this only changes the view, not your plan)" title="Ticking and unticking only changes what the chart shows. Your plan and net worth don’t change.">
+    <div className="flex min-w-0 flex-col items-start gap-0.5">
+    <ul className="-ml-1.5 flex flex-wrap gap-x-1 gap-y-0.5" aria-label="Show or hide each part of the chart (this only changes the view, not your plan)" title="Ticking and unticking only changes what the chart shows. Your plan and net worth don’t change.">
       {list.map((s) => {
         const on = !hidden.includes(s.key);
         const onlyOne = on && list.filter((x) => !hidden.includes(x.key)).length === 1;
@@ -87,6 +96,7 @@ export function WealthChart({ points, retireYear, height = 320, real, hidden = [
   const upTo = (p: YearPoint, key: string) => { let t = 0; for (const s of shown) { t += Math.max(0, p[s.key] as number); if (s.key === key) break; } return t; };
   const equityTop = (p: YearPoint) => (shown.some((s) => s.key === 'propertyEquity') ? upTo(p, 'propertyEquity') : shown.filter((s) => s.key === 'cash').reduce((t, s) => t + Math.max(0, p[s.key] as number), 0));
   const stackTop = (p: YearPoint) => shown.reduce((t, s) => t + Math.max(0, p[s.key] as number), 0);
+  const narrow = useNarrow();
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={points} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
@@ -102,14 +112,14 @@ export function WealthChart({ points, retireYear, height = 320, real, hidden = [
         {runsOutYear != null && <ReferenceLine x={runsOutYear} stroke={C.clay} strokeWidth={1.5} label={{ value: 'Money runs out', position: 'insideTopLeft', fill: C.clay, fontSize: 11 }} />}
         {points.filter((p) => p.bought).map((p) => (
           <ReferenceDot key={p.year} x={p.year} y={equityTop(p)} r={5} fill="rgb(var(--surface))" stroke={C.brass} strokeWidth={2}
-            label={{ value: `Buy #${p.properties}`, position: 'top', fill: C.muted, fontSize: 10 }} />
+            label={narrow ? undefined : { value: `Buy #${p.properties}`, position: 'top', fill: C.muted, fontSize: 10 }} />
         ))}
         {points.filter((p) => p.sold).map((p) => (
           <ReferenceDot key={`s${p.year}`} x={p.year} y={equityTop(p)} r={5} fill="rgb(var(--surface))" stroke={C.clay} strokeWidth={2}
-            label={{ value: p.sold!.length > 1 ? `Sell ×${p.sold!.length}` : 'Sell', position: 'top', fill: C.clay, fontSize: 10 }} />
+            label={narrow ? undefined : { value: p.sold!.length > 1 ? `Sell ×${p.sold!.length}` : 'Sell', position: 'top', fill: C.clay, fontSize: 10 }} />
         ))}
         {points.filter((p) => p.paidOff).map((p, k) => (
-          <ReferenceDot key={`d${p.year}`} x={p.year} y={shown.some((x) => x.key === 'cash') ? upTo(p, 'cash') : 0} r={4.5} fill={C.equity} stroke="rgb(var(--surface))" strokeWidth={1.5} ifOverflow="visible" label={k === 0 ? { value: 'Loan paid off', position: 'top', fill: C.equity, fontSize: 10 } : undefined} />
+          <ReferenceDot key={`d${p.year}`} x={p.year} y={shown.some((x) => x.key === 'cash') ? upTo(p, 'cash') : 0} r={4.5} fill={C.equity} stroke="rgb(var(--surface))" strokeWidth={1.5} ifOverflow="visible" label={k === 0 && !narrow ? { value: 'Loan paid off', position: 'top', fill: C.equity, fontSize: 10 } : undefined} />
         ))}
         {points.filter((p) => p.liquidated).map((p) => (
           <ReferenceDot key={`l${p.year}`} x={p.year} y={stackTop(p)} r={8} fill={C.clay} stroke="rgb(var(--surface))" strokeWidth={1.5}
