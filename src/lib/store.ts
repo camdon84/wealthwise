@@ -5,11 +5,14 @@ import { normalize } from './defaults';
 
 const adapter = createAdapter();
 
-/** Offset money lives on each loan (Properties); the cash total's "in offset" figure is always their sum. */
+/**
+ * Offset money lives on each loan and is entered per property in My Details. Cash at the bank
+ * (excluding offsets) is entered separately. The total the engine uses is always the two added up.
+ */
 export function syncOffsets(p: Profile) {
   const loans = p.properties.flatMap((pr) => pr.loans);
-  if (loans.length === 0) return;
   p.finances.cashOffset = loans.reduce((t, l) => t + (l.offset ?? 0), 0) || null;
+  if (p.finances.cashSavings != null || p.finances.cashOffset != null) p.finances.cash = (p.finances.cashSavings ?? 0) + (p.finances.cashOffset ?? 0);
 }
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 

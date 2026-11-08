@@ -12,7 +12,7 @@ export function Field({ label, hint, children, className = '' }: { label: string
   );
 }
 
-export function MoneyInput({ id, value, onChange, placeholder, suffix }: { id?: string; value: number | null; onChange: (v: number | null) => void; placeholder?: string; suffix?: string }) {
+export function MoneyInput({ id, value, onChange, placeholder, suffix, disabled }: { id?: string; value: number | null; onChange: (v: number | null) => void; placeholder?: string; suffix?: string; disabled?: boolean }) {
   const fmt = (v: number | null) => (v == null ? '' : v.toLocaleString('en-AU', { maximumFractionDigits: 2 }));
   const [text, setText] = useState(fmt(value));
   const [focus, setFocus] = useState(false);
@@ -21,7 +21,7 @@ export function MoneyInput({ id, value, onChange, placeholder, suffix }: { id?: 
     <div className="relative">
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">$</span>
       <input
-        id={id} inputMode="decimal" className="input pl-7 pr-14" placeholder={placeholder ?? '0'} value={text}
+        id={id} inputMode="decimal" className={`input pl-7 pr-14 ${disabled ? 'cursor-not-allowed opacity-50' : ''}`} placeholder={placeholder ?? '0'} value={text} disabled={disabled} readOnly={disabled}
         onFocus={() => setFocus(true)}
         onBlur={() => { setFocus(false); setText(fmt(value)); }}
         onChange={(e) => { setText(e.target.value); onChange(parseMoney(e.target.value)); }}

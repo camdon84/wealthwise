@@ -78,7 +78,7 @@ export function PropertyEditor({ value, onChange, thorough }: { value: Property;
                   <div className="sm:col-span-3"><p className="field-label">Rate type</p><Segmented size="sm" value={l.rateType ?? 'variable'} onChange={(v) => setL({ rateType: v })} options={[{ value: 'variable', label: 'Variable' }, { value: 'fixed', label: 'Fixed' }]} /></div>
                   {l.rateType === 'fixed' && <Field label="Fixed until" className="sm:col-span-2" hint="We’ll remind you before it ends.">{(id) => <input id={id} type="month" className="input" value={l.fixedUntil ?? ''} onChange={(e) => setL({ fixedUntil: e.target.value })} />}</Field>}
                   {thorough && <Field label="Years left" className="sm:col-span-1">{(id) => <NumInput id={id} value={l.yearsLeft} onChange={(v) => setL({ yearsLeft: v })} />}</Field>}
-                  <Field label="Offset balance" hint="Also shown in My Details, under your cash." className="sm:col-span-2">{(id) => <MoneyInput id={id} value={l.offset} onChange={(v) => setL({ offset: v })} />}</Field>
+                  <Field label="Offset balance" hint="This value can only be edited in your My Details tab." className="sm:col-span-2">{(id) => <MoneyInput id={id} value={l.offset ?? null} onChange={() => {}} disabled />}</Field>
                 </div>
                 {value.loans.length > 1 && <button type="button" className="mt-2 text-xs text-muted hover:text-clay" onClick={() => set({ loans: value.loans.filter((x) => x.id !== l.id) })}>Remove split {i + 1}</button>}
               </div>

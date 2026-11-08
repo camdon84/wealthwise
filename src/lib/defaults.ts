@@ -50,7 +50,12 @@ export function normalize(p: Profile): Profile {
   // Offset money now belongs to a loan: move an old unassigned offset amount onto the first loan (home first)
   { const loans = [...p.properties].sort((a, b) => (a.use === 'home' ? -1 : 0) - (b.use === 'home' ? -1 : 0)).flatMap((pr) => pr.loans);
     const assigned = loans.reduce((t, l) => t + (l.offset ?? 0), 0);
-    if (loans.length && !assigned && (p.finances.cashOffset ?? 0) > 0) loans[0].offset = p.finances.cashOffset!; }
+    if (loans.length && !assigned && (p.finances.cashOffset ?? 0) > 0) loans[0].offset = p.finances.cashOffset!;
+    // Cash at the bank is now entered on its own (excluding offsets); work it out from an old total once
+    const inOffset = loans.reduce((t, l) => t + (l.offset ?? 0), 0);
+    if (p.finances.cashSavings == null && p.finances.cash != null) p.finances.cashSavings = Math.max(0, p.finances.cash - inOffset);
+    p.finances.cashOffset = inOffset || null;
+    if (p.finances.cashSavings != null || inOffset) p.finances.cash = (p.finances.cashSavings ?? 0) + inOffset; }
   p.plannedPurchases ??= [];
   for (const pp of p.plannedPurchases) { pp.ioFirst5 ??= true; pp.payOff ??= false; pp.depositPct ??= 20; pp.costsPct ??= 5; pp.holdingPct ??= 1.2; pp.mgmtPct ??= 7; if (pp.buyBy === undefined) pp.buyBy = null; }
   for (const pr of p.properties) { pr.planIo5 ??= pr.loans.length > 0 && pr.loans.every((l) => l.type === 'io'); pr.planPayOff ??= pr.use === 'home'; }
