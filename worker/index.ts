@@ -469,8 +469,8 @@ const WORK_IDEA = /\btrusts?\b|company structure|\bsmsf\b|self[- ]managed super|
 const noWork = (i: { title?: string; body?: string }) => !WORK_IDEA.test(`${i.title ?? ''} ${i.body ?? ''}`);
 /** Tidies how the AI writes money: "$1.5 m" → "$1.5m", "$95 k" → "$95k", "$2 000" → "$2,000" (any space, including thin and non-breaking ones). */
 const tidyMoney = (t: string) => t
-  .replace(/\$(\d[\d,.]*)[\s   ]+(m|k|b)\b/gi, (_, n, u) => `$${n}${u.toLowerCase()}`)
-  .replace(/\$(\d{1,3})(?:[\s   ](\d{3}))+\b/g, (m) => '$' + m.slice(1).replace(/[\s   ]/g, ',').replace(/^(\d+)/, '$1'));
+  .replace(/\$(\d[\d,.]*)[\s\u00a0\u202f\u2009]+(m|k|b)\b/gi, (_, n, u) => `$${n}${u.toLowerCase()}`)
+  .replace(/\$(\d{1,3})(?:[\s\u00a0\u202f\u2009](\d{3}))+\b/g, (m) => '$' + m.slice(1).replace(/[\s\u00a0\u202f\u2009]/g, ','));
 /** False when an idea delays a purchase, or cuts a share plan that already waits for the next purchase. Mirrors src/lib/insights.ts. */
 const noDelay = (i: { title?: string; body?: string }) => !/\b(delay\w*|postpon\w*|defer\w*|push(ing)? back|hold(ing)? off on (buying|the|your next|property))\b[^.]{0,60}\b(property|purchase|buy\w*)|\b(property|purchase)\b[^.]{0,30}\b(later|delay\w*|postpon\w*)\b/i.test(`${i.title ?? ''} ${i.body ?? ''}`);
 const keepsShareHold = (facts: any) => (i: { title?: string; body?: string }) => !facts?.sharePlan?.alreadyOnHoldUntilPropertyNumber
