@@ -36,6 +36,7 @@ function preset(p: Profile, risk: Risk, hisaRate: number, prev?: CashPlan): Cash
   };
 }
 
+const RISK_CLS: Record<string, string> = { 'Very low': 'bg-gum/15 text-gum', Low: 'bg-gum/15 text-gum', Medium: 'bg-brass/15 text-brass', 'Medium–high': 'bg-clay/15 text-clay', High: 'bg-clay/20 text-clay' };
 const STEPS = ['Approach', 'Emergency fund', 'Within reach', 'Where it sits', 'Shares'] as const;
 
 export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares' | 'timeline') => void }) {
@@ -73,7 +74,12 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
     return list.map((s) => {
       const r = project({ ...p, cashPlan: s.cp }, quotes);
       const i = ri(r);
-      return { ...s, buys: r.purchases.map((x) => x.year), atRetire: r.points[i].netWorth / inf(i), peakCash: Math.max(0, ...r.points.slice(0, i).map((x, k) => x.cash / inf(k))), tax: r.cashSharesTax, runsOut: r.runsOutAge };
+      // Risk: how much of the spare cash ends up in shares over the working years
+      const work = r.points.slice(0, i);
+      const inShares = work.reduce((t, x) => t + x.cashShares, 0), total = work.reduce((t, x) => t + Math.max(0, x.cash) + x.cashShares, 0);
+      const share = total ? inShares / total : 0;
+      const risk = share < 0.05 ? 'Very low' : share < 0.25 ? 'Low' : share < 0.5 ? 'Medium' : share < 0.75 ? 'Medium–high' : 'High';
+      return { ...s, risk, buys: r.purchases.map((x) => x.year), atRetire: r.points[i].netWorth / inf(i), peakCash: Math.max(0, ...work.map((x, k) => x.cash / inf(k))), tax: r.cashSharesTax, runsOut: r.runsOutAge };
     });
   }, [p, quotes, plan, choices.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const worst = Math.min(...scen.map((s) => s.atRetire));
@@ -243,14 +249,15 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
 
       <section className="panel p-5 sm:p-6">
         <h3 className="font-display text-lg font-semibold">How each option plays out</h3>
-        <p className="mt-1 text-sm text-muted">Your whole plan run with the cash held each way. Net worth at {p.goals.retirementAge}, in today’s money.</p>
+        <p className="mt-1 text-sm text-muted">Your whole plan run with the cash held each way. Net worth at {p.goals.retirementAge}, in today’s money. Risk is how much of your spare cash would be in shares, which can fall just when you need a deposit.</p>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-xs text-muted"><tr className="border-b border-line"><th className="py-2 pr-3 text-left font-medium">Where the cash goes</th><th className="px-3 py-2 text-right font-medium">Most cash held</th><th className="px-3 py-2 text-right font-medium">Buys in</th><th className="px-3 py-2 text-right font-medium">Tax on selling</th><th className="py-2 pl-3 text-right font-medium">Net worth at {p.goals.retirementAge}</th></tr></thead>
+            <thead className="align-bottom text-xs text-muted"><tr className="border-b border-line"><th className="py-2 pr-3 text-left font-medium">Where the cash goes</th><th className="px-3 py-2 text-left font-medium">Risk</th><th className="px-3 py-2 text-right font-medium">Highest bank balance<span className="block font-normal">before you retire, today’s money</span></th><th className="px-3 py-2 text-right font-medium">Property purchases<span className="block font-normal">year bought</span></th><th className="px-3 py-2 text-right font-medium">Tax on selling shares<span className="block font-normal">capital gains tax</span></th><th className="whitespace-nowrap py-2 pl-3 text-right font-medium">Net worth at {p.goals.retirementAge}</th></tr></thead>
             <tbody className="divide-y divide-line">
               {scen.map((s) => (
                 <tr key={s.key} className={s.key === 'mine' ? 'bg-brass/10 font-medium' : ''}>
                   <td className="py-2.5 pr-3"><p>{s.label}</p><p className="text-xs font-normal text-muted">{s.note}</p></td>
+                  <td className="px-3 py-2.5"><span className={`chip whitespace-nowrap ${RISK_CLS[s.risk]}`}>{s.risk}</span></td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{money(s.peakCash, { compact: true })}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{s.buys.join(', ') || '—'}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{s.tax > 0 ? money(s.tax, { compact: true }) : '—'}</td>
