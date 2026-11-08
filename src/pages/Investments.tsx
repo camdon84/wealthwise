@@ -166,7 +166,7 @@ function CryptoGuess({ value }: { value: number }) {
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div className="w-44"><Field label="My expected growth">{(id) => <NumInput id={id} value={g} onChange={(v) => update((d) => { d.cryptoGrowth = v; })} step={1} suffix="% / yr" placeholder="e.g. 15" />}</Field></div>
         {future != null ? (
-          <div><p className="text-xs text-muted">Expected value at {p.goals.retirementAge}</p><p className="font-display text-2xl font-semibold">{money(future, { compact: true })}</p><p className="text-xs text-muted">about {money(real!, { compact: true })} in today’s money</p></div>
+          <div><p className="text-xs text-muted">Expected value at {p.goals.retirementAge}</p><p className="font-display text-2xl font-semibold">{money(future, { compact: true })}</p><p className="text-xs text-muted">about {money(real!, { compact: true })} (in today’s money)</p></div>
         ) : <p className="pb-2 text-sm text-muted">Enter a growth rate to see what your crypto could be worth at {p.goals.retirementAge}.</p>}
       </div>
       <label className="flex cursor-pointer items-start gap-3 border-t border-line pt-4">
@@ -180,7 +180,7 @@ function CryptoGuess({ value }: { value: number }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="crypto-warn" onClick={() => setAsking(false)}>
           <div className="paper w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-clay/15 text-clay"><Icon name="coin" className="h-5 w-5" /></span><h2 id="crypto-warn" className="font-display text-xl font-semibold">Cryptocurrency</h2></div>
-            <p className="mt-4 leading-relaxed">Cryptocurrency is a volatile asset. We can include it in your plan, but it will only be a simple metric of your current portfolio value in today’s money and the expected growth that is set by you.</p>
+            <p className="mt-4 leading-relaxed">Cryptocurrency is a volatile asset. We can include it in your plan, but it will only be a simple metric of your current portfolio value (in today’s money) and the expected growth that is set by you.</p>
             {g == null && <p className="mt-3 text-sm text-clay">You’ll need to enter your expected growth for it to be included.</p>}
             <div className="mt-6 flex justify-end gap-2">
               <button className="btn-quiet" onClick={() => setAsking(false)}>Cancel</button>

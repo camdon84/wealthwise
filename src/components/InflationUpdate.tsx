@@ -75,7 +75,7 @@ export function InflationUpdate() {
         </div>
         <p className="mt-4 leading-relaxed">
           The government has just announced inflation for the {months === 12 ? '12 months' : `${months} months`} to {periodLabel(c.latest.period)}. It came back at <strong>{pct}%</strong>.
-          In order to keep your plan and financial modelling up to date, things like the purchase price of your properties in today’s money, as well as your monthly investment into shares, need to be updated to continue to align with your retirement outcomes. Here are your new figures.
+          In order to keep your plan and financial modelling up to date, things like the purchase price of your properties (in today’s money), as well as your monthly investment into shares, need to be updated to continue to align with your retirement outcomes. Here are your new figures.
         </p>
         {items.length > 0 ? (
           <div className="mt-5 overflow-hidden rounded-xl ring-1 ring-line">

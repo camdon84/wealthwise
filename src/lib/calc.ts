@@ -394,7 +394,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         const lift = r.uplift / Math.max(1, valueNow.get(r.propertyId) ?? 1);
         sim.value *= 1 + lift; sim.cost += r.cost * infl(i);
         if (sim.invest && r.rentPerWeek) sim.rent += r.rentPerWeek * 52 * infl(i);
-        say(year, 'cost', `Renovate ${sim.name} (${r.items.join(', ').toLowerCase() || r.label}): about ${fmt(r.cost)} in today’s money, adding about ${fmt(r.uplift)} to its value${sim.invest && r.rentPerWeek ? ` and ${fmt(r.rentPerWeek)} a week in rent` : ''}.`);
+        say(year, 'cost', `Renovate ${sim.name} (${r.items.join(', ').toLowerCase() || r.label}): about ${fmt(r.cost)} (in today’s money), adding about ${fmt(r.uplift)} to its value${sim.invest && r.rentPerWeek ? ` and ${fmt(r.rentPerWeek)} a week in rent` : ''}.`);
       }
 
       // What cash earns. Without a cash plan: it all sits in an offset where there's debt, saving that interest.
@@ -509,7 +509,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         const proceeds = s.value * (1 - SELL_COSTS) - s.debt - Math.max(0, s.value - s.cost) * CGT_RATE;
         sims.splice(idx, 1);
         cash += proceeds; saleIn += Math.max(0, proceeds); sold.push(s.name);
-        say(year, 'sell', `Sell ${s.name} for about ${fmt(s.value / infl(i))} in today’s money${why}, freeing about ${fmt(proceeds / infl(i))} after the loan, selling costs and tax.`);
+        say(year, 'sell', `Sell ${s.name} for about ${fmt(s.value / infl(i))} (in today’s money)${why}, freeing about ${fmt(proceeds / infl(i))} after the loan, selling costs and tax.`);
       };
 
       const eventCost = p.goals.events.filter((ev) => ev.year === year).reduce((t, ev) => t + n(ev.amount), 0) + renoCost;
@@ -540,7 +540,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
           for (let k = sims.length - 1; k >= 0; k--) if (sims[k].invest && !sims[k].payOff && sims[k].debt > 1000) sellProperty(k, ' at retirement, as it still has a loan and isn’t set to be paid off');
           const snap = `After that you’d have about ${fmt(sup / infl(i))} in super, ${fmt(shares / infl(i))} in shares, ${cryptoBal > 1000 ? `${fmt(cryptoBal / infl(i))} in crypto, ` : ''}${fmt(Math.max(0, cash) / infl(i))} in cash and ${sims.length} ${sims.length === 1 ? 'property' : 'properties'} (today’s money).`;
           const sold = events.length - at;
-          say(year, 'retire', `Stop working at ${retireAge}.${sold ? ` ${sold === 1 ? 'One property is' : `${sold} properties are`} sold (below). ${snap}` : ` ${snap.replace('After that you’d', 'You’d')}`} From here you live on ${fmt(p.goals.passiveIncome)} a year in today’s money.`);
+          say(year, 'retire', `Stop working at ${retireAge}.${sold ? ` ${sold === 1 ? 'One property is' : `${sold} properties are`} sold (below). ${snap}` : ` ${snap.replace('After that you’d', 'You’d')}`} From here you live on ${fmt(p.goals.passiveIncome)} a year (in today’s money).`);
           events.splice(at, 0, events.pop()!);
         }
         // A home loan still owing in retirement is cleared from savings, then from super once it can be reached
@@ -552,7 +552,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         }
         // Retired: spend the income goal (plus any dependants still at home). Super pays first (from 60), then rent and savings, then shares, then investment property sales.
         spendGoal = p.goals.passiveIncome * infl(i) + dependantsMonthly(p, i) * 12 * infl(i);
-        if (age === PRESERVATION_AGE && sup > 0 && age > retireAge) say(year, 'super', `Super opens at 60: about ${fmt(sup / infl(i))} in today’s money. It now pays your yearly income first.`);
+        if (age === PRESERVATION_AGE && sup > 0 && age > retireAge) say(year, 'super', `Super opens at 60: about ${fmt(sup / infl(i))} (in today’s money). It now pays your yearly income first.`);
         let superDraw = 0;
         if (age >= PRESERVATION_AGE && sup > 0) {
           superDraw = Math.min(sup, Math.max(sup * minDrawdown(age), spendGoal));
@@ -639,7 +639,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
           waitFrom = null;
           const fhbNote = fhb ? ` First home buyer help: ${[fhb.deposit5 && '5% deposit with no mortgage insurance', fhb.grant && `a ${fmt(grant)} First Home Owner Grant`, fhb.noStampDuty && 'no stamp duty'].filter(Boolean).join(', ') || 'none ticked'}.` : '';
           const ngNote = !(plan?.firstHome && p.properties.length === 0 && k === 0) ? (plan?.newBuild ? ' As a new build it keeps negative gearing.' : ' As an established home bought after Budget night 2026, rental losses can’t reduce your other tax from July 2027; they carry forward against its future rent.') : '';
-          say(year, 'buy', `Buy ${label}${fhb ? ' as your first home' : ''} for about ${fmt(price / infl(i))} in today’s money (${fmt(price)} at the time), putting in ${via || 'equity'} and borrowing ${fmt(newLoan)}.${waited}${fhb ? '' : loanPlan}${fhbNote}${ngNote}`);
+          say(year, 'buy', `Buy ${label}${fhb ? ' as your first home' : ''} for about ${fmt(price / infl(i))} (in today’s money; ${fmt(price)} at the time), putting in ${via || 'equity'} and borrowing ${fmt(newLoan)}.${waited}${fhb ? '' : loanPlan}${fhbNote}${ngNote}`);
         } else {
           if (waitFrom == null) waitFrom = year;
           block = { year, reason: deposit - usable > spare ? 'deposit' : 'servicing', price, deposit, available: usable + spare, monthlyShort: Math.max(0, pmt(rate + a.serviceBuffer, 30, total - spare) - pmt(rate + a.serviceBuffer, 30, maxLoan)) };
@@ -665,7 +665,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, rentIncome: sims.filter((x) => x.invest).reduce((t, x) => t + x.rent, 0), superDrawn, paidOff: paidOff.length ? paidOff : undefined, sold: sold.length ? sold : undefined, payNet, investNet, saleIn, giftIn, liqIn, propNet: propNetY, spending: working ? living : spendGoal, liquidated: liquidated || undefined,
     });
   }
-  if (runsOutAge == null) say(y0 + (endAge - startAge), 'goal', `Your money lasts to ${endAge}, with about ${fmt((points[points.length - 1].netWorth) / infl(endAge - startAge))} in today’s money left over.`);
+  if (runsOutAge == null) say(y0 + (endAge - startAge), 'goal', `Your money lasts to ${endAge}, with about ${fmt((points[points.length - 1].netWorth) / infl(endAge - startAge))} (in today’s money) left over.`);
   events.sort((x, y) => x.year - y.year);
   return { points, purchases, retireYear, block: purchases.length + p.properties.length >= p.goals.targetProperties ? null : block, events, runsOutAge, shortfallYear, sharesAtRetire, buffer, shareMonthly, requiredShareMonthly: reqMonthly, cryptoExcluded, cashSharesTax };
 }

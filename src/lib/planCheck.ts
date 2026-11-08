@@ -86,7 +86,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
     const scale = bisect(0.3, 1, (f) => propsOk(p, run((x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= f; }); })));
     if (scale != null && scale < 0.97) {
       const prices = [...new Set(planned.map((pp) => m(round(pp.price * scale, 5000))))];
-      fixes.push(`Choose cheaper properties: about ${prices.length === 1 ? `${prices[0]} each` : prices.join(', then ')} in today’s money would fit.`);
+      fixes.push(`Choose cheaper properties: about ${prices.length === 1 ? `${prices[0]} each` : prices.join(', then ')} (in today’s money) would fit.`);
     }
     // Smaller share goal frees savings for deposits
     if (r.shareMonthly > 0 && !cap) {
@@ -140,7 +140,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   if (lastsOk(r)) {
     const last = r.points[r.points.length - 1];
     const left = last ? Math.max(0, last.netWorth) / Math.pow(1 + p.assumptions.inflation / 100, r.points.length - 1) : 0;
-    good.push(`Living on ${m(g.passiveIncome)} a year from ${retireAge}, your money lasts past ${life}, with about ${m(left)} in today’s money to spare.`);
+    good.push(`Living on ${m(g.passiveIncome)} a year from ${retireAge}, your money lasts past ${life}, with about ${m(left)} (in today’s money) to spare.`);
     // Room for more?
     if (propsOk(p, r) && cashOk(r) && g.targetProperties < 10 && g.wealthFocus !== 'shares') {
       const more = run((x) => { x.goals.targetProperties += 1; });
@@ -190,7 +190,7 @@ function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) =>
       });
     }
   }
-  levers.push({ text: `aim for a property about 10% cheaper (around ${m(round(planned[0].price * 0.9, 5000))} in today’s money)`, mod: (x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= 0.9; }); } });
+  levers.push({ text: `aim for a property about 10% cheaper (around ${m(round(planned[0].price * 0.9, 5000))}, today’s money)`, mod: (x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= 0.9; }); } });
   levers.push({ text: 'reduce your living expenses by about 10%', mod: (x) => { const f = x.finances; if (f.livingMonthly) f.livingMonthly *= 0.9; for (const k in f.livingBreakdown ?? {}) if (f.livingBreakdown[k]) f.livingBreakdown[k] = (f.livingBreakdown[k] ?? 0) * 0.9; } });
 
   const out: { k: number; gain: number; text: string; liquidation?: PlanIdea['liquidation'] }[] = [];
@@ -247,7 +247,7 @@ function equityIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void)
       const avg = work.reduce((t2, x, i) => t2 + x.shareContribution / Math.pow(1 + p.assumptions.inflation / 100, i), 0) / Math.max(1, work.length * 12);
       const monthly = Math.floor(avg / 50) * 50;
       const gain = real(rr.sharesAtRetire) - real(r.sharesAtRetire);
-      if (gain > 50000 && monthly > r.shareMonthly + 100) out.push({ text: `Have you thought about owning ${t} ${t === 1 ? 'property' : 'properties'} instead of ${g.targetProperties}? You could invest about ${m(monthly)} a month in shares on average instead of ${m(r.shareMonthly)}, with your shares reaching about ${m(real(rr.sharesAtRetire))} by ${g.retirementAge} in today’s money (${m(gain)} more), and less borrowing.` });
+      if (gain > 50000 && monthly > r.shareMonthly + 100) out.push({ text: `Have you thought about owning ${t} ${t === 1 ? 'property' : 'properties'} instead of ${g.targetProperties}? You could invest about ${m(monthly)} a month in shares on average instead of ${m(r.shareMonthly)}, with your shares reaching about ${m(real(rr.sharesAtRetire))} by ${g.retirementAge} (in today’s money) (${m(gain)} more), and less borrowing.` });
     }
   }
   // A share plan that waits for a property purchase: starting now gives it longer to grow

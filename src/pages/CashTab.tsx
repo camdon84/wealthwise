@@ -92,8 +92,8 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
           {big
             ? <>
               {peak.year >= lastBuy
-                ? <p>You’re going to build up large cash reserves in the bank, up to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> in today’s money. {buys.length ? <>The biggest build-up comes after your last property purchase, so that money isn’t needed for a deposit.{waves.length > 1 ? ' Before that, your cash builds towards each deposit:' : ''}</> : 'Your plan doesn’t have another property purchase before you stop work, so it isn’t needed for a deposit.'}</p>
-                : <p>You’re going to build up large cash reserves in the bank, up to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> in today’s money. Based on your plan, most of this will go towards the deposits on your property purchases:</p>}
+                ? <p>You’re going to build up large cash reserves in the bank, up to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> (in today’s money). {buys.length ? <>The biggest build-up comes after your last property purchase, so that money isn’t needed for a deposit.{waves.length > 1 ? ' Before that, your cash builds towards each deposit:' : ''}</> : 'Your plan doesn’t have another property purchase before you stop work, so it isn’t needed for a deposit.'}</p>
+                : <p>You’re going to build up large cash reserves in the bank, up to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> (in today’s money). Based on your plan, most of this will go towards the deposits on your property purchases:</p>}
               {waves.length > 1 && (
                 <ul className="flex flex-wrap gap-2 pt-1">
                   {waves.map((w) => <li key={w.year} className="rounded-lg bg-raised px-3 py-2 text-sm ring-1 ring-line"><span className="font-display font-semibold">{money(w.v, { compact: true })}</span> by {w.year}<span className="block text-xs text-muted">{w.label}</span></li>)}

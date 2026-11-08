@@ -321,7 +321,7 @@ export function goalAnalysis(p: Profile, quotes: Quotes) {
     if (extra && extra.year <= proj.retireYear - 3) lines.push({ tone: 'good', text: `There looks to be room for one more. On these numbers you could also buy property ${p.goals.targetProperties + 1} around ${extra.year} at about ${money(extra.price, { compact: true })}. Raise “Properties owned by retirement” to add it to your plan.` });
   }
   if (target > 0) {
-    if (sharesAtRetireReal >= target * 0.98) lines.push({ tone: 'good', text: `Investing ${money(proj.shareMonthly)} a month, your shares reach about ${money(sharesAtRetireReal, { compact: true })} in today’s money by ${p.goals.retirementAge}, meeting your ${money(target, { compact: true })} goal.` });
+    if (sharesAtRetireReal >= target * 0.98) lines.push({ tone: 'good', text: `Investing ${money(proj.shareMonthly)} a month, your shares reach about ${money(sharesAtRetireReal, { compact: true })} (in today’s money) by ${p.goals.retirementAge}, meeting your ${money(target, { compact: true })} goal.` });
     else lines.push({ tone: 'warn', text: `To grow your shares to ${money(target, { compact: true })} by ${p.goals.retirementAge}, you’d invest about ${money(proj.requiredShareMonthly)} a month. At ${money(proj.shareMonthly)} a month you’d reach about ${money(sharesAtRetireReal, { compact: true })}.` });
   }
   const incomeReal = atRetire?.passiveIncomeReal ?? 0;

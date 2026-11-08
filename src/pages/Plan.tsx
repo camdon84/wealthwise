@@ -191,12 +191,12 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
           <Field label="Planning to live to">{(id) => <NumInput id={id} value={g.lifeExpectancy ?? 90} onChange={(v) => update((d) => { d.goals.lifeExpectancy = v ?? 90; })} />}</Field>
           <LinkedValue label="Properties owned by retirement" value={`${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}`} hint="Update your property goal on the Property Portfolio tab." tabLabel="Property Portfolio" onGo={() => go('timeline')} />
           <LinkedValue label="Share portfolio value at retirement" value={g.sharesTarget ? `${money(g.sharesTarget)}` : 'No goal set'} hint="Update your share plan on the Shares tab." tabLabel="Shares" onGo={() => go('shares')} />
-          <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working, in today’s money. The plan sells shares and properties if it needs to.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
-          <div><Field label="Accessible cash reserves in retirement" hint="The minimum amount of money you want access to in your everyday bank accounts during retirement, in today’s money. This replaces the emergency cash buffer you set in My Details once you retire. We recommend at least $50,000.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder="50000" />}</Field>
+          <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working (in today’s money). The plan sells shares and properties if it needs to.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
+          <div><Field label="Accessible cash reserves in retirement" hint="The minimum amount of money you want access to in your everyday bank accounts during retirement (in today’s money). This replaces the emergency cash buffer you set in My Details once you retire. We recommend at least $50,000.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder="50000" />}</Field>
             {g.retireCash != null && g.retireCash < RETIRE_CASH_MIN && <p role="status" className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-sm">We recommend keeping at least {money(RETIRE_CASH_MIN)} in cash once you’ve retired, for repairs, health costs and surprises without having to sell anything.</p>}</div>
           <div className="sm:col-span-2">
             <p className="field-label">Planning to have children?</p>
-            <p className="-mt-1 mb-2 text-xs text-muted">Add the year you expect each one. We allow the Australian average cost of raising a child, about {money(CHILD_COST_YEAR)} a year from birth to 18 in today’s money. Leave it blank if you’re not planning any. Children you already have go in My Details, under Dependants.</p>
+            <p className="-mt-1 mb-2 text-xs text-muted">Add the year you expect each one. We allow the Australian average cost of raising a child, about {money(CHILD_COST_YEAR)} a year from birth to 18 (in today’s money). Leave it blank if you’re not planning any. Children you already have go in My Details, under Dependants.</p>
             <div className="space-y-2">
               {(g.plannedChildren ?? []).map((c, k) => (
                 <div key={c.id} className="flex items-center gap-2">
@@ -413,14 +413,14 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
     ? <p className={`text-right text-sm ${late ? 'text-clay' : ''}`}><span className="font-semibold">{bought.year}</span><br /><span className="text-muted">age {startAge + (bought.year - startYear)} · {money(bought.price, { compact: true })} then</span></p>
     : <p className="text-sm font-medium text-clay">Doesn’t fit before {retireAge}</p>;
   return (
-    <RowShell n={n} tone={bought && !late ? 'planned' : 'missing'} title={plan.label || `Property ${n}`} sub={`Planned · ${money(plan.price, { compact: true })} in today’s money · ${plan.yieldPct}% yield, about ${money(weeklyRent)} a week rent`} right={right} chips={chips} open={open} onToggle={onToggle}>
+    <RowShell n={n} tone={bought && !late ? 'planned' : 'missing'} title={plan.label || `Property ${n}`} sub={`Planned · ${money(plan.price, { compact: true })} (in today’s money) · ${plan.yieldPct}% yield, about ${money(weeklyRent)} a week rent`} right={right} chips={chips} open={open} onToggle={onToggle}>
       {!bought && firstMissing && block && (
         <p className="mb-3 text-sm text-clay">{block.reason === 'servicing' ? `Held back by borrowing power: lenders would want about ${money(block.monthlyShort, { compact: true })} a month more income. Try a cheaper price or a higher yield.` : `Needs about ${money(block.deposit, { compact: true })} for the deposit and costs; you’d have ${money(block.available, { compact: true })}.`}</p>
       )}
       {late && <p className="mb-3 text-sm text-clay">You want to purchase this property before {plan.buyBy}, but the earliest it fits is {bought!.year}. Adjust the price, the purchase year, or go to your <button className="font-semibold underline" onClick={onGoals}>Goals tab</button> for further recommendations.</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Name (optional)">{(id) => <TextInput id={id} value={plan.label} onChange={(v) => set({ label: v })} placeholder={`Property ${n}`} />}</Field>
-        <Field label="Price in today’s money">{(id) => <MoneyInput id={id} value={plan.price} onChange={(v) => set({ price: v ?? 0 })} />}</Field>
+        <Field label="Price (in today’s money)">{(id) => <MoneyInput id={id} value={plan.price} onChange={(v) => set({ price: v ?? 0 })} />}</Field>
         <Field label="When">{(id) => <Select id={id} value={String(plan.buyBy ?? '')} onChange={(v) => set({ buyBy: v ? Number(v) : null })}
           options={[{ value: '', label: 'As soon as possible' }, ...Array.from({ length: Math.max(1, retireAge - startAge) }, (_, j) => startYear + 1 + j).map((y) => ({ value: String(y), label: `Before ${y}` }))]} />}</Field>
         <Field label="Interest rate" hint={plan.rate === assumedRate ? 'Same as your assumptions' : <button type="button" className="font-medium text-brass hover:underline" onClick={() => set({ rate: assumedRate })}>Use interest rate from assumptions ({assumedRate}%)</button>}>{(id) => <NumInput id={id} value={plan.rate} onChange={(v) => set({ rate: v ?? 0 })} step={0.05} suffix="%" />}</Field>
@@ -689,7 +689,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
         <div className="mt-5"><p className="text-xs text-muted">Shares today</p><p className="font-display text-2xl font-semibold">{money(sharesNow)}</p></div>
         <p className="mt-5 text-sm">Plan your shares one of two ways: set a goal for retirement, or set how much you’ll invest each month. We’ll work out the other.</p>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <Field label="Retirement goal" hint="What you’d like your shares to be worth when you stop work, in today’s money. Leave blank if you don’t have one.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
+          <Field label="Retirement goal" hint="What you’d like your shares to be worth when you stop work (in today’s money). Leave blank if you don’t have one.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
           <Field label="Monthly investment" hint={auto && p.goals.sharesTarget ? 'Worked out from your goal. Type an amount to set your own instead.' : 'The amount goes up with inflation each year.'}>{(id) => <MoneyInput id={id} value={auto ? (p.goals.sharesTarget ? Math.round(required) : null) : p.goals.shareMonthly ?? null} onChange={(v) => {
             // Typing a monthly amount works the retirement goal out from it, so the two boxes always agree
             const x: typeof p = JSON.parse(JSON.stringify(p)); x.goals.shareMonthly = v ?? 0;
@@ -717,7 +717,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
           {auto && p.goals.sharesTarget ? (<>
             <p className="text-sm text-muted">To reach {money(p.goals.sharesTarget, { compact: true })} by {p.goals.retirementAge} at {p.assumptions.shareReturn}% a year, you’d invest about</p>
             <p className="font-display text-3xl font-semibold">{money(required)} <span className="text-base font-normal text-muted">a month</span></p>
-            <p className="text-xs text-muted">{money(required * 12)} a year in today’s money, rising with inflation, for {years} years.</p>
+            <p className="text-xs text-muted">{money(required * 12)} a year (in today’s money), rising with inflation, for {years} years.</p>
           </>) : !auto && proj.shareMonthly > 0 ? (<>
             <p className="text-sm text-muted">By investing {money(proj.shareMonthly)} a month, you’d have about</p>
             <p className="font-display text-3xl font-semibold">{money(realAtRetire, { compact: true })} <span className="text-base font-normal text-muted">by {p.goals.retirementAge}</span></p>
@@ -732,7 +732,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
             <Icon name="x" className="mt-0.5 h-5 w-5 shrink-0 text-clay" />
             <div>
               <p className="font-semibold">This share plan stops your property purchases</p>
-              <p className="mt-1 text-sm">Based on your property purchasing goals, the maximum you can invest in shares is <span className="font-semibold">{money(cap.monthly)} a month</span>. That grows to about {money(cap.sharesAtRetireReal, { compact: true })} by {p.goals.retirementAge} in today’s money.</p>
+              <p className="mt-1 text-sm">Based on your property purchasing goals, the maximum you can invest in shares is <span className="font-semibold">{money(cap.monthly)} a month</span>. That grows to about {money(cap.sharesAtRetireReal, { compact: true })} by {p.goals.retirementAge} (in today’s money).</p>
               <button className="btn-quiet mt-3" onClick={() => useAmount(cap.monthly)}>Use {money(cap.monthly)} a month</button>
             </div>
           </div>
