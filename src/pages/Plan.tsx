@@ -807,8 +807,6 @@ const EVENT_STYLE: Record<string, { icon: string; cls: string }> = {
 function Projections({ quotes }: { quotes: Quotes }) {
   const p = usePlanProfile();
   const check = useMemo(() => planCheck(p, quotes), [p, quotes]);
-  const takeInsights = useMemo(() => wiseInsights(p, quotes), [p, quotes]);
-  const take = useWiseTake(p, quotes, takeInsights, 'goals'); // same request as the Goals tab
   const proj = check.proj;
   const [dollars, setDollars] = useState<'real' | 'nominal'>('real');
   const [hidden, setHidden] = useState<string[]>([]);
@@ -842,7 +840,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
         </div>
       </section>
 
-      <PlanCheckBox check={check} take={take} />
+      <PlanCheckBox check={check} notesOnly />
 
       <section className="panel p-5 sm:p-6">
         <h2 className="font-display text-xl font-semibold">What happens, year by year</h2>

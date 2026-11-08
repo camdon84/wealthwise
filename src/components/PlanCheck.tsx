@@ -34,8 +34,9 @@ function RetireIncomeNotice() {
 /** "Does this plan work?" box, shared by the Goals tab and Your Wise Future. */
 type Take = { summary: string; ideas: { title: string; body: string }[] } | null | 'loading';
 
-export function PlanCheckBox(props: { check: PlanCheck; compact?: boolean; take?: Take }) {
-  return <><RetireIncomeNotice />{props.check.works && <LockNudge />}<PlanCheckResult {...props} /></>;
+/** notesOnly: just the retirement-income and lock notes (Your Wise Future); the full check and ideas live on Goals. */
+export function PlanCheckBox(props: { check: PlanCheck; compact?: boolean; take?: Take; notesOnly?: boolean }) {
+  return <><RetireIncomeNotice />{props.check.works && <LockNudge />}{!props.notesOnly && <PlanCheckResult {...props} />}</>;
 }
 
 /** Wise's one-paragraph read of the plan, under the dot points. */
