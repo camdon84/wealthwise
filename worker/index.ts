@@ -268,6 +268,11 @@ async function api(req: Request, env: Env, path: string) {
   if (path === '/api/documents/read' && method === 'POST') return readDocument(req, env);
   if (path === '/api/geocode' && method === 'GET') return geocode(req, env);
   if (path === '/api/renovate-image' && method === 'POST') return renovateImage(req, env);
+  if (path === '/api/cpi' && method === 'GET') {
+    const force = new URL(req.url).searchParams.get('debug') === '1';
+    const data = force ? await cpiRaw() : await cpi(env);
+    return data ? json(data, 200, { 'cache-control': force ? 'no-store' : 'public, max-age=3600' }) : fail('Inflation figures unavailable right now.', 503);
+  }
   if (path === '/api/cash-rate' && method === 'GET') {
     const data = await cashRate(env);
     return data ? json(data, 200, { 'cache-control': 'public, max-age=1800' }) : fail('Cash rate unavailable right now.', 503);
@@ -283,6 +288,7 @@ export default {
       await nationalBriefing(env, 'equity', true);
       await nationalBriefing(env, 'property', true);
       await cashRate(env, true);
+      await cpi(env, true);
     })());
   },
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -440,6 +446,45 @@ Reply with JSON only: {"summary":"2-3 sentences, max 60 words","ideas":[{"title"
     return { summary: String(out?.summary || '').slice(0, 600), ideas: (Array.isArray(out?.ideas) ? out.ideas : []).slice(0, 2).map((i: any) => ({ title: String(i.title || '').slice(0, 80), body: String(i.body || '').slice(0, 300) })) };
   });
   return data?.summary ? json(data) : fail('Wise is unavailable right now.', 503);
+}
+
+/* ---------- CPI: the ABS consumer price index, as republished by the RBA (table G1, quarterly) ----------
+ * Returns the quarterly index levels so the app can index a locked plan by exactly what prices did since it was set. */
+async function cpiRaw() {
+  const res = await fetch('https://www.rba.gov.au/statistics/tables/csv/g1-data.csv', { headers: { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' } });
+  if (!res.ok) throw new Error(`rba g1 ${res.status}`);
+  const text = latin1(await res.arrayBuffer());
+  const lines = text.split(/\r?\n/).map((l) => l.split(','));
+  const idRow = lines.find((c) => c[0]?.trim() === 'Series ID') ?? [];
+  const titleRow = lines.find((c) => c[0]?.trim() === 'Title') ?? [];
+  return { head: lines.slice(0, 12).map((c) => c.slice(0, 6).join(' | ')), ids: idRow.slice(0, 20), titles: titleRow.slice(0, 20), tail: lines.filter((c) => c[0] && /\d{4}/.test(c[0])).slice(-3).map((c) => c.slice(0, 8).join(' | ')) };
+}
+/** Latin-1 bytes to text (the RBA's CSVs aren't UTF-8). */
+const latin1 = (buf: ArrayBuffer) => { const b = new Uint8Array(buf); let out = ''; for (let i = 0; i < b.length; i += 8192) out += String.fromCharCode(...b.subarray(i, i + 8192)); return out; };
+const MON: Record<string, number> = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+function cpi(env: Env, force = false) {
+  return cached(env, 'rba:cpi', 12 * 3600e3, async () => {
+    const res = await fetch('https://www.rba.gov.au/statistics/tables/csv/g1-data.csv', { headers: { 'user-agent': 'Mozilla/5.0 (compatible; WealthWise/1.0)' } });
+    if (!res.ok) throw new Error(`rba g1 ${res.status}`);
+    const lines = latin1(await res.arrayBuffer()).split(/\r?\n/).map((l) => l.split(','));
+    const ids = (lines.find((c) => c[0]?.trim() === 'Series ID') ?? []).map((x) => x.trim());
+    const iIdx = ids.indexOf('GCPIAG'), iYr = ids.indexOf('GCPIAGYP');
+    if (iIdx < 0) throw new Error('no CPI index column');
+    const series: { period: string; index: number; annual: number | null }[] = [];
+    for (const c of lines) {
+      const m = /^(?:\d{1,2}-)?([A-Za-z]{3})-(\d{4})$/.exec(c[0]?.trim() ?? '');
+      if (!m) continue;
+      const idx = Number(c[iIdx]);
+      if (!c[iIdx] || isNaN(idx)) continue;
+      const mo = MON[m[1].toLowerCase()];
+      series.push({ period: `${m[2]}-${String(mo).padStart(2, '0')}`, index: idx, annual: iYr >= 0 && c[iYr] && !isNaN(Number(c[iYr])) ? Number(c[iYr]) : null });
+    }
+    if (series.length < 5) throw new Error('too few CPI rows');
+    const recent = series.slice(-24);
+    const last = recent[recent.length - 1];
+    const yearAgo = recent[recent.length - 5];
+    return { latest: { ...last, annual: last.annual ?? Math.round((last.index / yearAgo.index - 1) * 1000) / 10 }, series: recent };
+  }, force);
 }
 
 /* ---------- RBA cash rate (official daily series) ---------- */
