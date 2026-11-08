@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
 import { applySnapshot, newForecast, PlanProvider, snapshot, useForecast, usePlanMode, usePlanProfile, usePlanUpdate, type PlanCtx } from '../lib/planContext';
-import { CHILD_COST_YEAR, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, type Quotes } from '../lib/calc';
+import { CHILD_COST_YEAR, RETIRE_CASH_MIN, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, type Quotes } from '../lib/calc';
 import { maxShareMonthly, planCheck, saleAfterTax } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { wiseInsights } from '../lib/insights';
@@ -37,10 +37,10 @@ export function Plan({ quotes }: { quotes: Quotes }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="mb-3 inline-flex rounded-xl border border-line bg-surface/5 p-1" role="radiogroup" aria-label="Plan mode">
+          <div className="mb-2 inline-flex rounded-lg border border-line bg-surface/5 p-0.5" role="radiogroup" aria-label="Plan mode">
             {(['live', 'forecast'] as const).map((m) => (
               <button key={m} role="radio" aria-checked={(forecasting ? 'forecast' : 'live') === m} onClick={() => (m === 'live' ? fc.set({ mode: 'live' }) : startForecast())}
-                className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors ${(forecasting ? 'forecast' : 'live') === m ? (m === 'live' ? 'bg-gum text-surface' : 'bg-sky text-surface') : 'text-muted hover:text-ink'}`}>
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${(forecasting ? 'forecast' : 'live') === m ? (m === 'live' ? 'bg-gum text-surface' : 'bg-sky text-surface') : 'text-muted hover:text-ink'}`}>
                 {m === 'live' ? 'Live plan' : 'Forecast'}
               </button>
             ))}
@@ -59,7 +59,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
           {!forecasting && (
             <button onClick={() => (locked ? setAsk({}) : liveUpdate((d) => { d.planLocked = true; }))} title={locked ? 'Your plan is locked. Click to unlock.' : 'Lock your plan so it can’t be changed by accident'}
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold ${locked ? 'bg-ink text-surface' : 'border border-line text-muted hover:text-ink'}`}>
-              <Icon name={locked ? 'lock' : 'unlock'} className="h-4 w-4" />{locked ? 'Locked' : 'Lock'}
+              <Icon name={locked ? 'lock' : 'unlock'} className="h-4 w-4" />{locked ? 'Plan locked' : 'Lock my plan'}
             </button>
           )}
         </div>
@@ -80,7 +80,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
         {tab === 'liquidations' && <LiquidationsTab quotes={quotes} />}
         {tab === 'gifts' && <GiftsTab />}
       </div>
-      {tab === 'projections' && <Projections quotes={quotes} onLock={() => liveUpdate((d) => { d.planLocked = true; })} onAskUnlock={() => setAsk({})} />}
+      {tab === 'projections' && <Projections quotes={quotes} />}
 
       {ask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="lock-h" onClick={() => setAsk(null)}>
@@ -187,7 +187,8 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
           <LinkedValue label="Properties owned by retirement" value={`${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}`} hint="Update your property goal on the Property portfolio tab." tabLabel="Property portfolio" onGo={() => go('timeline')} />
           <LinkedValue label="Share portfolio value at retirement" value={g.sharesTarget ? `${money(g.sharesTarget)}` : 'No goal set'} hint="Update your share plan on the Shares tab." tabLabel="Shares" onGo={() => go('shares')} />
           <Field label="Yearly income after retirement" hint="What you want to live on each year once you stop working, in today’s money. The plan sells shares and properties if it needs to.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
-          <Field label="Cash to keep on hand in retirement" hint="The least you want in the bank at any time once you stop work, in today’s money. It replaces your emergency cash buffer from then on.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder={String(Math.round(p.finances.buffer ?? recommendedBuffer(p)))} />}</Field>
+          <div><Field label="Cash to keep on hand in retirement" hint="The least you want in the bank at any time once you stop work, in today’s money. It replaces your emergency cash buffer from then on. We use $50,000 if you leave it blank.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder="50000" />}</Field>
+            {g.retireCash != null && g.retireCash < RETIRE_CASH_MIN && <p role="status" className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-sm">We recommend keeping at least {money(RETIRE_CASH_MIN)} in cash once you’ve retired, for repairs, health costs and surprises without having to sell anything.</p>}</div>
           <div className="sm:col-span-2">
             <p className="field-label">Planning to have children?</p>
             <p className="-mt-1 mb-2 text-xs text-muted">Add the year you expect each one. We allow the Australian average cost of raising a child, about {money(CHILD_COST_YEAR)} a year from birth to 18 in today’s money. Leave it blank if you’re not planning any. Children you already have go in Dependants.</p>
@@ -226,18 +227,16 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
 function LinkedValue({ label, value, hint, tabLabel, onGo }: { label: string; value: string; hint: string; tabLabel: string; onGo: () => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="relative" data-free>
+    <div className="relative" data-free onMouseLeave={() => setOpen(false)}>
       <p className="field-label">{label}</p>
       <button type="button" className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-line bg-raised/60 px-3.5 py-2.5 text-left text-ink hover:border-brass/60" onClick={() => setOpen((o) => !o)} aria-expanded={open} title={hint}>
         <span>{value}</span><Icon name="plan" className="h-4 w-4 text-muted" />
       </button>
       <p className="mt-1.5 text-xs text-muted">{hint}</p>
-      {open && (
-        <div role="dialog" className="absolute left-0 right-0 top-[4.6rem] z-20 rounded-xl border border-brass/50 bg-surface p-3 text-sm shadow-xl">
-          <p>This is set on the {tabLabel} tab, so it always matches your plan there.</p>
-          <div className="mt-2 flex gap-2"><button className="btn-primary py-1.5 text-sm" onClick={onGo}>Go to {tabLabel}</button><button className="btn-ghost py-1.5 text-sm" onClick={() => setOpen(false)}>Close</button></div>
-        </div>
-      )}
+      <div role="dialog" aria-hidden={!open} className={`absolute left-0 right-0 top-[4.6rem] z-20 rounded-xl border border-brass/50 bg-surface p-3 text-sm shadow-xl transition-all duration-300 ${open ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'}`}>
+        <p>This is set on the {tabLabel} tab, so it always matches your plan there.</p>
+        <button className="btn-primary mt-2 py-1.5 text-sm" tabIndex={open ? 0 : -1} onClick={onGo}>Go to {tabLabel}</button>
+      </div>
     </div>
   );
 }
@@ -488,7 +487,7 @@ function RetirementMetrics({ proj }: { proj: ReturnType<typeof project> }) {
       {at && tile(p.household.hasPartner ? 'Combined net worth' : 'Net worth', c(at.netWorth), `${c(at.super)} in super · ${c(at.shares)} in shares`, 'text-gum')}
       {at && tile('Investment property cash flow', investKept > 0 ? `${propMonthly >= 0 ? '' : '−'}${money(Math.abs(propMonthly))}` : '$0', investKept > 0 ? `a month from the ${investKept} investment ${investKept === 1 ? 'property' : 'properties'} you keep, after loans and costs` : 'No investment properties kept. Set one to be paid off by retirement to keep its rent.', propMonthly < 0 ? 'text-clay' : '')}
       {at && tile('Super paid out in the first year', c(at.superDrawn), at.age >= 60 ? 'Super pays your income first' : `Super opens at 60, ${60 - at.age} ${60 - at.age === 1 ? 'year' : 'years'} after you stop`)}
-      {tile('Cash on hand', money(p.goals.retireCash ?? p.finances.buffer ?? 0, { compact: true }), 'kept in the bank at all times. Set it in Goals.')}
+      {tile('Cash on hand', money(p.goals.retireCash ?? RETIRE_CASH_MIN, { compact: true }), 'kept in the bank at all times. Set it in Goals.')}
     </div>
   );
 }
@@ -721,8 +720,7 @@ const EVENT_STYLE: Record<string, { icon: string; cls: string }> = {
   shares: { icon: 'shares', cls: 'bg-sky/15 text-sky' }, runout: { icon: 'x', cls: 'bg-clay/15 text-clay' }, cost: { icon: 'details', cls: 'bg-line text-ink' }, goal: { icon: 'check', cls: 'bg-gum/15 text-gum' },
 };
 
-function Projections({ quotes, onLock, onAskUnlock }: { quotes: Quotes; onLock: () => void; onAskUnlock: () => void }) {
-  const mode = usePlanMode();
+function Projections({ quotes }: { quotes: Quotes }) {
   const p = usePlanProfile();
   const check = useMemo(() => planCheck(p, quotes), [p, quotes]);
   const proj = check.proj;
@@ -738,19 +736,12 @@ function Projections({ quotes, onLock, onAskUnlock }: { quotes: Quotes; onLock: 
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="font-display text-2xl font-semibold">Your Wise Future</h2>
+              <div><div className="mb-3"><Segmented size="sm" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} /></div>
+                <h2 className="font-display text-2xl font-semibold">Your Wise Future</h2>
                 <p className={`text-sm font-medium ${proj.runsOutAge != null ? 'text-clay' : 'text-gum'}`}>{proj.runsOutAge != null ? `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money runs out at ${proj.runsOutAge}.` : `At ${money(p.goals.passiveIncome, { compact: true })} a year, your money lasts to ${p.goals.lifeExpectancy ?? 90}.`}</p></div>
               <div className="flex flex-wrap items-center justify-end gap-3"><LiveToAge /><DollarsToggle value={dollars} onChange={setDollars} /></div>
             </div>
-            {mode === 'live' && (
-              <div className="mt-3">
-                {p.planLocked
-                  ? <button className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-sm font-semibold text-surface" onClick={onAskUnlock}><Icon name="lock" className="h-4 w-4" />Plan locked · unlock</button>
-                  : <button className="inline-flex items-center gap-2 rounded-xl border border-ink/70 px-4 py-2 text-sm font-semibold text-ink hover:bg-ink hover:text-surface" onClick={onLock}><Icon name="lock" className="h-4 w-4" />Lock my plan</button>}
-              </div>
-            )}
-            <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-              <Segmented size="sm" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} />
+            <div className="mt-3 flex flex-wrap items-start justify-end gap-3">
               {view === 'worth' && <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} />}
             </div>
             <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} />{proj.cryptoExcluded > 0 && ` Crypto (${money(proj.cryptoExcluded, { compact: true })} today) is left out because its future value can’t be estimated.`}</p>

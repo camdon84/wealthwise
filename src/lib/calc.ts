@@ -45,6 +45,8 @@ export function hecsCompulsory(income: number) {
 /** Monthly cost of dependants this year, or `yearsAhead` from now (costs stop at each one's support age). */
 /** Average cost of raising a child in Australia, birth to 18 (about $474k in 2026 dollars), spread evenly. */
 export const CHILD_COST_YEAR = 474000 / 18;
+/** Cash we suggest keeping on hand in retirement, today's money. */
+export const RETIRE_CASH_MIN = 50000;
 
 export function dependantsMonthly(p: Profile, yearsAhead = 0) {
   const year = new Date().getFullYear() + yearsAhead;
@@ -296,7 +298,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   let baseLivingAdj = 0; // e.g. rent stops once a first home is bought
   let hecsBal = hecsAnnual(p).balance;
   const buffer = n(p.finances.buffer) || recommendedBuffer(p);
-  const retireBuffer = p.goals.retireCash != null ? n(p.goals.retireCash) : buffer;
+  const retireBuffer = p.goals.retireCash != null ? n(p.goals.retireCash) : RETIRE_CASH_MIN;
   // Car loans, personal loans and cards, one by one. Loans run off on their repayments; cards are cleared as soon as savings above the emergency fund allow.
   const DEBT_NAME: Record<string, string> = { car: 'car loan', personal: 'personal loan', 'credit-card': 'credit card', other: 'loan' };
   const debtSims = p.finances.debts.filter((d) => d.kind !== 'hecs' && n(d.balance) > 0).map((d) => {
