@@ -12,7 +12,7 @@ import { plannedPurchase, uid } from '../lib/defaults';
 import { useCashRate } from '../lib/rates';
 import type { Assumptions, Forecast, Gift, Liquidation, PlanSnapshot, PlannedPurchase, Profile, Property } from '../lib/types';
 import { CashFlowChart, CashFlowKey, MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
-import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
+import { DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { useWiseTake } from '../components/Assistants';
 import { Field, Icon, MoneyInput, NumInput, Segmented, Select, TextInput, Toggle } from '../components/ui';
 
@@ -875,7 +875,7 @@ function Projections({ quotes }: { quotes: Quotes }) {
             <div className="mt-3 flex flex-wrap items-start justify-end gap-3">
               {view === 'worth' && <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} />}
             </div>
-            <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} />{proj.cryptoExcluded > 0 && ` Crypto (${money(proj.cryptoExcluded, { compact: true })} today) is left out because its future value can’t be estimated.`}</p>
+            <p className="mt-2 text-xs text-muted">{proj.cryptoExcluded > 0 && `Crypto (${money(proj.cryptoExcluded, { compact: true })} today) is left out because its future value can’t be estimated.`}</p>
             {view === 'worth' ? (<>
               <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(pts, p.assumptions.inflation) : pts} retireYear={proj.retireYear} height={340} real={dollars === 'real'} hidden={hidden} runsOutYear={runsOutYear} /></div>
               <MarkerKey points={pts} />

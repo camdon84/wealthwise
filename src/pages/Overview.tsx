@@ -5,7 +5,7 @@ import { money } from '../lib/format';
 import type { Quotes } from '../lib/calc';
 import { CashFlowChart, CashFlowKey, MarkerKey, SeriesToggles, WealthChart, toReal } from '../components/Charts';
 import { Icon, Segmented } from '../components/ui';
-import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
+import { DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { NewsPanel, WisePanel } from '../components/Assistants';
 import { RateWatch } from '../components/RateWatch';
 import { InflationUpdate } from '../components/InflationUpdate';
@@ -69,7 +69,7 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
               <div className="mt-4 -ml-2"><CashFlowChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} /></div>
               <CashFlowKey />
             </>)}
-            <p className="mt-2 text-xs text-muted"><DollarsNote value={dollars} /> Projected from your current position to age {p.goals.lifeExpectancy ?? 90}, using the assumptions in your plan. Markers show when your equity could fund each new purchase.</p>
+            <p className="mt-2 text-xs text-muted">Projected from your current position to age {p.goals.lifeExpectancy ?? 90}, using the assumptions in your plan. Markers show when your equity could fund each new purchase.</p>
           </div>
           <div className="grid grid-cols-2 gap-px border-t border-line bg-line lg:grid-cols-1 lg:border-l lg:border-t-0">
             <Kpi label="Usable equity today" value={money(pos.usable, { compact: true })} sub={`at ${p.assumptions.lvr}% LVR`} />
