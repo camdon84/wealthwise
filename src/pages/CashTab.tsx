@@ -50,12 +50,24 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
   const set = (patch: Partial<CashPlan>) => setDraft((d) => ({ ...d, ...patch }));
   const plan = editing ? draft : saved!;
 
-  // How big the reserves get, in today's money, before you stop work
+  // How big the reserves get, in today's money, on the plan as it stands (with any saved split)
   const inf = (i: number) => Math.pow(1 + p.assumptions.inflation / 100, i);
-  const proj = useMemo(() => project({ ...p, cashPlan: undefined }, quotes), [p, quotes]);
+  const proj = useMemo(() => project(p, quotes), [p, quotes]);
   const ri = Math.max(0, proj.points.findIndex((x) => x.year === proj.retireYear));
-  const peak = proj.points.slice(0, ri).reduce((m, x, i) => Math.max(m, x.cash / inf(i)), 0);
-  const big = peak > Math.max(100000, buffer * 2);
+  const work = proj.points.slice(0, ri).map((x, i) => ({ year: x.year, v: x.cash / inf(i) }));
+  const peak = work.reduce((m, x) => (x.v > m.v ? x : m), { year: 0, v: 0 });
+  const big = peak.v > Math.max(100000, buffer * 2);
+  // Cash builds up in waves, each spent on a deposit: the high point before each purchase, and after the last one
+  const waves: { year: number; v: number; label: string }[] = [];
+  let from = 0;
+  const buys = proj.purchases.map((b) => b.year).filter((y) => y < proj.retireYear);
+  const lastBuy = buys.length ? buys[buys.length - 1] : 0;
+  [...buys, proj.retireYear].forEach((until, k) => {
+    const seg = work.filter((x) => x.year >= from && x.year < until);
+    const top = seg.reduce((m, x) => (x.v > m.v ? x : m), { year: 0, v: 0 });
+    if (top.v > Math.max(50000, buffer * 1.5)) waves.push({ ...top, label: k < buys.length ? `before you buy property ${p.properties.length + k + 1} in ${until}` : `after your last purchase, before you stop work` });
+    from = until;
+  });
 
   // One plain comparison: this split against leaving it all in an everyday account
   const gain = useMemo(() => {
@@ -78,7 +90,16 @@ export function CashTab({ quotes, onGo }: { quotes: Quotes; onGo: (tab: 'shares'
         <h2 className="font-display text-2xl font-semibold">Cash Reserves</h2>
         <div className="mt-2 max-w-3xl space-y-2 leading-relaxed">
           {big
-            ? <p>You’re going to build up large cash reserves in the bank, up to about <strong>{money(peak, { compact: true })}</strong> in today’s money. Based on your plan, most of this will go towards the deposits on your property purchases.</p>
+            ? <>
+              {peak.year >= lastBuy
+                ? <p>You’re going to build up large cash reserves in the bank, up to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> in today’s money. {buys.length ? <>The biggest build-up comes after your last property purchase, so that money isn’t needed for a deposit.{waves.length > 1 ? ' Before that, your cash builds towards each deposit:' : ''}</> : 'Your plan doesn’t have another property purchase before you stop work, so it isn’t needed for a deposit.'}</p>
+                : <p>You’re going to build up large cash reserves in the bank, up to about <strong>{money(peak.v, { compact: true })}</strong> by <strong>{peak.year}</strong> in today’s money. Based on your plan, most of this will go towards the deposits on your property purchases:</p>}
+              {waves.length > 1 && (
+                <ul className="flex flex-wrap gap-2 pt-1">
+                  {waves.map((w) => <li key={w.year} className="rounded-lg bg-raised px-3 py-2 text-sm ring-1 ring-line"><span className="font-display font-semibold">{money(w.v, { compact: true })}</span> by {w.year}<span className="block text-xs text-muted">{w.label}</span></li>)}
+                </ul>
+              )}
+            </>
             : <p>Your cash reserves stay fairly close to your emergency fund, but they still need somewhere to sit while they build towards your next deposit.</p>}
           <p className="text-muted">This section helps you decide where to hold your cash reserves while they build, so the money is working for you until you buy. Your share plan sits outside this, and so does your {money(buffer)} emergency fund.</p>
         </div>
