@@ -1,5 +1,5 @@
 import { holdingsStats, incomeTax, position, project, propertyStats, type Projection, type Quotes } from './calc';
-import { listJoin, money } from './format';
+import { listJoin, money, nProps } from './format';
 import type { Liquidation, Profile } from './types';
 
 /**
@@ -71,7 +71,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   const reached = owned + r.purchases.length;
   if (reached < g.targetProperties) {
     const why = r.block?.reason === 'servicing' ? 'Borrowing power is what holds it back: a lender wouldn’t lend enough on your income.' : r.block?.reason === 'deposit' ? 'There isn’t enough equity and savings for the next deposit.' : '';
-    problems.push(`You’d own ${reached} of the ${g.targetProperties} properties you want by ${retireAge}. ${why}`.trim());
+    problems.push(`You’d own ${reached} of the ${nProps(g.targetProperties)} you want by ${retireAge}. ${why}`.trim());
   }
   planned.forEach((pp, k) => {
     if (!pp.buyBy) return;
@@ -102,7 +102,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
       }
     }
     // Fewer properties
-    if (reached < g.targetProperties && reached > owned) fixes.push(`Aim for ${reached} properties instead of ${g.targetProperties}.`);
+    if (reached < g.targetProperties && reached > owned) fixes.push(`Aim for ${nProps(reached)} instead of ${g.targetProperties}.`);
     else if (reached < g.targetProperties && reached === owned) fixes.push(`Hold off on adding properties for now: on these numbers none fits before ${retireAge}.`);
     // Move the deadline
     planned.forEach((pp, k) => {
@@ -128,7 +128,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
       const need = Math.ceil(hi / 50) * 50;
       if (need > r.shareMonthly + 50) fixes.push(or(`Invest about ${money(need)} a month in shares while you work, instead of ${m(r.shareMonthly)} (set “Monthly investment” in Shares). That lasts to ${life}.`));
     }
-    if (g.targetProperties > owned && lastsOk(run((x) => { x.goals.targetProperties = Math.max(owned, x.goals.targetProperties - 1); }))) fixes.push(or(`Aim for ${g.targetProperties - 1} properties: the last purchase costs more than it adds by retirement.`));
+    if (g.targetProperties > owned && lastsOk(run((x) => { x.goals.targetProperties = Math.max(owned, x.goals.targetProperties - 1); }))) fixes.push(or(`Aim for ${nProps(g.targetProperties - 1)}: the last purchase costs more than it adds by retirement.`));
   }
 
   // 4. Shares short of goal with a custom amount
@@ -166,7 +166,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   }
 
   // What's working
-  if (g.targetProperties > owned && propsOk(p, r)) good.push(`You reach ${g.targetProperties} properties, buying in ${listJoin(r.purchases.map((x) => String(x.year)))}.`);
+  if (g.targetProperties > owned && propsOk(p, r)) good.push(`You reach ${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}, buying in ${listJoin(r.purchases.map((x) => String(x.year)))}.`);
   if ((g.sharesTarget ?? 0) > 0 && sharesReal >= (g.sharesTarget ?? 0) * 0.97) good.push(`Investing ${m(r.shareMonthly)} a month, your shares reach about ${m(sharesReal)} by ${retireAge}.`);
   if (lastsOk(r)) {
     const last = r.points[r.points.length - 1];

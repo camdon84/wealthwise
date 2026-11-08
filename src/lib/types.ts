@@ -191,7 +191,7 @@ export interface Profile {
   updatedAt: string;
 }
 
-export interface Session { userId: string; email: string; name: string; demo?: boolean; sandbox?: boolean }
+export interface Session { userId: string; email: string; name: string; demo?: boolean; sandbox?: boolean; viewing?: boolean } // viewing: an administrator looking at this account, read-only
 
 export type DocKind = 'valuation' | 'super' | 'loan' | 'rental' | 'payslip' | 'trades' | 'other';
 export interface DocRecord { id: string; name: string; kind: DocKind; uploadedAt: string; summary: string; applied: string[] }

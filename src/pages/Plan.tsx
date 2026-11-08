@@ -7,7 +7,7 @@ import { PlanCheckBox } from '../components/PlanCheck';
 import { CashTab } from './CashTab';
 import { WealthFocusPicker } from '../components/WealthFocus';
 import { wiseInsights } from '../lib/insights';
-import { CGT_2027_NOTE, money } from '../lib/format';
+import { CGT_2027_NOTE, money, nProps } from '../lib/format';
 import { plannedPurchase, uid } from '../lib/defaults';
 import { useCashRate } from '../lib/rates';
 import type { Assumptions, Forecast, Gift, Liquidation, PlanSnapshot, PlannedPurchase, Profile, Property } from '../lib/types';
@@ -148,7 +148,7 @@ function ForecastBar() {
             {list.map((f) => (
               <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                 <div><p className="font-medium">{f.name}{fc.sourceId === f.id && <span className="ml-2 rounded bg-sky/15 px-1.5 py-0.5 text-[11px] text-sky">open</span>}</p>
-                  <p className="text-xs text-muted">{f.kind === 'previous' ? 'Previous Wise Future' : 'Forecast'} · saved {new Date(f.savedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })} · {f.plan.goals.targetProperties} properties · {money(f.plan.goals.passiveIncome, { compact: true })} a year from {f.plan.goals.retirementAge}</p></div>
+                  <p className="text-xs text-muted">{f.kind === 'previous' ? 'Previous Wise Future' : 'Forecast'} · saved {new Date(f.savedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })} · {nProps(f.plan.goals.targetProperties)} · {money(f.plan.goals.passiveIncome, { compact: true })} a year from {f.plan.goals.retirementAge}</p></div>
                 <div className="flex flex-wrap gap-2">
                   <button className="btn-quiet py-1.5 text-sm" onClick={() => open(f)}>Open</button>
                   <button className="btn-quiet py-1.5 text-sm" onClick={() => setConfirm({ name: f.name, plan: f.plan })}>{f.kind === 'previous' ? 'Reinstate' : 'Make it my Wise Future'}</button>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApp, useNavIntent } from '../lib/store';
 import { propertyStats } from '../lib/calc';
-import { money, monthYear, pct } from '../lib/format';
+import { money, monthYear, nProps, pct } from '../lib/format';
 import { emptyProperty, uid } from '../lib/defaults';
 import type { Property, ValuationEntry } from '../lib/types';
 import { PhotoControls, PropertyPhoto } from '../components/Aerial';
@@ -33,7 +33,7 @@ export function Properties() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Your property portfolio</h1><p className="text-muted">{p.properties.length} properties · {money(totals.v, { compact: true })} value · {money(totals.v - totals.d, { compact: true })} equity</p></div>
+        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Your property portfolio</h1><p className="text-muted">{nProps(p.properties.length)} · {money(totals.v, { compact: true })} value · {money(totals.v - totals.d, { compact: true })} equity</p></div>
         <div className="flex gap-2">
           <Segmented size="sm" label="Layout" value={view} onChange={setView} options={[{ value: 'cards', label: 'Cards' }, { value: 'list', label: 'List' }]} />
           <button className="btn-primary" onClick={() => setEditing(emptyProperty())}><Icon name="plus" className="h-4 w-4" />Add property</button>

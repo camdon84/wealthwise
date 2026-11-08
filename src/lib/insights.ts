@@ -1,6 +1,6 @@
 import type { InsightState, Profile } from './types';
 import { borrowingCapacity, livingCosts, position, project, propertyStats, type Quotes } from './calc';
-import { money } from './format';
+import { money, nProps } from './format';
 
 export type InsightKind = 'opportunity' | 'watch' | 'milestone' | 'goal';
 export interface Insight {
@@ -336,9 +336,9 @@ export function goalAnalysis(p: Profile, quotes: Quotes) {
   const spareYearly = Math.max(0, pos.monthlySurplus * 12);
   const lines: { tone: 'good' | 'warn'; text: string }[] = [];
   if (p.goals.targetProperties > owned) {
-    if (projectedProps >= p.goals.targetProperties) lines.push({ tone: 'good', text: `You’re on track to own ${p.goals.targetProperties} properties by ${p.goals.retirementAge}. Purchases land around ${proj.purchases.map((x) => x.year).join(', ')}.` });
-    else if (proj.block?.reason === 'servicing') lines.push({ tone: 'warn', text: `You’d reach ${projectedProps} of your ${p.goals.targetProperties} properties by ${p.goals.retirementAge}. The next one is held back by borrowing power: lenders would want to see about ${money(proj.block.monthlyShort, { compact: true })} a month more income than you’d have, or a cheaper property.` });
-    else if (proj.block?.reason === 'deposit') lines.push({ tone: 'warn', text: `You’d reach ${projectedProps} of your ${p.goals.targetProperties} properties by ${p.goals.retirementAge}. The next one needs about ${money(proj.block.deposit, { compact: true })} for a deposit, and you’d have ${money(proj.block.available, { compact: true })} in equity and savings.` });
+    if (projectedProps >= p.goals.targetProperties) lines.push({ tone: 'good', text: `You’re on track to own ${p.goals.targetProperties} ${p.goals.targetProperties === 1 ? 'property' : 'properties'} by ${p.goals.retirementAge}. Purchases land around ${proj.purchases.map((x) => x.year).join(', ')}.` });
+    else if (proj.block?.reason === 'servicing') lines.push({ tone: 'warn', text: `You’d reach ${projectedProps} of your ${nProps(p.goals.targetProperties)} by ${p.goals.retirementAge}. The next one is held back by borrowing power: lenders would want to see about ${money(proj.block.monthlyShort, { compact: true })} a month more income than you’d have, or a cheaper property.` });
+    else if (proj.block?.reason === 'deposit') lines.push({ tone: 'warn', text: `You’d reach ${projectedProps} of your ${nProps(p.goals.targetProperties)} by ${p.goals.retirementAge}. The next one needs about ${money(proj.block.deposit, { compact: true })} for a deposit, and you’d have ${money(proj.block.available, { compact: true })} in equity and savings.` });
   }
   // Could one more property fit before retirement?
   if (projectedProps >= p.goals.targetProperties && p.goals.targetProperties < 8) {

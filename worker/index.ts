@@ -6,32 +6,16 @@
  *   only its SHA-256 hash is stored.
  * - Quotes: 15–20 minute delayed prices, cached in D1 so free limits hold.
  */
+import { ADMIN_TABLES, hashPassword, randomHex, safeEqual, sha256 } from './shared';
+
 export interface Env { DB: D1Database; ASSETS: Fetcher; AI: Ai }
 
 const COOKIE = 'ww_session';
 const SESSION_DAYS = 30;
-const enc = new TextEncoder();
 
 const json = (data: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers } });
 const fail = (error: string, status = 400) => json({ error }, status);
-
-const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-const randomHex = (bytes: number) => hex(crypto.getRandomValues(new Uint8Array(bytes)).buffer);
-const sha256 = async (s: string) => hex(await crypto.subtle.digest('SHA-256', enc.encode(s)));
-
-async function hashPassword(password: string, saltHex: string) {
-  const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const salt = new Uint8Array(saltHex.match(/../g)!.map((h) => parseInt(h, 16)));
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100000 }, key, 256);
-  return hex(bits);
-}
-function safeEqual(a: string, b: string) {
-  if (a.length !== b.length) return false;
-  let r = 0;
-  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return r === 0;
-}
 
 let schemaReady = false;
 async function ensureSchema(db: D1Database) {
@@ -44,6 +28,7 @@ async function ensureSchema(db: D1Database) {
     db.prepare('CREATE TABLE IF NOT EXISTS login_failures (email TEXT NOT NULL, at INTEGER NOT NULL)'),
     db.prepare('CREATE TABLE IF NOT EXISTS ai_cache (key TEXT PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL)'),
     db.prepare('CREATE TABLE IF NOT EXISTS image_runs (who TEXT NOT NULL, at INTEGER NOT NULL)'),
+    ...ADMIN_TABLES.map((q) => db.prepare(q)),
   ]);
   schemaReady = true;
 }
@@ -240,6 +225,18 @@ async function api(req: Request, env: Env, path: string) {
     const token = readCookie(req);
     await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(u.id, token ? await sha256(token) : '').run(); // sign out other devices
     return json({ ok: true });
+  }
+
+  // An administrator viewing a user's account, read-only. The admin portal issues a one-time token that lasts
+  // 15 minutes; it only ever reads the profile here, and the app never saves while viewing.
+  if (path === '/api/view' && method === 'GET') {
+    const token = req.headers.get('x-view-token') || '';
+    if (!/^[a-f0-9]{64}$/.test(token)) return fail('This view link isn’t valid.', 401);
+    const row = await env.DB.prepare('SELECT v.user_id, u.email, u.name FROM view_tokens v JOIN users u ON u.id = v.user_id WHERE v.token_hash = ? AND v.expires_at > ?')
+      .bind(await sha256(token), Date.now()).first<{ user_id: string; email: string; name: string }>();
+    if (!row) return fail('This view link has expired. Open the account again from the admin portal.', 401);
+    const prof = await env.DB.prepare('SELECT data FROM profiles WHERE user_id = ?').bind(row.user_id).first<{ data: string }>();
+    return json({ userId: row.user_id, email: row.email, name: row.name, profile: prof ? JSON.parse(prof.data) : null });
   }
 
   if (path === '/api/profile') {

@@ -1,7 +1,7 @@
 import { WiseActions } from './pages/WiseActions';
 import { actionsNeedingUpdate, reviewDue, wiseActions } from './lib/actions';
 import { useEffect, useMemo, useState } from 'react';
-import { useApp } from './lib/store';
+import { endView, useApp } from './lib/store';
 import { useHashRoute, useQuotes } from './lib/hooks';
 import { Auth } from './pages/Auth';
 import { Onboarding } from './onboarding/Onboarding';
@@ -48,7 +48,7 @@ function Shell() {
   const due = eofyItems(profile).outstanding.length;
   const acts = useMemo(() => wiseActions(profile, quotes).actions, [profile, quotes]);
   const actionAlerts = actionsNeedingUpdate(profile, acts).length + (reviewDue(profile) ? 1 : 0);
-  if (profile.firstLookSeen === false) return <FirstLook quotes={quotes} />;
+  if (profile.firstLookSeen === false && !session?.viewing) return <FirstLook quotes={quotes} />;
 
   const nav = (
     <nav aria-label="Main" className="space-y-1">
@@ -68,9 +68,9 @@ function Shell() {
       <aside className="hidden border-r border-line bg-surface lg:flex lg:flex-col lg:justify-between lg:sticky lg:top-0 lg:h-screen p-4">
         <div><div className="px-2 py-2"><Logo /></div><div className="mt-6">{nav}</div></div>
         <div className="space-y-1 border-t border-line pt-4">
-          <p className="px-3 pb-2 text-xs text-muted">{session?.sandbox ? 'Test mode, nothing is saved' : session?.demo ? 'Demo account' : session?.email}</p>
+          <p className="px-3 pb-2 text-xs text-muted">{session?.viewing ? `Viewing ${session.email}` : session?.sandbox ? 'Test mode, nothing is saved' : session?.demo ? 'Demo account' : session?.email}</p>
           <button className="btn-ghost w-full justify-start" onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} className="h-4 w-4" />{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button>
-          <button className="btn-ghost w-full justify-start" onClick={signOut}><Icon name="out" className="h-4 w-4" />Sign out</button>
+          <button className="btn-ghost w-full justify-start" onClick={signOut}><Icon name="out" className="h-4 w-4" />{session?.viewing ? 'Exit' : 'Sign out'}</button>
         </div>
       </aside>
 
@@ -79,9 +79,16 @@ function Shell() {
           <Logo size={24} />
           <button className="btn-ghost p-2" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu(!menu)}><Icon name={menu ? 'x' : 'menu'} /></button>
         </header>
-        {menu && <div className="border-b border-line bg-surface p-4 lg:hidden">{nav}<div className="mt-3 flex gap-2 border-t border-line pt-3"><button className="btn-ghost" onClick={toggleTheme}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button><button className="btn-ghost" onClick={signOut}>Sign out</button></div></div>}
-        <main className="mx-auto max-w-[1400px] px-5 py-8 sm:px-8">
-          <p className="mb-2 h-4 text-right text-xs text-muted" aria-live="polite">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'All changes saved' : ''}</p>
+        {menu && <div className="border-b border-line bg-surface p-4 lg:hidden">{nav}<div className="mt-3 flex gap-2 border-t border-line pt-3"><button className="btn-ghost" onClick={toggleTheme}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button><button className="btn-ghost" onClick={signOut}>{session?.viewing ? 'Exit' : 'Sign out'}</button></div></div>}
+        {session?.viewing && (
+          <div className="sticky top-0 z-40 flex flex-wrap items-center gap-x-4 gap-y-2 bg-[#3d6891] px-5 py-2.5 text-sm text-white sm:px-8" role="status">
+            <Icon name="lock" className="h-4 w-4 shrink-0" />
+            <p className="min-w-[12rem] flex-1"><span className="font-semibold">Viewing {session.name}’s account.</span> Read only: nothing here can be changed.</p>
+            <button className="rounded-lg bg-white/15 px-3 py-1 font-semibold hover:bg-white/25" onClick={() => endView()}>Exit</button>
+          </div>
+        )}
+        <main className={`mx-auto max-w-[1400px] px-5 py-8 sm:px-8 ${session?.viewing ? 'view-only' : ''}`}>
+          <p className="mb-2 h-4 text-right text-xs text-muted" aria-live="polite">{session?.viewing ? '' : saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'All changes saved' : ''}</p>
           {current === 'overview' && <Overview quotes={quotes} go={go} />}
           {current === 'properties' && <Properties />}
           {current === 'investments' && <Investments quotes={quotes} asOf={asOf} />}

@@ -1,0 +1,14 @@
+{
+  // WealthWise admin portal: its own Worker and address, sharing the app's D1 database.
+  // Deploy with `npm run deploy:admin`.
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "wealthwise-admin",
+  "main": "index.ts",
+  "compatibility_date": "2025-09-01",
+  "workers_dev": true,
+  "d1_databases": [
+    { "binding": "DB", "database_name": "wealthwise", "database_id": "72ad86e1-366d-4940-ab37-64bac244d250" }
+  ],
+  "vars": { "APP_URL": "https://wealthwise.cam-donley.workers.dev" },
+  "observability": { "enabled": true }
+}

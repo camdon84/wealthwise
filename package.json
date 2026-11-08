@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "build:preview": "tsc --noEmit && vite build --mode preview",
     "deploy": "npm run build && wrangler deploy",
-    "cf:dev": "npm run build && wrangler dev"
+    "cf:dev": "npm run build && wrangler dev",
+    "deploy:admin": "wrangler deploy -c admin/wrangler.jsonc",
+    "admin:dev": "wrangler dev -c admin/wrangler.jsonc --port 8788"
   },
   "dependencies": {
     "papaparse": "^5.7.0",

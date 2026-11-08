@@ -52,3 +52,6 @@ export const CGT_2027_NOTE = 'From 1 July 2027, the 2026–27 Budget replaces th
 
 /** "a", "a and b", "a, b and c" (no Oxford comma, per Australian style). */
 export const listJoin = (items: string[]) => (items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
+
+/** "1 property", "3 properties". */
+export const nProps = (n: number) => `${n} ${n === 1 ? 'property' : 'properties'}`;

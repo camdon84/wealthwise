@@ -92,3 +92,6 @@ input[type=range] { accent-color: rgb(var(--brass)); }
 /* Sideways-scrolling rows on phones (tab bars): scrollable, no visible scrollbar */
 .no-scrollbar { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* An administrator viewing someone's account: fields can't be typed in or changed */
+.view-only input, .view-only select, .view-only textarea { pointer-events: none; }
