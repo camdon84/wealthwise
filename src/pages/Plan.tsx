@@ -57,7 +57,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
             <Icon name="spark" className={`h-4 w-4 ${tab === 'projections' ? '' : 'transition-transform group-hover:rotate-45'}`} />{forecasting ? 'Forecast Future' : 'Your Wise Future'}
           </button>
           {!forecasting && (
-            <button onClick={() => (locked ? setAsk({}) : liveUpdate((d) => { d.planLocked = true; }))} title={locked ? 'Your plan is locked. Click to unlock.' : 'Lock your plan so it can’t be changed by accident'}
+            <button onClick={() => (locked ? setAsk({}) : liveUpdate((d) => { d.planLocked = true; d.cpiBase = undefined; }))} title={locked ? 'Your plan is locked. Click to unlock.' : 'Lock your plan so it can’t be changed by accident'}
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold ${locked ? 'bg-ink text-surface' : 'border border-line text-muted hover:text-ink'}`}>
               <Icon name={locked ? 'lock' : 'unlock'} className="h-4 w-4" />{locked ? 'Plan locked' : 'Lock my plan'}
             </button>
@@ -91,7 +91,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               <button className="btn-quiet" onClick={() => { setAsk(null); startForecast(); }}>Try a forecast instead</button>
               <button className="btn-quiet" onClick={() => setAsk(null)}>No</button>
-              <button className="btn-primary" onClick={() => { const then = ask.then; liveUpdate((d) => { d.planLocked = false; if (then) then(d); }); setAsk(null); }}>Yes, unlock</button>
+              <button className="btn-primary" onClick={() => { const then = ask.then; liveUpdate((d) => { d.planLocked = false; d.cpiBase = undefined; if (then) then(d); }); setAsk(null); }}>Yes, unlock</button>
             </div>
           </div>
         </div>
@@ -123,7 +123,7 @@ function ForecastBar() {
   const makeLive = (name: string, plan: PlanSnapshot) => {
     liveUpdate((d) => {
       (d.forecasts ??= []).unshift(newForecast(`Wise Future before “${name}” (${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })})`, d, 'previous'));
-      applySnapshot(d, plan);
+      applySnapshot(d, plan); d.cpiBase = undefined; // fresh figures: index from now
     });
     fc.set({ mode: 'live', draft: null, name: '', sourceId: null });
     setConfirm(null);
@@ -593,22 +593,42 @@ function GiftsTab() {
     <section className="panel p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h2 className="font-display text-xl font-semibold">Gifts and inheritances</h2><p className="mt-1 max-w-2xl text-sm text-muted">Money you expect from family, like a parent helping with a deposit or a future inheritance. It goes into your savings in that year, so it can bring a purchase forward.</p></div>
-        <button className="btn-primary" onClick={() => update((d) => { (d.gifts ??= []).push({ id: uid(), year: y0 + 1, amount: 0, from: '', kind: 'gift' }); })}><Icon name="plus" className="h-4 w-4" />Add a gift or inheritance</button>
+        <button className="btn-primary" onClick={() => update((d) => { (d.gifts ??= []).push({ id: uid(), year: y0 + 1, amount: 0, from: '', kind: 'gift', saved: false }); })}><Icon name="plus" className="h-4 w-4" />Add a gift or inheritance</button>
       </div>
       {list.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">Nothing here yet. If someone has said they’ll help, add it so your plan can count on it.</p> : (
         <ul className="mt-6 space-y-3">
-          {list.map((gft) => (
+          {list.map((gft) => {
+            const saved = gft.saved ?? gft.amount > 0;
+            const ready = gft.amount > 0 && gft.from.trim().length > 0;
+            const remove = () => update((d) => { d.gifts = d.gifts!.filter((x) => x.id !== gft.id); });
+            if (saved) return (
+              <li key={gft.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-line bg-raised/60 p-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gum/15 text-gum"><Icon name="check" className="h-4 w-4" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{money(gft.amount)} {gft.kind === 'inheritance' ? 'inheritance' : 'gift'}{gft.from ? ` from ${gft.from}` : ''}</p>
+                  <p className="text-sm text-muted">{gft.year === y0 ? `This year (${y0})` : `In ${gft.year}`}{gft.note ? ` · ${gft.note}` : ''}</p>
+                </div>
+                <button className="btn-quiet py-1.5" onClick={() => set(gft.id, { saved: false })}>Edit</button>
+                <button className="btn-ghost p-2" aria-label="Remove" onClick={remove}><Icon name="trash" className="h-4 w-4" /></button>
+              </li>
+            );
+            return (
             <li key={gft.id} className="rounded-xl border border-line p-4">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="w-36"><Field label="Type">{(id) => <Select id={id} value={gft.kind} onChange={(v) => set(gft.id, { kind: v as Gift['kind'] })} options={[{ value: 'gift', label: 'Gift' }, { value: 'inheritance', label: 'Inheritance' }]} />}</Field></div>
                 <div className="min-w-[10rem] flex-1"><Field label="From">{(id) => <TextInput id={id} value={gft.from} onChange={(v) => set(gft.id, { from: v })} placeholder="e.g. Mum and Dad" />}</Field></div>
-                <div className="w-44"><Field label="Amount">{(id) => <MoneyInput id={id} value={gft.amount || null} onChange={(v) => set(gft.id, { amount: v ?? 0 })} />}</Field></div>
+                <div className="w-44"><Field label="Amount">{(id) => <MoneyInput id={id} value={gft.amount || null} onChange={(v) => set(gft.id, { amount: v ?? 0, saved: false })} />}</Field></div>
                 <div className="w-44"><Field label="Year">{(id) => <Select id={id} value={String(gft.year)} onChange={(v) => set(gft.id, { year: Number(v) })} options={Array.from({ length: lastYear - y0 + 1 }, (_, j) => y0 + j).map((y) => ({ value: String(y), label: y === y0 ? `This year (${y})` : String(y) }))} />}</Field></div>
-                <button className="btn-ghost mb-0.5 p-2" aria-label="Remove" onClick={() => update((d) => { d.gifts = d.gifts!.filter((x) => x.id !== gft.id); })}><Icon name="trash" className="h-4 w-4" /></button>
+                <button className="btn-ghost mb-0.5 p-2" aria-label="Remove" onClick={remove}><Icon name="trash" className="h-4 w-4" /></button>
               </div>
               <div className="mt-3"><Field label="What it’s for (optional)">{(id) => <TextInput id={id} value={gft.note ?? ''} onChange={(v) => set(gft.id, { note: v })} placeholder="e.g. Towards the deposit on our next property" />}</Field></div>
+              <div className="mt-3 flex items-center justify-end gap-3">
+                {!ready && <span className="text-xs text-muted">Add who it’s from and the amount to save it.</span>}
+                <button className="btn-primary py-2" disabled={!ready} onClick={() => set(gft.id, { saved: true })}><Icon name="check" className="h-4 w-4" />Save</button>
+              </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       <p className="mt-5 text-[11px] text-muted">Gifts in Australia aren’t usually taxed, but some lenders ask for a gift letter. Amounts are in the dollars of the year you expect them.</p>

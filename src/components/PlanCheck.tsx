@@ -43,7 +43,7 @@ function LockNudge() {
     <section className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-sky/40 bg-sky/10 p-4" aria-label="Lock your plan">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky text-surface"><Icon name="lock" className="h-4 w-4" /></span>
       <p className="min-w-0 flex-1 text-[15px] leading-relaxed">Now that your plan is complete and looks great, it’s a good time to lock it using the button in the top right corner. To try different scenarios, you can always use Forecast mode.</p>
-      <button className="inline-flex items-center gap-1.5 rounded-lg border border-sky/50 bg-surface px-3 py-1.5 text-sm font-semibold hover:bg-sky/15" onClick={() => update((d) => { d.planLocked = true; })}><Icon name="lock" className="h-4 w-4" />Lock my plan</button>
+      <button className="inline-flex items-center gap-1.5 rounded-lg border border-sky/50 bg-surface px-3 py-1.5 text-sm font-semibold hover:bg-sky/15" onClick={() => update((d) => { d.planLocked = true; d.cpiBase = undefined; })}><Icon name="lock" className="h-4 w-4" />Lock my plan</button>
     </section>
   );
 }

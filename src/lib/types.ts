@@ -174,7 +174,9 @@ export interface Profile {
   renovations?: Renovation[];
   liquidations?: Liquidation[];
   forecasts?: Forecast[]; // saved forecasts and previous live plans
-  insightState?: InsightState; // Wise Insights: what's been seen, dismissed and refreshed
+  insightState?: InsightState;
+  cpiBase?: { period: string; index: number }; // CPI quarter the locked plan's figures are in (set when the plan is locked)
+  cpiLog?: { period: string; annual: number; at: string; updated: string[]; kept: string[] }[]; // inflation updates offered // Wise Insights: what's been seen, dismissed and refreshed
   planLocked?: boolean;
   gifts?: Gift[];
   cryptoGrowth?: number | null;
@@ -219,7 +221,7 @@ export interface Liquidation {
   note?: string;
 }
 /** Money expected from family: a gift or an inheritance. Amount is in the dollars of that year. */
-export interface Gift { id: string; year: number; amount: number; from: string; kind: 'gift' | 'inheritance'; note?: string }
+export interface Gift { id: string; year: number; amount: number; from: string; kind: 'gift' | 'inheritance'; note?: string; saved?: boolean }
 
 export interface PlanSnapshot {
   goals: Goals; assumptions: Assumptions; plannedPurchases: PlannedPurchase[]; liquidations: Liquidation[]; gifts: Gift[];

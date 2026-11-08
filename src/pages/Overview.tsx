@@ -8,6 +8,7 @@ import { Icon, Segmented } from '../components/ui';
 import { DollarsNote, DollarsToggle, LiveToAge } from '../components/ChartControls';
 import { NewsPanel, WisePanel } from '../components/Assistants';
 import { RateWatch } from '../components/RateWatch';
+import { InflationUpdate } from '../components/InflationUpdate';
 
 export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => void }) {
   const p = useApp((s) => s.profile)!;
@@ -37,6 +38,7 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
       </div>
 
       <RateWatch />
+      <InflationUpdate />
 
       <section className="panel overflow-hidden">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
