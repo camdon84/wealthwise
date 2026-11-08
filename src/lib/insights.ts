@@ -66,10 +66,10 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
     const pk = real.reduce((m, x) => (x.v > m.v ? x : m), { year: 0, v: 0 });
     if (pk.v > Math.max(150000, buf * 3)) out.push({
       id: 'idle-cash', kind: 'opportunity',
-      title: 'Your plan builds up a lot of cash',
-      body: `On the way to your next deposit you’d hold up to about ${money(pk.v, { compact: true })} in cash (today’s money) around ${pk.year}. The Cash tab compares keeping it in an offset, a high-interest account or shares, and can put the extra to work until you buy.`,
+      title: 'Your plan builds up large cash reserves',
+      body: `On the way to your next deposit you’d hold up to about ${money(pk.v, { compact: true })} in cash (today’s money) around ${pk.year}. Cash Reserves helps you choose where it sits while it builds: offset, high-interest or immediate-access savings.`,
       figure: money(pk.v, { compact: true }), figureLabel: `cash around ${pk.year}`,
-      action: { label: 'Put it to work in the Cash tab', to: 'plan:cash' },
+      action: { label: 'Choose where your cash sits', to: 'plan:cash' },
     });
   }
 

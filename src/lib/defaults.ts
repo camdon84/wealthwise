@@ -40,6 +40,8 @@ const financeDefaults = (): Pick<Finances, 'housing' | 'rentMonthly' | 'mortgage
 
 /** Fill in fields added after a profile was first saved. */
 export function normalize(p: Profile): Profile {
+  // Cash Reserves no longer moves cash into shares: switch that off on any plan saved before
+  if (p.cashPlan) { p.cashPlan.sweep = false; p.cashPlan.accessMax = null; }
   p.finances = { ...financeDefaults(), ...p.finances };
   p.finances.livingBreakdown ??= {};
   for (const d of p.finances.debts) if (d.rate === undefined && d.kind !== 'hecs') d.rate = DEBT_RATE[d.kind] ?? null;

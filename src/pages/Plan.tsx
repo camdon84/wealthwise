@@ -52,7 +52,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
           <p className="text-muted">{forecasting ? 'Try changes here without touching your live plan. Save it, or make it your new Wise Future.' : 'Set where you want to end up, check the assumptions, and see how it plays out.'}</p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 xl:flex-nowrap" role="tablist" aria-label="Plan section">
-          <Segmented stretch label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property Portfolio' }, { value: 'shares', label: 'Shares' }, { value: 'cash', label: 'Cash' }, { value: 'liquidations', label: 'Liquidation Events' }, { value: 'gifts', label: 'Gifts' }]} />
+          <Segmented stretch label="Plan section" value={tab === 'projections' ? ('' as Tab) : tab} onChange={setTab} options={[{ value: 'goals', label: 'Goals' }, { value: 'assumptions', label: 'Assumptions' }, { value: 'timeline', label: 'Property Portfolio' }, { value: 'shares', label: 'Shares' }, { value: 'cash', label: 'Cash Reserves' }, { value: 'liquidations', label: 'Liquidation Events' }, { value: 'gifts', label: 'Gifts' }]} />
           <button role="tab" aria-selected={tab === 'projections'} onClick={() => setTab('projections')}
             className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${tab === 'projections'
               ? 'bg-brass text-ground shadow-[0_6px_20px_-6px_rgb(var(--brass)/0.7)] ring-2 ring-brass/40'
@@ -79,7 +79,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
         {tab === 'goals' && <Goals quotes={quotes} go={setTab} />}
         {tab === 'assumptions' && <AssumptionsTab />}
         {tab === 'timeline' && <Timeline quotes={quotes} onGoals={() => setTab('goals')} />}
-        {tab === 'shares' && <SharesPlan quotes={quotes} onCash={() => setTab('cash')} />}
+        {tab === 'shares' && <SharesPlan quotes={quotes} />}
         {tab === 'cash' && <CashTab quotes={quotes} onGo={(t) => setTab(t)} />}
         {tab === 'liquidations' && <LiquidationsTab quotes={quotes} />}
         {tab === 'gifts' && <GiftsTab />}
@@ -641,30 +641,8 @@ function GiftsTab() {
   );
 }
 
-/* Read-only: spare cash the Cash tab puts into shares. Only changed from the Cash tab. */
-function CashShares({ p, proj, onCash }: { p: Profile; proj: ReturnType<typeof project>; onCash: () => void }) {
-  const cp = p.cashPlan?.active ? p.cashPlan : null;
-  const inf = (i: number) => Math.pow(1 + p.assumptions.inflation / 100, i);
-  const pts = proj.points.map((x, i) => ({ year: x.year, v: x.cashShares / inf(i) }));
-  const peak = pts.reduce((m, x) => (x.v > m.v ? x : m), { year: 0, v: 0 });
-  const sales = proj.events.filter((e) => e.kind === 'liquidate' && e.text.includes('spare cash'));
-  return (
-    <div className="mt-6 rounded-xl border border-dashed border-line p-4">
-      <div className="flex items-center justify-between gap-3"><p className="font-semibold">Spare cash invested</p><span className="chip bg-raised text-muted ring-1 ring-line"><Icon name="lock" className="h-3 w-3" />Set in the Cash tab</span></div>
-      {cp?.sweep && cp.accessMax != null ? (<>
-        <p className="mt-1 text-sm text-muted">Cash above {money(cp.accessMax)}, plus your emergency fund (today’s money), goes into shares, and is sold to cover deposits.</p>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-          <div><p className="text-xs text-muted">Most invested</p><p className="font-display text-lg font-semibold">{money(peak.v, { compact: true })}</p><p className="text-xs text-muted">{peak.year ? `around ${peak.year}, today’s money` : '—'}</p></div>
-          <div><p className="text-xs text-muted">Sold for deposits</p><p className="font-display text-lg font-semibold">{sales.length ? `${sales.length} ${sales.length === 1 ? 'time' : 'times'}` : 'Not yet'}</p><p className="text-xs text-muted">{proj.cashSharesTax > 0 ? `about ${money(proj.cashSharesTax, { compact: true })} in tax` : ''}</p></div>
-        </div>
-      </>) : <p className="mt-1 text-sm text-muted">None yet. The Cash tab can put cash above what you want within reach into shares, then sell it down when you buy a property.</p>}
-      <button className="btn-quiet mt-3 py-1.5" onClick={onCash}>{cp ? 'Change this in the Cash tab' : 'Set up the Cash tab'}</button>
-    </div>
-  );
-}
-
 /* ---------- Shares plan ---------- */
-function SharesPlan({ quotes, onCash }: { quotes: Quotes; onCash: () => void }) {
+function SharesPlan({ quotes }: { quotes: Quotes }) {
   const p = usePlanProfile();
   const update = usePlanUpdate();
   const proj = useMemo(() => project(p, quotes), [p, quotes]);
@@ -746,7 +724,6 @@ function SharesPlan({ quotes, onCash }: { quotes: Quotes; onCash: () => void }) 
           </div>
         )}
         {!over && cap && <p className="mt-5 text-sm text-gum">Your property plan still works. You could invest up to {money(cap.monthly)} a month before it starts delaying a purchase.</p>}
-        <CashShares p={p} proj={proj} onCash={onCash} />
       </section>
       <ShareTradeOff quotes={quotes} current={proj.shareMonthly} required={required} cap={cap?.monthly ?? null} onUse={useAmount} />
     </div>
