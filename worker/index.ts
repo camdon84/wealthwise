@@ -424,7 +424,8 @@ async function wiseRoute(req: Request, env: Env) {
   try { facts = JSON.parse(text); } catch { return fail('Could not read that.'); }
   const mode = new URL(req.url).searchParams.get('mode');
   const firstLook = mode === 'first-look';
-  const key = `wise:${mode ?? ''}:${await sha256(text)}`;
+  const fresh = (new URL(req.url).searchParams.get('fresh') || '').replace(/\D/g, '').slice(0, 15);
+  const key = `wise:${mode ?? ''}:${fresh}:${await sha256(text)}`;
   const data = await cached(env, key, 7 * 864e5, async () => {
     const lead = firstLook
       ? `This is the household's first look straight after finishing setup. Lead with their quickest wins, especially debts: compare each debt's interest rate with their savings, offset and home loan rate, and point out where paying down or restructuring high-interest debt would save money (the app's observations include the exact savings). Then one line on how they track against their goal.\n`
@@ -435,7 +436,7 @@ async function wiseRoute(req: Request, env: Env) {
 Write a short, warm, plain-English overview of where they stand against their goal, then up to 2 ideas or scenarios worth exploring in the app (for example a renovation, timing the next purchase, building a buffer, testing a later retirement age).
 Rules: use ONLY the numbers given and never calculate new ones. This is general information, not personal financial advice: suggest things to explore or questions to ask a broker, accountant or licensed adviser; never tell them to buy, sell or borrow, and never name a lender, fund or stock.
 Reply with JSON only: {"summary":"2-3 sentences, max 60 words","ideas":[{"title":"max 8 words","body":"1-2 sentences, max 40 words"}]}`;
-    const out = await askAI(env, sys, JSON.stringify(facts));
+    const out = await askAI(env, fresh ? sys + `\nThe household asked for fresh insights: pick angles you haven't led with before, still using only the figures given.` : sys, JSON.stringify(facts));
     return { summary: String(out?.summary || '').slice(0, 600), ideas: (Array.isArray(out?.ideas) ? out.ideas : []).slice(0, 2).map((i: any) => ({ title: String(i.title || '').slice(0, 80), body: String(i.body || '').slice(0, 300) })) };
   });
   return data?.summary ? json(data) : fail('Wise is unavailable right now.', 503);

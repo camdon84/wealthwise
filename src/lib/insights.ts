@@ -1,4 +1,4 @@
-import type { Profile } from './types';
+import type { InsightState, Profile } from './types';
 import { borrowingCapacity, livingCosts, position, project, propertyStats, type Quotes } from './calc';
 import { money } from './format';
 
@@ -41,6 +41,21 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
         : `After rent, savings, super and selling shares and investment properties, the plan can't keep paying ${money(p.goals.passiveIncome, { compact: true })} a year past ${proj.runsOutAge}. A lower yearly income, a later stop-work age or a bigger share plan would stretch it. Try them in the plan.`,
       figure: onTrack ? `${life}+` : `${proj.runsOutAge}`, figureLabel: onTrack ? 'money lasts past' : 'money runs out at age',
     });
+  }
+
+  // 1b. Room to spend more in retirement (snoozed for 12 months once they've adjusted it)
+  if (proj.runsOutAge == null && !((p.insightState?.spendSnoozeUntil ?? 0) > Date.now())) {
+    const more = affordableIncome(p, quotes);
+    const cur = p.goals.passiveIncome;
+    if (more != null && more >= cur * 1.1 && more - cur >= 10000) {
+      out.push({
+        id: 'spend-more', kind: 'opportunity',
+        title: 'You look set for a comfortable retirement',
+        body: `At ${money(cur, { compact: true })} a year from ${p.goals.retirementAge}, your plan still leaves a large nest egg at the end. You could live on up to about ${money(more, { compact: true })} a year and your money would still last past ${p.goals.lifeExpectancy ?? 90}. Consider raising your yearly income after retirement, or keep the extra as a safety margin.`,
+        figure: money(more, { compact: true }), figureLabel: 'a year you could afford',
+        action: { label: 'Adjust my retirement income', to: 'plan:goals' },
+      });
+    }
   }
 
   // 2. Next purchase from equity
@@ -207,8 +222,34 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
     figure: money(pos.netWorth, { compact: true }), figureLabel: 'net worth',
   });
 
-  const rank: Record<InsightKind, number> = { goal: 0, opportunity: 1, watch: 2, milestone: 3 };
-  return out.sort((a, b) => rank[a.kind] - rank[b.kind]);
+  return out.sort((a, b) => RANK[a.kind] - RANK[b.kind]);
+}
+
+/** Highest yearly retirement income (today's money, to the $5k below) that still lasts to life expectancy. */
+export function affordableIncome(p: Profile, quotes: Quotes): number | null {
+  const cur = p.goals.passiveIncome;
+  if (!(cur > 0)) return null;
+  const lasts = (inc: number) => project({ ...p, goals: { ...p.goals, passiveIncome: inc } }, quotes).runsOutAge == null;
+  let lo = cur, hi = cur * 3;
+  if (lasts(hi)) return Math.floor(hi / 5000) * 5000;
+  for (let k = 0; k < 9 && hi - lo > 2500; k++) { const mid = (lo + hi) / 2; if (lasts(mid)) lo = mid; else hi = mid; }
+  return Math.floor(lo / 5000) * 5000;
+}
+
+export const MAX_INSIGHTS = 10;
+const SIX_MONTHS = 182 * 864e5;
+export const insightKey = (i: Insight) => `${i.id}|${i.title}`;
+const RANK: Record<InsightKind, number> = { goal: 0, opportunity: 1, watch: 2, milestone: 3 };
+
+/**
+ * Which insights to show, in order. Dismissed ones stay hidden for 6 months unless "Give me Wise Insights"
+ * was pressed since. Order: ones not yet sent to the back of the queue, then by importance, then newest first.
+ */
+export function rankInsights(all: Insight[], st: InsightState | undefined, now = Date.now()) {
+  const seen = st?.seen ?? {}, back = st?.back ?? {}, dis = st?.dismissed ?? {}, refreshed = st?.refreshedAt ?? 0;
+  const live = all.filter((i) => { const d = dis[insightKey(i)]; return !(d && now - d < SIX_MONTHS && d > refreshed); });
+  const sorted = [...live].sort((a, b) => (back[insightKey(a)] ?? 0) - (back[insightKey(b)] ?? 0) || RANK[a.kind] - RANK[b.kind] || (seen[insightKey(b)] ?? now) - (seen[insightKey(a)] ?? now));
+  return { visible: sorted.slice(0, MAX_INSIGHTS), queued: Math.max(0, sorted.length - MAX_INSIGHTS), dismissed: all.length - live.length };
 }
 
 /* Facts for Wise's AI write-up. Figures are rounded so small price moves don't trigger a new write-up. */

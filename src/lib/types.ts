@@ -174,6 +174,7 @@ export interface Profile {
   renovations?: Renovation[];
   liquidations?: Liquidation[];
   forecasts?: Forecast[]; // saved forecasts and previous live plans
+  insightState?: InsightState; // Wise Insights: what's been seen, dismissed and refreshed
   planLocked?: boolean;
   gifts?: Gift[];
   cryptoGrowth?: number | null;
@@ -217,3 +218,13 @@ export interface PlanSnapshot {
 }
 /** A saved forecast, or a previous live plan kept when a forecast replaced it. */
 export interface Forecast { id: string; name: string; kind: 'forecast' | 'previous'; savedAt: string; plan: PlanSnapshot }
+
+/** Wise Insights bookkeeping. Keys are insight id + title, so a changed insight counts as new. Times are ms since epoch. */
+export interface InsightState {
+  seen?: Record<string, number>; // first time each insight appeared
+  back?: Record<string, number>; // pushed to the back of the queue by "Give me Wise Insights"
+  dismissed?: Record<string, number>;
+  refreshedAt?: number; // last "Give me Wise Insights"
+  spendBase?: number | null; // retirement income when we first suggested they could afford more
+  spendSnoozeUntil?: number; // they changed it after that suggestion: don't suggest again until then
+}
