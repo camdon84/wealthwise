@@ -39,7 +39,10 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
   const living = r10(pos.living);
   const surplus = Math.max(0, pos.monthlySurplus);
   const bills = r10(Math.max(0, pos.takeHome - pos.living - pos.monthlySurplus)); // loan repayments, property costs, other debts
-  const shares = r10(Math.min(surplus, proj.shareMonthly));
+  // Shares only once the plan starts them (e.g. 'don't invest until I've bought property 2')
+  const waiting = (p.goals.shareStartAfter ?? 0) > 0 && (proj.points[0]?.shareContribution ?? 0) < 1;
+  const shareStart = proj.points.find((x) => x.shareContribution > 0)?.year ?? null;
+  const shares = waiting ? 0 : r10(Math.min(surplus, proj.shareMonthly));
   const rest = Math.max(0, surplus - shares);
   const split = cp ? cp.split : loanProps.length ? { offset: 100, hisa: 0, everyday: 0 } : { offset: 0, hisa: 100, everyday: 0 };
   // The 'savings account' share of Cash Reserves is everyday money, so it joins everyday spending
@@ -74,7 +77,7 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
       sig: `offset:${pr.id}`,
     });
   }
-  if (flow.shares > 0) out.push({
+  if (flow.shares > 0 || waiting) out.push({
     key: 'broker', group: 'setup', title: 'Use a share trading account that can auto-invest',
     body: 'Check your broker lets you schedule a regular buy into ETFs or index funds. If it doesn’t, many Australian brokers now do, so it may be worth moving.',
     sig: 'broker',
@@ -122,6 +125,11 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
   });
 
   // ---- Check in
+  if (waiting && proj.shareMonthly > 0) out.push({
+    key: 'shares-later', group: 'check', title: `Start your automatic share purchase ${shareStart ? `in ${shareStart}` : 'later'}`,
+    body: `You’ve chosen not to invest in shares until you’ve bought property ${p.properties.length + (p.goals.shareStartAfter ?? 0)}. Once it’s bought, set up a regular automatic buy into a diversified ETF or index fund.`,
+    amount: pm(r10(proj.shareMonthly)), sig: `shares-later:${shareStart}:${r10(proj.shareMonthly)}`,
+  });
   out.push({
     key: 'super', group: 'check', title: 'Check your super is being paid',
     body: 'Your employer should pay 12% of your salary into super at least every quarter. Look for the payments in your fund’s app, and make sure your fund has your tax file number.',

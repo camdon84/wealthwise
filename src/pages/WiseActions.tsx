@@ -92,7 +92,7 @@ export function WiseActions({ quotes, go }: { quotes: Quotes; go: (r: string) =>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[11px] text-muted">From your current income, living expenses, loans and plan. Monthly amounts, rounded to the nearest $10. If your pay comes fortnightly, halve them and add a little.</p>
+        <p className="mt-3 text-[11px] text-muted">From your current income, living expenses, loans and plan. Monthly amounts, rounded to the nearest $10.</p>
       </section>
 
       {GROUPS.map((g) => {
