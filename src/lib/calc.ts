@@ -260,12 +260,15 @@ export function project(p: Profile, quotes: Quotes): Projection {
   type Sim = {
     name: string; value: number; cost: number; debt: number; rate: number; ioLeft: number; years: number; rent: number; costs: number; mgmt: number; g: number;
     invest: boolean; pay: number; payOff: boolean; home: boolean; pid?: string;
+    ng: boolean; ngUntil?: number; carry: number; // negative gearing allowed (until a year), and losses carried forward when it isn't
   };
   const sims: Sim[] = pos.props.map(({ pr, s }) => ({
     name: pr.address || 'A property', value: s.val.value, cost: n(pr.purchasePrice) || s.val.value, debt: s.debt, rate: s.avgRate || a.newLoanRate,
     ioLeft: pr.planIo5 ? 5 : 0, years: Math.max(1, ...pr.loans.map((l) => n(l.yearsLeft) || 25)),
     rent: s.rentGross, costs: n(pr.annualCosts), mgmt: n(pr.managementPct) / 100, g: pr.growthRate / 100, invest: pr.use === 'investment', pay: pr.use === 'home' ? share : 1,
     payOff: pr.planPayOff ?? pr.use === 'home', home: pr.use === 'home', pid: pr.id,
+    // 2026 Budget: properties held before 7:30pm 12 May 2026 keep negative gearing; established homes bought after it lose it from 1 July 2027
+    ng: pr.oldNegGearing ?? (!pr.purchaseDate || pr.purchaseDate < '2026-05'), ngUntil: (pr.oldNegGearing ?? (!pr.purchaseDate || pr.purchaseDate < '2026-05')) ? undefined : 2027, carry: 0,
   }));
   const valueNow = new Map(pos.props.map(({ pr, s }) => [pr.id, s.val.value]));
   const renos = (p.renovations ?? []).filter((r) => !r.done && valueNow.has(r.propertyId));
@@ -290,6 +293,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   let partSal = p.household.hasPartner ? n(p.household.partner.salary) : 0;
   const baseLiving = Math.max(livingCosts(p), livingFloor(p) - dependantsMonthly(p)) + housingMonthly(p);
   let living = (baseLiving + dependantsMonthly(p)) * 12;
+  let baseLivingAdj = 0; // e.g. rent stops once a first home is bought
   let hecsBal = hecsAnnual(p).balance;
   const buffer = n(p.finances.buffer) || recommendedBuffer(p);
   const retireBuffer = p.goals.retireCash != null ? n(p.goals.retireCash) : buffer;
@@ -317,7 +321,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   let block: PurchaseBlock | null = null;
   let waitFrom: number | null = null;
   let shortfallYear: number | null = null;
-  let superGone = false, reinvestSaid = false, sharesGoneSaid = false, shareShortSaid = false, shareStartSaid = false;
+  let superGone = false, reinvestSaid = false, sharesGoneSaid = false, shareShortSaid = false, shareStartSaid = false, ngSaid = false, renting = p.finances.housing === 'rent';
   let sharesAtRetire = 0;
   let runsOutAge: number | null = null;
   const kidsEnd = new Set<string>();
@@ -339,7 +343,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
     let bought: number | undefined;
     let contribution = 0;
     let spendGoal = 0, spendFunded = 0, superDrawn = 0, sharePlanned = 0;
-    let payNet = 0, saleIn = 0, giftIn = 0, liqIn = 0, propNetY = 0, liquidated = 0, investNet = 0;
+    let payNet = 0, saleIn = 0, giftIn = 0, liqIn = 0, propNetY = 0, liquidated = 0, investNet = 0, rentTax = 0;
     const paidOff: string[] = i === 0 ? [...paidAtStart] : [];
     const sold: string[] = [];
 
@@ -347,6 +351,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       // Property: grow, collect rent, pay loans (interest-only while that lasts, then principal and interest)
       let propNet = 0;
       investNet = 0;
+      let taxableRent = 0; // rental profit (or deductible loss) added to taxable income this year
       for (const s of sims) {
         s.value *= 1 + s.g;
         s.rent *= 1 + a.rentGrowth / 100;
@@ -363,6 +368,12 @@ export function project(p: Profile, quotes: Quotes): Projection {
           }
         }
         s.years = Math.max(1, s.years - 1);
+        if (s.invest) {
+          const result = s.rent * (1 - s.mgmt) - s.costs - interest; // principal isn't deductible
+          const geared = s.ng || (s.ngUntil != null && year <= s.ngUntil);
+          if (result < 0) { if (geared) taxableRent += result; else s.carry -= result; }
+          else { const used = Math.min(s.carry, result); s.carry -= used; taxableRent += result - used; }
+        }
         propNet += s.invest ? s.rent * (1 - s.mgmt) - s.costs - repay : -(s.costs + repay * s.pay);
         if (s.invest) investNet += s.rent * (1 - s.mgmt) - s.costs - repay;
       }
@@ -392,7 +403,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       };
       youSal = working ? nextSalary('you', youSal) : 0;
       partSal = working && p.household.hasPartner ? nextSalary('partner', partSal) : 0;
-      living = (baseLiving + dependantsMonthly(p, i)) * 12 * infl(i);
+      living = (baseLiving + baseLivingAdj + dependantsMonthly(p, i)) * 12 * infl(i);
       for (const c of p.goals.plannedChildren ?? []) {
         if (c.year === year) say(year, 'kids', `A new baby is planned. About ${fmt(CHILD_COST_YEAR)} a year (in today’s money) is added to your costs until they turn 18, based on the Australian average.`);
         if (c.year + 18 === year) say(year, 'kids', 'Your planned child turns 18: their costs drop out of your budget.');
@@ -417,6 +428,10 @@ export function project(p: Profile, quotes: Quotes): Projection {
       if (hecsBal > 0) { const h = hecsAnnual(p, youSal, partSal); hecsPaid = Math.min(hecsBal, h.compulsory + h.voluntary); hecsBal -= hecsPaid; if (hecsBal <= 0) { paidOff.push('HECS'); say(year, 'debt', 'HECS is paid off.'); } }
       const net = afterTax(youSal + n(p.household.otherIncome)) + (partSal ? afterTax(partSal) : 0) - hecsPaid;
       payNet = working ? net : 0;
+      // Tax on rent: profits are taxed at your marginal rate; losses on negatively geared properties come back as a tax refund (split between partners if both earn)
+      const base1 = youSal + n(p.household.otherIncome), split = p.household.hasPartner && partSal > 0;
+      rentTax = split ? (incomeTax(base1 + taxableRent / 2) - incomeTax(base1)) + (incomeTax(partSal + taxableRent / 2) - incomeTax(partSal)) : incomeTax(base1 + taxableRent) - incomeTax(base1);
+      if (taxableRent < 0 && !ngSaid) { ngSaid = true; say(year, 'goal', `Negative gearing: your rental losses cut your tax by about ${fmt(-rentTax)} this year.`); }
 
       // Gifts and inheritances land in savings
       for (const gft of p.gifts ?? []) if (Math.max(gft.year, y0 + 1) === year && gft.amount > 0) {
@@ -455,7 +470,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
 
       const eventCost = p.goals.events.filter((ev) => ev.year === year).reduce((t, ev) => t + n(ev.amount), 0) + renoCost;
       if (working) {
-        cash += net + propNet + offsetSaving - living - debtRepay - eventCost; // planned one-off costs come before investing
+        cash += net + propNet + offsetSaving - living - debtRepay - eventCost - rentTax; // planned one-off costs come before investing
         // Shares are bought only from savings above the emergency fund: you can't invest money you don't have
         const waitForBuys = n(p.goals.shareStartAfter);
         sharePlanned = waitForBuys > 0 && purchases.length < waitForBuys ? 0 : shareMonthly * 12 * infl(i);
@@ -491,7 +506,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
           sup -= superDraw; superDrawn = superDraw;
           if (sup < 1000 && superDraw > 0 && !superGone) { superGone = true; sup = 0; say(year, 'super', 'Your super is fully drawn down by now. Rent, savings and shares take over.'); }
         }
-        cash += propNet + offsetSaving + superDraw - spendGoal - debtRepay - renoCost;
+        cash += propNet + offsetSaving + superDraw - spendGoal - debtRepay - renoCost - rentTax;
         const floor = retireBuffer * infl(i);
         if (cash < floor - 1) sellShares(floor - cash);
         if (cash < floor - 1 && cryptoBal > 0) {
@@ -525,14 +540,17 @@ export function project(p: Profile, quotes: Quotes): Projection {
         const price = (plan?.price ?? a.newPurchasePrice) * Math.pow(1 + growth, i);
         const yieldPct = plan?.yieldPct ?? a.newPurchaseYield;
         const rate = plan?.rate ?? a.newLoanRate;
-        const costsPct = (plan?.costsPct ?? 5) / 100;
+        // First home buyer benefits only apply to a first home you live in
+        const fhb = plan?.firstHome && p.properties.length === 0 && k === 0 ? plan.fhb ?? {} : null;
+        const costsPct = (fhb?.noStampDuty ? 1 : plan?.costsPct ?? 5) / 100; // with no stamp duty, roughly legals and inspections are left
+        const grant = fhb?.grant ? n(fhb.grantAmount ?? 15000) : 0;
         const usable = sims.reduce((t, s) => t + Math.max(0, s.value * (a.lvr / 100) - s.debt), 0);
-        const deposit = price * ((plan?.depositPct ?? 20) / 100 + costsPct);
+        const deposit = Math.max(0, price * ((fhb?.deposit5 ? 5 : plan?.depositPct ?? 20) / 100 + costsPct) - grant);
         const spare = Math.max(0, cash - buffer * infl(i));
         // The most a lender would lend now (car loans and cards only count for the first new purchase)
         const maxLoan = Math.max(0, pv(rate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, k === 0)));
         // Cash needed: at least whatever equity can't cover of the deposit, and enough to keep the loan within what a lender allows
-        const total = price * (1 + costsPct);
+        const total = price * (1 + costsPct) - grant;
         const needCash = Math.max(0, deposit - usable, total - maxLoan);
         const fromCash = Math.min(spare, Math.max(needCash, Math.min(spare, deposit)));
         const fromEquity = Math.max(0, deposit - fromCash);
@@ -542,14 +560,20 @@ export function project(p: Profile, quotes: Quotes): Projection {
           block = null;
           cash -= fromCash;
           const label = plan?.label || `Property ${ownedNow + 1}`;
-          sims.push({ name: label, value: price, cost: price, debt: newLoan, rate, ioLeft: plan?.ioFirst5 === false ? 0 : 5, years: 30, rent: price * (yieldPct / 100) * (50 / 52), costs: price * ((plan?.holdingPct ?? 1.2) / 100), mgmt: (plan?.mgmtPct ?? 7) / 100, g: growth, invest: true, pay: 1, payOff: !!plan?.payOff, home: false });
+          const asHome = !!plan?.firstHome && p.properties.length === 0 && k === 0;
+          sims.push({ name: label, value: price, cost: price, debt: newLoan, rate, ioLeft: plan?.ioFirst5 === false ? 0 : 5, years: 30, rent: asHome ? 0 : price * (yieldPct / 100) * (50 / 52), costs: price * ((plan?.holdingPct ?? 1.2) / 100), mgmt: (plan?.mgmtPct ?? 7) / 100, g: growth, invest: !asHome, pay: 1, payOff: asHome ? true : !!plan?.payOff, home: asHome,
+            ng: !!plan?.newBuild, ngUntil: plan?.newBuild ? undefined : 2027, carry: 0 });
+          if (asHome && renting) { renting = false; baseLivingAdj -= housingMonthly(p); say(year, 'goal', 'You stop paying rent once you move into your first home.'); }
+          if (grant) { giftIn += grant; }
           purchases.push({ year, price, id: plan?.id });
           bought = price;
           const via = [fromEquity > 1000 ? `${fmt(fromEquity)} of equity` : '', fromCash > 1000 ? `${fmt(fromCash)} of savings` : ''].filter(Boolean).join(' and ');
           const waited = prevBlock && waitFrom != null && waitFrom < year - 1 ? (prevBlock.reason === 'servicing' ? ' It waits until now because, until this year, a lender wouldn’t lend enough on your income, so savings build up to cover the gap.' : ' It waits until now for enough equity and savings to cover the deposit and costs.') : '';
           const loanPlan = ` ${plan?.ioFirst5 === false ? 'Principal and interest from day one' : 'Interest-only for 5 years, then principal and interest'}${plan?.payOff ? `, paid off by ${retireAge}` : `, sold at ${retireAge} if a loan is still owing`}.`;
           waitFrom = null;
-          say(year, 'buy', `Buy ${label} for about ${fmt(price / infl(i))} in today’s money (${fmt(price)} at the time), putting in ${via || 'equity'} and borrowing ${fmt(newLoan)}.${waited}${loanPlan}`);
+          const fhbNote = fhb ? ` First home buyer help: ${[fhb.deposit5 && '5% deposit with no mortgage insurance', fhb.grant && `a ${fmt(grant)} First Home Owner Grant`, fhb.noStampDuty && 'no stamp duty'].filter(Boolean).join(', ') || 'none ticked'}.` : '';
+          const ngNote = !(plan?.firstHome && p.properties.length === 0 && k === 0) ? (plan?.newBuild ? ' As a new build it keeps negative gearing.' : ' As an established home bought after Budget night 2026, rental losses can’t reduce your other tax from July 2027; they carry forward against its future rent.') : '';
+          say(year, 'buy', `Buy ${label}${fhb ? ' as your first home' : ''} for about ${fmt(price / infl(i))} in today’s money (${fmt(price)} at the time), putting in ${via || 'equity'} and borrowing ${fmt(newLoan)}.${waited}${fhb ? '' : loanPlan}${fhbNote}${ngNote}`);
         } else {
           if (waitFrom == null) waitFrom = year;
           block = { year, reason: deposit - usable > spare ? 'deposit' : 'servicing', price, deposit, available: usable + spare, monthlyShort: Math.max(0, pmt(rate + a.serviceBuffer, 30, total - spare) - pmt(rate + a.serviceBuffer, 30, maxLoan)) };

@@ -36,6 +36,17 @@ export function PropertyEditor({ value, onChange, thorough }: { value: Property;
         {thorough && <Field label="Bedrooms">{(id) => <NumInput id={id} value={value.bedrooms} onChange={(v) => set({ bedrooms: v })} placeholder="3" />}</Field>}
       </div>
 
+      {value.use === 'investment' && (() => {
+        const grandfathered = value.oldNegGearing ?? (!value.purchaseDate || value.purchaseDate < '2026-05');
+        return (
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={grandfathered} onChange={(e) => set({ oldNegGearing: e.target.checked })} />
+            <span className="text-sm"><span className="font-medium">This property is under the old negative gearing rules</span>
+              <span className="block text-xs text-muted">Tick if you owned it (or had signed the contract) before 7:30pm AEST on 12 May 2026. Those properties keep negative gearing. Established homes bought after that can’t offset rental losses against your salary from 1 July 2027; new builds still can.</span></span>
+          </label>
+        );
+      })()}
+
       {thorough && (
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Owned by">{(id) => <Select id={id} value={value.structure} onChange={(v) => set({ structure: v })} options={[

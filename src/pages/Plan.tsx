@@ -399,11 +399,12 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
 }) {
   const update = usePlanUpdate();
   const assumedRate = usePlanProfile().assumptions.newLoanRate;
+  const fhbEligible = usePlanProfile().properties.length === 0 && k === 0;
   const set = (patch: Partial<PlannedPurchase>) => update((d) => { Object.assign(d.plannedPurchases![k], patch); });
   const late = plan.buyBy && bought && bought.year >= plan.buyBy;
   const io5 = plan.ioFirst5 !== false;
   const weeklyRent = (plan.price * plan.yieldPct) / 100 / 52;
-  const chips = [plan.buyBy ? `Before ${plan.buyBy}` : 'As soon as possible', io5 ? 'Interest-only for 5 years' : 'Principal and interest', plan.payOff ? `Paid off by ${retireAge}` : `Sold at ${retireAge} if a loan is left`];
+  const chips = [plan.buyBy ? `Before ${plan.buyBy}` : 'As soon as possible', ...(plan.firstHome && fhbEligible ? ['First home'] : [plan.newBuild ? 'New build' : 'Established', io5 ? 'Interest-only for 5 years' : 'Principal and interest', plan.payOff ? `Paid off by ${retireAge}` : `Sold at ${retireAge} if a loan is left`])];
   const right = bought
     ? <p className={`text-right text-sm ${late ? 'text-clay' : ''}`}><span className="font-semibold">{bought.year}</span><br /><span className="text-muted">age {startAge + (bought.year - startYear)} · {money(bought.price, { compact: true })} then</span></p>
     : <p className="text-sm font-medium text-clay">Doesn’t fit before {retireAge}</p>;
@@ -425,6 +426,37 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
         <Field label="Stamp duty and buying costs">{(id) => <NumInput id={id} value={plan.costsPct ?? 5} onChange={(v) => set({ costsPct: v ?? 5 })} step={0.5} suffix="%" />}</Field>
         <Field label="Rates, insurance, upkeep" hint="Of the price, each year">{(id) => <NumInput id={id} value={plan.holdingPct ?? 1.2} onChange={(v) => set({ holdingPct: v ?? 1.2 })} step={0.1} suffix="%" />}</Field>
         <Field label="Property management" hint="Of the rent">{(id) => <NumInput id={id} value={plan.mgmtPct ?? 7} onChange={(v) => set({ mgmtPct: v ?? 7 })} step={0.5} suffix="%" />}</Field>
+      </div>
+      <div className="mt-5 space-y-3">
+        {!plan.firstHome && (
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={!!plan.newBuild} onChange={(e) => set({ newBuild: e.target.checked })} />
+            <span className="text-sm"><span className="font-medium">This will be a new build and subject to negative gearing</span>
+              <span className="block text-xs text-muted">Under the 2026 Budget rules, new builds keep negative gearing: rental losses reduce the tax on your salary. An established home bought now can’t do that from 1 July 2027; its losses carry forward against its own future rent instead.</span></span>
+          </label>
+        )}
+        {fhbEligible && (
+          <div className="rounded-xl border border-line p-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={!!plan.firstHome} onChange={(e) => set({ firstHome: e.target.checked, fhb: plan.fhb ?? { deposit5: true, noStampDuty: true } })} />
+              <span className="text-sm"><span className="font-medium">I am using my first home buyer benefits</span>
+                <span className="block text-xs text-muted">This becomes your first home to live in, so there’s no rent from it and your own rent stops when you move in.</span></span>
+            </label>
+            {plan.firstHome && (
+              <div className="mt-3 space-y-2 border-t border-line pt-3 pl-7">
+                <p className="text-sm font-medium">Which benefits are you using?</p>
+                {([['deposit5', '5% Deposit Scheme', 'Buy with a 5% deposit and no lenders mortgage insurance (the government guarantees the rest).'], ['noStampDuty', 'No stamp duty', 'First home stamp duty exemption or concession in your state.'], ['grant', 'First Home Owner Grant', 'A one-off grant, usually for new homes. The amount depends on your state.']] as const).map(([key, label, hint]) => (
+                  <label key={key} className="flex cursor-pointer items-start gap-3">
+                    <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={!!plan.fhb?.[key]} onChange={(e) => set({ fhb: { ...plan.fhb, [key]: e.target.checked } })} />
+                    <span className="text-sm">{label}<span className="block text-xs text-muted">{hint}</span></span>
+                  </label>
+                ))}
+                {plan.fhb?.grant && <div className="max-w-xs pl-7"><Field label="Grant amount" hint="Queensland is $15,000 for a new home under $750,000 (contracts from 1 July 2026). Check your state.">{(id) => <MoneyInput id={id} value={plan.fhb?.grantAmount ?? 15000} onChange={(v) => set({ fhb: { ...plan.fhb, grantAmount: v } })} />}</Field></div>}
+                <p className="text-[11px] text-muted">Eligibility, price caps and amounts vary by state and change often. Check with your broker or state revenue office.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Toggle checked={io5} onChange={(v) => set({ ioFirst5: v })} label="Interest-only for the first 5 years?" description="Lower repayments while you build up; principal and interest after that." />

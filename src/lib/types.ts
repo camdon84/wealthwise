@@ -91,6 +91,7 @@ export interface Property {
   annualCosts: number | null; // rates, insurance, strata, maintenance
   bedrooms: number | null;
   yearBuilt: number | null;
+  oldNegGearing?: boolean; // bought before 7:30pm AEST 12 May 2026: grandfathered under the old negative gearing rules
   planIo5?: boolean; // plan: interest-only for the next 5 years
   photo?: string | null; // the user's own photo (small JPEG data URL); replaces the aerial view
   renoAdds?: { id: string; amount: number; date: string }[]; // value added by finished renovations (see propertyValuation)
@@ -193,6 +194,9 @@ export interface PlannedPurchase {
   ioFirst5?: boolean; // interest-only for the first 5 years, then principal and interest
   payOff?: boolean; // paid off by retirement; otherwise sold at retirement
   depositPct?: number; costsPct?: number; holdingPct?: number; mgmtPct?: number;
+  newBuild?: boolean; // a new build: keeps negative gearing under the 2026 rules
+  firstHome?: boolean; // bought as your first home to live in
+  fhb?: { deposit5?: boolean; grant?: boolean; grantAmount?: number | null; noStampDuty?: boolean };
 }
 
 /** A renovation saved from the Renovator. Planned ones are modelled in the projection in their year; done ones live in the property's valuations. */
