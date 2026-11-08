@@ -21,7 +21,7 @@ export function Account() {
         </div>
       </section>
       <section className="panel p-6">
-        <Toggle checked={hh.hasPartner} onChange={(v) => update((d) => { d.household.hasPartner = v; })} label="I’m planning with a partner" description="Their income, super and share of each asset count toward the plan. Add their details in My details." />
+        <Toggle checked={hh.hasPartner} onChange={(v) => update((d) => { d.household.hasPartner = v; })} label="I’m planning with a partner" description="Their income, super and share of each asset count toward the plan. Add their details in My Details." />
         {hh.hasPartner && (
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <Field label="Partner’s first name">{(id) => <TextInput id={id} value={hh.partner.name} onChange={(v) => update((d) => { d.household.partner.name = v; })} />}</Field>

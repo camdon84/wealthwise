@@ -148,7 +148,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
       if (extra && extra.year <= r.retireYear - 3 && lastsOk(more) && cashOk(more)) good.push(`There’s room for one more: property ${g.targetProperties + 1} would fit around ${extra.year}. Raise “Properties owned by retirement” to add it.`);
     }
   }
-  if (cashOk(r) && position(p, quotes).monthlySurplus < 0) problems.push('You’re spending more than you earn each month right now. Check your living expenses in My details.');
+  if (cashOk(r) && position(p, quotes).monthlySurplus < 0) problems.push('You’re spending more than you earn each month right now. Check your living expenses in My Details.');
 
   const ideas: PlanIdea[] = [...buyIdeas(p, r, run, quotes), ...(lastsOk(r) && cashOk(r) && propsOk(p, r) ? retireIdeas(p, run).map((text) => ({ text })) : [])];
   return { works: problems.length === 0, problems, fixes: [...new Set(fixes)], good, ideas, proj: r };

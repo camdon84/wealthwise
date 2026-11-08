@@ -8,7 +8,7 @@ import { Properties } from './pages/Properties';
 import { Investments } from './pages/Investments';
 import { Plan } from './pages/Plan';
 import { Renovate } from './pages/Renovate';
-import { Dependants, MyDetails } from './pages/MyDetails';
+import { MyDetails } from './pages/MyDetails';
 import { Account } from './pages/Account';
 import { FirstLook } from './pages/FirstLook';
 import { Documents, eofyItems } from './pages/Documents';
@@ -21,8 +21,7 @@ const NAV = [
   { id: 'crypto', label: 'Crypto', icon: 'coin' },
   { id: 'plan', label: 'Wise Plan', icon: 'plan' },
   { id: 'renovate', label: 'Renovator Centre', icon: 'renovate' },
-  { id: 'details', label: 'My details', icon: 'details' },
-  { id: 'dependants', label: 'Dependants', icon: 'family' },
+  { id: 'details', label: 'My Details', icon: 'details' },
   { id: 'documents', label: 'Upload your documents', icon: 'upload' },
   { id: 'account', label: 'Account', icon: 'profile' },
 ];
@@ -85,7 +84,7 @@ function Shell() {
           {current === 'documents' && <Documents />}
           {current === 'renovate' && <Renovate />}
           {current === 'details' && <MyDetails />}
-          {current === 'dependants' && <Dependants />}
+          {current === 'dependants' && <MyDetails initialTab="dependants" />}
           {current === 'account' && <Account />}
         </main>
       </div>

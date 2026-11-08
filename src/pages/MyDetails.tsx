@@ -7,28 +7,30 @@ import type { Dependant } from '../lib/types';
 import { CashSuper, Income, Spending } from '../onboarding/Onboarding';
 import { Field, Icon, MoneyInput, NumInput, Segmented, Select, TextInput } from '../components/ui';
 
-type Tab = 'income' | 'home' | 'cash';
+type Tab = 'income' | 'home' | 'cash' | 'dependants';
 
-export function MyDetails() {
-  const [tab, setTab] = useState<Tab>('income');
+export function MyDetails({ initialTab = 'income' }: { initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">My details</h1><p className="text-muted">Keep these up to date and your plan updates with them.</p></div>
-        <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: 'income', label: 'Work and income' }, { value: 'home', label: 'Home and living costs' }, { value: 'cash', label: 'Cash, super and debts' }]} />
+        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">My Details</h1><p className="text-muted">Keep these up to date and your plan updates with them.</p></div>
+        <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: 'income', label: 'Work and Income' }, { value: 'home', label: 'Home and Living Costs' }, { value: 'cash', label: 'Cash, Superannuation and Debts' }, { value: 'dependants', label: 'Dependants' }]} />
       </div>
+      {tab === 'dependants' ? <Dependants embedded /> : (
       <section className="panel p-5 sm:p-7">
         {tab === 'income' && <Income thorough withDates />}
         {tab === 'home' && <Spending thorough />}
         {tab === 'cash' && <CashSuper thorough withDates />}
       </section>
+      )}
     </div>
   );
 }
 
 const thisYear = new Date().getFullYear();
 
-export function Dependants() {
+export function Dependants({ embedded }: { embedded?: boolean } = {}) {
   const p = useApp((s) => s.profile)!;
   const update = useApp((s) => s.update);
   const list = p.household.dependantsDetail ?? [];
@@ -38,7 +40,7 @@ export function Dependants() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Dependants</h1><p className="text-muted">Children or anyone else you support. Their costs stop in your plan once they reach the age you set.</p></div>
+        <div>{embedded ? <h2 className="font-display text-xl font-semibold">Dependants</h2> : <h1 className="font-display text-3xl font-semibold sm:text-4xl">Dependants</h1>}<p className="text-muted">Children or anyone else you support. Their costs stop in your plan once they reach the age you set.</p></div>
         <button className="btn-primary" onClick={() => update((d) => { (d.household.dependantsDetail ??= []).push(emptyDependant(d.household.dependantsDetail.length)); sync(d); })}><Icon name="plus" className="h-4 w-4" />Add a dependant</button>
       </div>
       {list.length > 0 && <p className="text-sm text-muted">Together they cost about <span className="font-semibold text-ink">{money(total)} a month</span> right now. That’s counted on top of your own living costs, so leave school fees and kids’ costs out of those.</p>}
