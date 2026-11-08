@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApp, useNavIntent } from '../lib/store';
 import { propertyStats } from '../lib/calc';
 import { money, monthYear, pct } from '../lib/format';
@@ -8,6 +9,8 @@ import { PhotoControls, PropertyPhoto } from '../components/Aerial';
 import { PropertyEditor } from '../components/PropertyEditor';
 import { Icon, MoneyInput, Select, Segmented } from '../components/ui';
 
+const n = (v: number | null | undefined) => v ?? 0;
+
 const reaUrl = (p: Property) =>
   `https://www.realestate.com.au/property/${[p.address, p.suburb, p.state, p.postcode].join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 
@@ -16,6 +19,7 @@ export function Properties() {
   const update = useApp((s) => s.update);
   const [view, setView] = useState<'cards' | 'list'>('cards');
   const [selected, setSelected] = useState<string | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
   const [editing, setEditing] = useState<Property | null>(() => {
     const id = useNavIntent.getState().editProperty; if (!id) return null;
     useNavIntent.getState().set({ editProperty: null });
@@ -30,7 +34,7 @@ export function Properties() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Properties</h1><p className="text-muted">{p.properties.length} properties · {money(totals.v, { compact: true })} value · {money(totals.v - totals.d, { compact: true })} equity</p></div>
+        <div><h1 className="font-display text-3xl font-semibold sm:text-4xl">Your current property portfolio</h1><p className="text-muted">{p.properties.length} properties · {money(totals.v, { compact: true })} value · {money(totals.v - totals.d, { compact: true })} equity</p></div>
         <div className="flex gap-2">
           <Segmented size="sm" label="Layout" value={view} onChange={setView} options={[{ value: 'cards', label: 'Cards' }, { value: 'list', label: 'List' }]} />
           <button className="btn-primary" onClick={() => setEditing(emptyProperty())}><Icon name="plus" className="h-4 w-4" />Add property</button>
@@ -48,11 +52,12 @@ export function Properties() {
       )}
 
       {view === 'cards' ? (
-        <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        <div className="space-y-5">
           {p.properties.map((pr) => {
             const s = propertyStats(pr, lvr);
             return (
-              <button key={pr.id} onClick={() => setSelected(pr.id)} className="panel overflow-hidden text-left transition-colors hover:border-brass/60">
+              <button key={pr.id} onClick={() => setSelected(pr.id)} onMouseEnter={() => setFocus(pr.id)} onFocus={() => setFocus(pr.id)} className={`panel block w-full overflow-hidden text-left transition-colors hover:border-brass/60 ${(focus ?? p.properties[0]?.id) === pr.id ? 'ring-2 ring-brass/50' : ''}`}>
                 <PropertyPhoto property={pr} className="h-36 w-full" />
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-3">
@@ -71,6 +76,12 @@ export function Properties() {
               </button>
             );
           })}
+        </div>
+        {p.properties.length > 0 && (
+          <div className="lg:sticky lg:top-6">
+            <ValueHistory property={p.properties.find((x) => x.id === focus) ?? p.properties[0]} onPick={setFocus} />
+          </div>
+        )}
         </div>
       ) : (
         <div className="panel overflow-x-auto">
@@ -91,7 +102,10 @@ export function Properties() {
 
       {sel && <PropertyDetail property={sel} onClose={() => setSelected(null)} onEdit={() => { setEditing(structuredClone(sel)); setSelected(null); }} />}
       {editing && (
-        <Sheet title={p.properties.some((x) => x.id === editing.id) ? `Edit ${editing.address}` : 'Add a property'} onClose={() => setEditing(null)}>
+        <Sheet title={p.properties.some((x) => x.id === editing.id) ? `Edit ${editing.address}` : 'Add a property you own'} onClose={() => setEditing(null)}>
+          {!p.properties.some((x) => x.id === editing.id) && (
+            <p className="-mt-4 mb-6 text-sm text-muted">To add a future property, go to <button className="font-medium text-brass hover:underline" onClick={() => { useNavIntent.getState().set({ planTab: 'timeline' }); setEditing(null); location.hash = 'plan'; }}>your plan</button>.</p>
+          )}
           <PropertyEditor value={editing} onChange={setEditing} thorough />
           <div className="mt-6 flex justify-between">
             {p.properties.some((x) => x.id === editing.id) ? <button className="btn-ghost text-clay" onClick={() => { update((d) => { d.properties = d.properties.filter((x) => x.id !== editing.id); }); setEditing(null); }}>Remove property</button> : <span />}
@@ -182,5 +196,59 @@ function PropertyDetail({ property: pr, onClose, onEdit }: { property: Property;
         </ul>
       </section>
     </Sheet>
+  );
+}
+
+/** Purchase to today to ten years out, for one property. */
+function ValueHistory({ property: pr, onPick }: { property: Property; onPick: (id: string) => void }) {
+  const p = useApp((s) => s.profile)!;
+  const now = propertyStats(pr, p.assumptions.lvr).val.value;
+  const y0 = new Date().getFullYear();
+  const [by, bm] = (pr.purchaseDate || `${y0}-01`).split('-').map(Number);
+  const bought = n(pr.purchasePrice);
+  const held = Math.max(0, y0 + (new Date().getMonth()) / 12 - (by + ((bm || 1) - 1) / 12));
+  // Growth: this property's own average since purchase if held 3+ years, otherwise its growth setting
+  const own = bought > 0 && held >= 3 ? Math.pow(now / bought, 1 / held) - 1 : null;
+  const g = own != null ? own : pr.growthRate / 100;
+  const data: { year: number; past?: number; future?: number }[] = [];
+  if (bought > 0 && by < y0) for (let y = by; y < y0; y++) data.push({ year: y, past: bought * Math.pow(now / bought, (y - by) / Math.max(0.5, held)) });
+  data.push({ year: y0, past: now, future: now });
+  for (let k = 1; k <= 10; k++) data.push({ year: y0 + k, future: now * Math.pow(1 + g, k) });
+  const end = data[data.length - 1].future!;
+  return (
+    <section className="panel p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><h2 className="font-display text-xl font-semibold">{pr.address}</h2><p className="text-sm text-muted">{pr.suburb} {pr.state} · value since you bought it, and the next 10 years</p></div>
+        {p.properties.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">{p.properties.map((x) => (
+            <button key={x.id} onClick={() => onPick(x.id)} className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${x.id === pr.id ? 'bg-brass text-ground ring-brass' : 'ring-line text-muted hover:text-ink'}`}>{x.address}</button>
+          ))}</div>
+        )}
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+        <div><p className="text-xs text-muted">Bought {bought > 0 ? `${by}` : ''}</p><p className="font-display text-xl font-semibold">{bought > 0 ? money(bought, { compact: true }) : '—'}</p></div>
+        <div><p className="text-xs text-muted">Today</p><p className="font-display text-xl font-semibold">{money(now, { compact: true })}</p>{bought > 0 && <p className="text-xs text-gum">{money(now - bought, { compact: true, sign: true })}</p>}</div>
+        <div><p className="text-xs text-muted">Forecast {y0 + 10}</p><p className="font-display text-xl font-semibold text-gum">{money(end, { compact: true })}</p><p className="text-xs text-muted">{(g * 100).toFixed(1)}% a year</p></div>
+      </div>
+      <div className="mt-4 -ml-2">
+        <ResponsiveContainer width="100%" height={280}>
+          <AreaChart data={data} margin={{ top: 16, right: 12, left: 0, bottom: 0 }}>
+            <defs><linearGradient id="vh-past" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="rgb(var(--gum))" stopOpacity={0.35} /><stop offset="1" stopColor="rgb(var(--gum))" stopOpacity={0.05} /></linearGradient></defs>
+            <CartesianGrid vertical={false} stroke="rgb(var(--line))" strokeDasharray="2 4" />
+            <XAxis dataKey="year" tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
+            <YAxis tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickLine={false} axisLine={false} width={56} tickFormatter={(v) => money(v, { compact: true })} domain={['dataMin', 'dataMax']} />
+            <Tooltip formatter={(v: number, k: string) => [money(v, { compact: true }), k === 'past' ? 'Value' : 'Forecast']} labelFormatter={(l) => String(l)} contentStyle={{ background: 'rgb(var(--surface))', border: '1px solid rgb(var(--line))', borderRadius: 12, fontSize: 12 }} />
+            <Area type="monotone" dataKey="past" stroke="rgb(var(--gum))" strokeWidth={2} fill="url(#vh-past)" isAnimationActive={false} connectNulls />
+            <Area type="monotone" dataKey="future" stroke="rgb(var(--brass))" strokeWidth={2} strokeDasharray="5 4" fill="rgb(var(--brass) / 0.06)" isAnimationActive={false} connectNulls />
+            {bought > 0 && by < y0 && <ReferenceDot x={by} y={bought} r={5} fill="rgb(var(--surface))" stroke="rgb(var(--gum))" strokeWidth={2} label={{ value: `Bought ${money(bought, { compact: true })}`, position: 'top', fill: 'rgb(var(--muted))', fontSize: 10 }} />}
+            <ReferenceDot x={y0} y={now} r={5} fill="rgb(var(--gum))" stroke="rgb(var(--surface))" strokeWidth={2} label={{ value: 'Today', position: 'top', fill: 'rgb(var(--muted))', fontSize: 10 }} />
+            <ReferenceLine x={y0} stroke="rgb(var(--muted))" strokeDasharray="3 3" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="mt-2 text-[11px] text-muted">{own != null
+        ? `Property forecast based on this property’s average growth since you bought it (${(own * 100).toFixed(1)}% a year). Suburb data from the last 10 years will replace this once it’s connected.`
+        : `Property forecast based on the growth rate set for this property (${pr.growthRate}% a year). Suburb data from the last 10 years will replace this once it’s connected.`} The line between purchase and today is smoothed. Not a valuation.</p>
+    </section>
   );
 }

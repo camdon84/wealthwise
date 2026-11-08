@@ -42,9 +42,10 @@ h1, h2, h3, .font-display { font-family: 'Bricolage Grotesque', system-ui, sans-
 
 /* Cards are cream in both themes: dark chrome around light, easy-to-read content. */
 .dark .panel, .dark .paper {
-  --surface: 250 247 239;
-  --raised: 242 238 228;
-  --line: 224 217 201;
+  /* In dark mode the cards stay light, but a softer, dimmer stone than light mode so they don't glare against the dark ground */
+  --surface: 228 223 209;
+  --raised: 217 211 195;
+  --line: 199 191 173;
   --ink: 24 36 31;
   --muted: 96 106 98;
   --brass: 150 108 38;
@@ -85,3 +86,5 @@ input[type=range] { accent-color: rgb(var(--brass)); }
 
 /* Locked plan: inputs look read-only; clicking them asks whether to unlock */
 .plan-locked input, .plan-locked select, .plan-locked textarea, .plan-locked [role='radiogroup'], .plan-locked .btn-primary, .plan-locked .btn-quiet { opacity: 0.55; cursor: not-allowed; }
+
+.dark .panel { background-image: linear-gradient(180deg, rgb(234 229 216) 0%, rgb(221 215 200) 100%); }
