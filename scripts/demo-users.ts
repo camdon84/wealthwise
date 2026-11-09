@@ -6,7 +6,7 @@
  * Print them as JSON: npx esbuild scripts/demo-users.ts --bundle --platform=node --define:import.meta.env={} | node
  * Accounts are added to D1 with random passwords (nobody signs in as them; admins open them with "View as user").
  */
-import { blankProfile, emptyProperty, normalize, uid } from '../src/lib/defaults';
+import { DEMO_PHOTO, blankProfile, emptyProperty, normalize, uid } from '../src/lib/defaults';
 import type { Holding, Profile } from '../src/lib/types';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -30,14 +30,14 @@ export function michelle(): Profile {
   };
   p.properties = [
     {
-      ...emptyProperty(), address: '5/18 Miller Street', suburb: 'Bargara', state: 'QLD', postcode: '4670', use: 'investment', kind: 'unit', structure: 'personal',
+      ...emptyProperty(), address: '5/18 Miller Street', suburb: 'Bargara', state: 'QLD', postcode: '4670', photo: DEMO_PHOTO('miller-street'), use: 'investment', kind: 'unit', structure: 'personal',
       purchasePrice: 265000, purchaseDate: '2012-05', growthRate: 5, bedrooms: 2, yearBuilt: 1998, weeklyRent: 520, annualCosts: 6500, vacancyWeeks: 2, managementPct: 7,
       valuations: [{ id: uid(), source: 'realestate.com.au', value: 470000, date: today }, { id: uid(), source: 'Domain', value: 490000, date: today }],
       loans: [{ id: uid(), lender: 'Suncorp', balance: 62000, rate: 6.24, type: 'pi', rateType: 'variable', yearsLeft: 8, offset: 0 }],
       oldNegGearing: true, planPayOff: true, planIo5: false,
     },
     {
-      ...emptyProperty(), address: '27 Crofton Street', suburb: 'Bundaberg West', state: 'QLD', postcode: '4670', use: 'investment', kind: 'house', structure: 'personal',
+      ...emptyProperty(), address: '27 Crofton Street', suburb: 'Bundaberg West', state: 'QLD', postcode: '4670', photo: DEMO_PHOTO('crofton-street'), use: 'investment', kind: 'house', structure: 'personal',
       purchasePrice: 245000, purchaseDate: '2009-08', growthRate: 5.5, bedrooms: 3, yearBuilt: 1975, weeklyRent: 560, annualCosts: 5200, vacancyWeeks: 2, managementPct: 7,
       valuations: [{ id: uid(), source: 'realestate.com.au', value: 510000, date: today }, { id: uid(), source: 'RP Data', value: 535000, date: today }],
       loans: [], oldNegGearing: true, planPayOff: true, planIo5: false,

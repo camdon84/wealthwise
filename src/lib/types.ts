@@ -95,7 +95,7 @@ export interface Property {
   yearBuilt: number | null;
   oldNegGearing?: boolean; // bought before 7:30pm AEST 12 May 2026: grandfathered under the old negative gearing rules
   planIo5?: boolean; // plan: interest-only for the next 5 years
-  photo?: string | null; // the user's own photo (small JPEG data URL); replaces the aerial view
+  photo?: string | null; // the user's own photo (small JPEG data URL), or a demo/ path for the example accounts; replaces the aerial view
   renoAdds?: { id: string; amount: number; date: string }[]; // value added by finished renovations (see propertyValuation)
   geo?: { lat: number; lon: number; street?: boolean } | null; // looked up from the address for the aerial photo; null = not found
   planPayOff?: boolean; // plan: paid off by retirement (otherwise an investment is sold at retirement, a home loan is cleared from super)

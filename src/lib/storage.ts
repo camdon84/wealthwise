@@ -62,7 +62,8 @@ class LocalAdapter implements StorageAdapter {
     ls.set(SESSION, JSON.stringify(s));
     return s;
   }
-  async signInDemo() { ls.set(SESSION, JSON.stringify(DEMO)); return DEMO; }
+  // Every click on "Explore the demo account" starts from a fresh copy, so visitors always see the showcase as designed
+  async signInDemo() { ls.del(`gw.profile.${DEMO.userId}`); ls.set(SESSION, JSON.stringify(DEMO)); return DEMO; }
   async signInSandbox() { ls.del(`gw.profile.${SANDBOX.userId}`); ls.set(SESSION, JSON.stringify(SANDBOX)); return SANDBOX; }
   async signOut() { const s = await this.currentSession(); if (s?.sandbox) ls.del(`gw.profile.${SANDBOX.userId}`); ls.del(SESSION); }
   async loadProfile(s: Session) {
