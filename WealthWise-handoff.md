@@ -145,7 +145,7 @@ This is one of the most important things.
 
 ### Overview
 - **Net worth / Cash flow toggle:** extra small, sits next to the value.
-- **Chart controls:** in the top-right corner of the chart panel, beside the headline figure: series tick boxes and a small Today's money / Future money toggle (same size as Net worth / Cash flow) on one line, with the hint underneath. When there isn't room (below about 1,550px wide, and on phones) they drop under the figure, still together. There's no "I'm planning to live to" picker on the charts any more; life expectancy is set on the Goals tab (and in onboarding).
+- **Chart controls:** series tick boxes (with the hint underneath) in the top-right corner of the chart panel, beside the headline figure; they drop under the figure when there isn't room. The Today's money / Future money toggle is small (same size as Net worth / Cash flow) and sits under the chart, bottom right, beside the key (`ChartFooter`). There's no "I'm planning to live to" picker on the charts any more; life expectancy is set on the Goals tab (and in onboarding).
 - **KPI tiles:** on phones the third tile ("Left over cash each month") spans both columns, so there's no empty box.
 - **Wise Insights:**
   - Shows at most 10, newest and most relevant first.
@@ -192,7 +192,7 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
 - **Gifts:** a Save button locks each gift into a summary line, with Edit and trash.
 - **Your Wise Future**
   - The net worth chart (or cash flow chart) plus retirement metrics, along with the retirement-income and lock notes only. It has no plan check and no ideas.
-  - Same chart toolbar as Overview (no "planning to live to" picker).
+  - Same chart controls as Overview (no "planning to live to" picker).
   - The chart marker reads "Retirement".
   - The loan-paid-off dot sits on the cash line, and the key reads "Loan paid off: …".
   - On phones the small marker words (Buy #, Sell, Loan paid off) are hidden so they don't overlap; the key under the chart names them.
