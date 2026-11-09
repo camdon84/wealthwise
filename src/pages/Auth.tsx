@@ -28,8 +28,8 @@ export function Auth() {
       <section className="relative hidden overflow-hidden bg-surface lg:flex lg:flex-col lg:justify-between p-12 border-r border-line">
         <Logo />
         <div className="max-w-lg">
-          <h1 className="font-display text-5xl font-semibold leading-[1.05]">See every property, share and dollar on one plan.</h1>
-          <p className="mt-5 text-lg text-muted">Plan when to buy each property, how much to invest and when you can retire.</p>
+          <h1 className="font-display text-4xl font-semibold leading-[1.08] xl:text-5xl xl:leading-[1.05]">Plan your property portfolio, share investing and retirement in one place.</h1>
+          <p className="mt-5 text-lg text-muted">Clear charts, ideas tested against your own numbers, and simple steps to put the plan in place.</p>
         </div>
         <HeroTimeline />
       </section>
