@@ -204,7 +204,7 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
 - **User page:** account, household, properties, goals and an admin activity log.
 - **View as user:** a one-time token that lasts 15 minutes (`view_tokens`) opens the app at `#view=<token>`. The app loads that account through `/api/view`, shows a blue "Viewing X's account. Read only" banner with Exit, blocks typing in fields and never saves (`update()` does nothing while viewing). Only for accounts that have finished setup.
 - **Send password reset:** placeholder only. It logs the request and shows a "Demo only" notice; nothing is sent and no password changes.
-- **Example users:** Michelle Donley (70, stops work at 75, a unit in Bargara and a house in Bundaberg West, about $500k super and $100k shares) and Melissa Donley (40, with Costa, buying an $850k established first home in Brisbane in 2027 with the 5% Deposit Scheme, two children planned). Emails are @example.com with random passwords; open them with View as user. No crypto.
+- **Example users:** Michelle Donley (70, stops work at 75, a unit in Bargara and a house in Bundaberg West, about $500k super and $100k shares) and Melissa Donley (40, with Costa, buying an $850k established first home in Brisbane in 2027 with the 5% Deposit Scheme, two children planned). Emails are made up but realistic (michelle.donley.bargara@bigpond.com, melandcosta.donley@gmail.com), so **leave these two out when password reset emails go live**. Random passwords nobody knows; open them with View as user. Their join dates and sign-ins (Sept to Nov 2026) are set in D1, with unusable session rows recording the sign-ins. No crypto.
 
 ### Wise Actions page
 In the sidebar under Wise Plan, with a badge that counts items needing attention.

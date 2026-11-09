@@ -1,6 +1,7 @@
 /**
  * Two example households for the portfolio showcase, built with the app's own profile code so they load like
- * real accounts. Fictional people and made-up addresses (real streets, invented numbers); emails use example.com.
+ * real accounts. Fictional people and made-up addresses (real streets, invented numbers). Their live emails, join dates
+ * and sign-ins were set straight in D1 (see WealthWise-handoff.md).
  *
  * Print them as JSON: npx esbuild scripts/demo-users.ts --bundle --platform=node --define:import.meta.env={} | node
  * Accounts are added to D1 with random passwords (nobody signs in as them; admins open them with "View as user").

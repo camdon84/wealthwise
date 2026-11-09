@@ -173,7 +173,8 @@ async function userPage(env: Env, admin: Admin, id: string, notice: string) {
   if (!u) return page(layout('Not found', admin, '<a class="back" href="/">← All users</a><h1>That user wasn’t found</h1>'), 404);
   const prof = await env.DB.prepare('SELECT data, updated_at FROM profiles WHERE user_id = ?').bind(id).first<{ data: string; updated_at: string }>();
   const p = prof ? JSON.parse(prof.data) : null;
-  const s = await env.DB.prepare('SELECT COUNT(*) AS n, MAX(expires_at) AS last FROM sessions WHERE user_id = ? AND expires_at > ?').bind(id, Date.now()).first<{ n: number; last: number | null }>();
+  // Devices: sessions still active. Last sign-in: the newest session of any age (sessions last 30 days, so it began 30 days before it expires).
+  const s = await env.DB.prepare('SELECT SUM(CASE WHEN expires_at > ? THEN 1 ELSE 0 END) AS n, MAX(expires_at) AS last FROM sessions WHERE user_id = ?').bind(Date.now(), id).first<{ n: number | null; last: number | null }>();
   const { results: events } = await env.DB.prepare('SELECT e.at, e.action, e.detail, a.name FROM admin_events e LEFT JOIN admins a ON a.id = e.admin_id WHERE e.user_id = ? ORDER BY e.at DESC LIMIT 10').bind(id).all<{ at: string; action: string; detail: string; name: string }>();
   const hh = p?.household;
   const full = [u.name, hh?.you?.lastName].filter(Boolean).join(' ');
@@ -197,7 +198,7 @@ ${notices[notice] ? `<div class="notice good">${notices[notice]}</div>` : ''}
     <dt>Name</dt><dd>${esc(full)}</dd><dt>Email</dt><dd>${esc(u.email)}</dd>
     <dt>Joined</dt><dd>${when(u.created_at)}</dd>
     <dt>Last sign-in</dt><dd>${s?.last ? when(s.last - 30 * 864e5) : '–'}</dd>
-    <dt>Signed in on</dt><dd>${s?.n ?? 0} ${s?.n === 1 ? 'device' : 'devices'}</dd>
+    <dt>Signed in on</dt><dd>${s?.n ?? 0} ${s?.n === 1 ? 'device' : 'devices'} now</dd>
     <dt>Plan last saved</dt><dd>${prof ? when(prof.updated_at) : '–'}</dd>
     <dt>Setup</dt><dd>${p?.onboarded ? '<span class="pill ok">Plan set up</span>' : p ? `<span class="pill part">Step ${(p.onboardingStep ?? 0) + 1} of 8</span>` : '<span class="pill none">Not started</span>'}</dd>
     <dt>User ID</dt><dd class="small muted">${esc(u.id)}</dd>
