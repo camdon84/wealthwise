@@ -4,8 +4,8 @@ import { Segmented } from './ui';
 
 export type Dollars = 'real' | 'nominal';
 
-export function DollarsToggle({ value, onChange, stretch }: { value: Dollars; onChange: (v: Dollars) => void; stretch?: boolean }) {
-  return <Segmented size="sm" stretch={stretch} label="Show values in" value={value} onChange={onChange} options={[{ value: 'real', label: 'Today’s money' }, { value: 'nominal', label: 'Future money' }]} />;
+export function DollarsToggle({ value, onChange, stretch, size = 'sm' }: { value: Dollars; onChange: (v: Dollars) => void; stretch?: boolean; size?: 'xs' | 'sm' }) {
+  return <Segmented size={size} stretch={stretch} label="Show values in" value={value} onChange={onChange} options={[{ value: 'real', label: 'Today’s money' }, { value: 'nominal', label: 'Future money' }]} />;
 }
 
 export function DollarsNote({ value }: { value: Dollars }) {
@@ -17,16 +17,18 @@ export function DollarsNote({ value }: { value: Dollars }) {
 }
 
 /**
- * The row straight above a chart: the series tick boxes on the left, today's or future money on the right.
- * On a phone the money toggle runs full width above the tick boxes, so nothing lands in an odd spot and the chart keeps its full width.
+ * Chart controls for the top-right of the chart panel: the series tick boxes and a small today's/future money toggle
+ * (the same size as Net worth / Cash flow) on one line, with the hint underneath. Pages put it in a wrapping row
+ * beside the headline figure, so it sits top right when there's room and drops neatly under the figure when there isn't.
  */
 export function ChartToolbar({ dollars, setDollars, series }: { dollars: Dollars; setDollars: (v: Dollars) => void; series?: ReactNode }) {
   return (
-    <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4">
-      <div className="flex sm:order-2">
-        <DollarsToggle value={dollars} onChange={setDollars} stretch />
+    <div className="flex min-w-0 flex-col items-start gap-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        {series}
+        <DollarsToggle value={dollars} onChange={setDollars} size="xs" />
       </div>
-      <div className="min-w-0">{series}</div>
+      {series && <p className="text-[11px] text-muted">Tick to show or hide. Your plan doesn’t change.</p>}
     </div>
   );
 }

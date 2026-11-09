@@ -51,17 +51,19 @@ export function Overview({ quotes, go }: { quotes: Quotes; go: (r: string) => vo
       <section className="panel overflow-hidden">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
             <div>
               <p className="text-sm text-muted">{p.household.hasPartner ? 'Your combined net worth' : 'Your current net worth'}</p>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><p className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">{money(pos.netWorth)}</p><Segmented size="xs" label="Chart" value={view} onChange={setView} options={[{ value: 'worth', label: 'Net worth' }, { value: 'flow', label: 'Cash flow' }]} /></div>
               <p className="mt-1 text-sm text-muted">{money(pos.assets, { compact: true })} in assets, {money(pos.liabilities, { compact: true })} owing</p>
             </div>
             <ChartToolbar dollars={dollars} setDollars={setDollars} series={view === 'worth' ? <SeriesToggles hidden={hidden} onChange={setHidden} crypto={proj.points.some((x) => x.crypto > 0)} /> : null} />
+            </div>
             {view === 'worth' ? (<>
-              <div className="mt-2 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} hidden={hidden} runsOutYear={proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null} /></div>
+              <div className="mt-4 -ml-2"><WealthChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} hidden={hidden} runsOutYear={proj.runsOutAge != null ? proj.retireYear + (proj.runsOutAge - p.goals.retirementAge) : null} /></div>
               <MarkerKey points={proj.points} />
             </>) : (<>
-              <div className="mt-2 -ml-2"><CashFlowChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} /></div>
+              <div className="mt-4 -ml-2"><CashFlowChart points={dollars === 'real' ? toReal(proj.points, p.assumptions.inflation) : proj.points} retireYear={proj.retireYear} real={dollars === 'real'} /></div>
               <CashFlowKey />
             </>)}
             <p className="mt-2 text-xs text-muted">Projected to age {p.goals.lifeExpectancy ?? 90}, using your plan’s assumptions.</p>

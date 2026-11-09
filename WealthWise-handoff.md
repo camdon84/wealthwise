@@ -145,7 +145,7 @@ This is one of the most important things.
 
 ### Overview
 - **Net worth / Cash flow toggle:** extra small, sits next to the value.
-- **Chart toolbar:** straight above the chart. Series tick boxes on the left, Today's money / Future money on the right. On a phone the money toggle runs full width above the tick boxes. There's no "I'm planning to live to" picker on the charts any more; life expectancy is set on the Goals tab (and in onboarding).
+- **Chart controls:** in the top-right corner of the chart panel, beside the headline figure: series tick boxes and a small Today's money / Future money toggle (same size as Net worth / Cash flow) on one line, with the hint underneath. When there isn't room (below about 1,550px wide, and on phones) they drop under the figure, still together. There's no "I'm planning to live to" picker on the charts any more; life expectancy is set on the Goals tab (and in onboarding).
 - **KPI tiles:** on phones the third tile ("Left over cash each month") spans both columns, so there's no empty box.
 - **Wise Insights:**
   - Shows at most 10, newest and most relevant first.

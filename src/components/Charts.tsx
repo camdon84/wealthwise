@@ -59,7 +59,6 @@ export function toReal(points: YearPoint[], inflation: number): YearPoint[] {
 export function SeriesToggles({ hidden, onChange, crypto }: { hidden: string[]; onChange: (h: string[]) => void; crypto?: boolean }) {
   const list = wealthSeries.filter((s) => crypto || s.key !== 'crypto');
   return (
-    <div className="flex min-w-0 flex-col items-start gap-0.5">
     <ul className="-ml-1.5 flex flex-wrap gap-x-1 gap-y-0.5" aria-label="Show or hide each part of the chart (this only changes the view, not your plan)" title="Ticking and unticking only changes what the chart shows. Your plan and net worth don’t change.">
       {list.map((s) => {
         const on = !hidden.includes(s.key);
@@ -77,8 +76,6 @@ export function SeriesToggles({ hidden, onChange, crypto }: { hidden: string[]; 
         );
       })}
     </ul>
-    <p className="text-[11px] text-muted">Tick to show or hide. Your plan doesn’t change.</p>
-    </div>
   );
 }
 
