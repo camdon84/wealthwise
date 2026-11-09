@@ -94,13 +94,13 @@ This is one of the most important things.
 - **Claude preview artifact.** A copy of the app runs as a Claude artifact on demo data:
   - slug `426277df-a86e-4fce-b44a-40e1f0c7bdee`
   - URL https://claude.ai/artifact/9CTFY1vT9D9F4XH3Yo8him
-  - latest version `1794180002-3c07`
+  - latest version `1794195999-9a52`
   - Build it with `npx vite build --mode preview --outDir dist-preview`.
-  - Publish with mode `replace`, including `index.html`, `assets/index-*.js`, `assets/index-*.css` and `samples/{loan,super,valuation}-sample.pdf`.
+  - Publish with mode `replace`, including `index.html`, `assets/index-*.js`, `assets/index-*.css`, `samples/{loan,super,valuation}-sample.pdf` and `demo/*.jpg`.
 - **Admin portal:** https://wealthwise-admin.cam-donley.workers.dev (separate Worker `wealthwise-admin`, same D1 database).
   - Code in `admin/` (`admin/index.ts`, `admin/wrangler.jsonc`). Its own Workers Builds trigger ("Admin portal") deploys it on pushes to `main` that touch `admin/*`, `worker/shared.ts` or `package.json`. Manual: `npm run deploy:admin`.
   - Admins live in the `admins` table (separate from app users) with their own sessions. Cameron's admin login is cam.donley@gmail.com. **No admin password is kept in the repo.** To add or change an admin, hash the password with PBKDF2-SHA256, 100,000 rounds and a random 16-byte salt (same as `hashPassword()` in `worker/shared.ts`), then insert into `admins` through the D1 API.
-- **Demo account:** log in with "Explore the demo account". The demo's CPI baseline is set one year back, so the inflation pop-up shows.
+- **Demo account:** log in with "Explore the demo account". Each click starts a fresh copy (the demo lives in the visitor's browser). The demo's CPI baseline is set one year back, so the inflation pop-up shows. Demo properties (and Michelle's) use stock photos from `public/demo/` (Unsplash licence; IDs listed in `defaults.ts` at `DEMO_PHOTO`).
 
 ---
 
