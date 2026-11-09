@@ -70,9 +70,9 @@ function PlanCheckResult({ check, compact, take }: { check: PlanCheck; compact?:
           <h2 className="font-display text-lg font-semibold">This plan works on your numbers</h2>
         </div>
         <ul className="mt-3 space-y-2 text-[15px] leading-relaxed">
-          {check.good.map((t) => <li key={t} className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-gum" aria-hidden="true" />{t}</li>)}
+          {check.good.slice(0, 4).map((t) => <li key={t} className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-gum" aria-hidden="true" />{t}</li>)}
         </ul>
-        <WiseRead take={take} />
+        {/* No Wise summary here: the dot points already say it all */}
       <PlanIdeas check={check} take={take} />
       </section>
     );

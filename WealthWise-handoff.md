@@ -166,7 +166,8 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
   - **Stop-work age is the user's choice.** Nothing in the app suggests working longer or retiring later. When money doesn't last, the tested fixes are: a lower retirement income, a bigger share plan while working (smallest tested amount that lasts and still buys every property on time), or one fewer property.
   - **Plan check:**
     - The dot points and red crosses can't be dismissed.
-    - The AI read (WiseRead) sits under the dot points. It's sent the plan check's tested problems, fixes and ideas, and must lead with one tested fix or idea and its figures, not a recap of the goals.
+    - When the plan works: just the 3–4 green dot points, with no Wise summary underneath (Cameron asked for no sentence that repeats the dot points).
+    - When it doesn't work: the AI read (WiseRead) sits under the problems. It's sent the plan check's tested problems, fixes and ideas, and must lead with one tested fix or idea and its figures, not a recap of the goals.
     - "Have you thought about these options?" shows at most 6 ideas, keeping one liquidation idea if there is one. Each idea has Dismiss (6 months); on phones Dismiss sits under the idea.
     - "Give me Wise ideas about my plan" refreshes the ideas, and they also refresh automatically every 6 months.
   - **Lock note:** "Now that your plan is complete, it's a good time to lock it in. To try different scenarios, you can always use Forecast mode." It has a Lock button and sits above the plan check result. It only shows when the plan works and it's the live plan.
