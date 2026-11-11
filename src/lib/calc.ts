@@ -374,12 +374,18 @@ export function project(p: Profile, quotes: Quotes): Projection {
   const otherRepay = () => debtSims.filter((d) => d.bal > 0).reduce((t, d) => t + d.monthly, 0) * 12;
   const cardLoad = p.finances.debts.filter((d) => d.kind === 'credit-card').reduce((t, d) => t + n(d.limit), 0) * 0.038 * 12;
   /** Monthly surplus as a lender would assess it. Car loans and cards only count against the first new purchase; after that they're assumed paid off. */
+  /**
+   * Years a lender assesses a loan over. Set to be paid off by retirement, that's the principal-and-interest years left
+   * before work stops (repayments run to the last working year, after any interest-only years), not 30: a lender assesses
+   * the term you'll actually repay over. Otherwise 30 years.
+   */
+  const payTerm = (payOff: boolean, ioYears: number, year: number) => (payOff ? Math.max(1, Math.min(30, retireYear - year - 1 - Math.max(0, ioYears))) : 30);
   const serviceSurplus = (list: Sim[], ys: number, ps: number, liv: number, countOtherDebts: boolean, year: number) => {
     const rent80 = list.reduce((t, s) => t + s.rent, 0) * 0.8;
     const taxable = list.filter((s) => s.invest).reduce((t, s) => t + taxableRentForLender(s.rent, s.debt * s.rate / 100, s.costs + s.rent * s.mgmt, s.ng || (s.ngUntil != null && year <= s.ngUntil)), 0);
     const base = ys + n(p.household.otherIncome) * 0.8;
     const net = afterTax(base + taxable) - taxable + rent80 + (ps ? afterTax(ps) : 0) - (hecsBal > 0 ? hecsAnnual(p, ys, ps).compulsory : 0);
-    const assessed = list.reduce((t, s) => t + pmt(s.rate + a.serviceBuffer, 30, s.debt) * 12, 0);
+    const assessed = list.reduce((t, s) => t + pmt(s.rate + a.serviceBuffer, payTerm(s.payOff, s.ioLeft, year), s.debt) * 12, 0);
     const others = countOtherDebts ? otherRepay() + cardLoad : 0;
     return (net - liv - assessed - others) / 12;
   };
@@ -649,7 +655,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         while (cash < floor - 1) {
           const idx = sims.map((s, k) => ({ s, k })).filter((x) => x.s.invest).map((x) => x.k).pop(); // newest investment first
           if (idx == null) break;
-          sellProperty(idx, '', 'income');
+          sellProperty(idx, ` to bring your cash back up to the ${fmt(retireBuffer)} you keep in the bank`, 'income');
         }
         // Spare cash rule in retirement: only if they chose it. Otherwise spare cash (rent, sale money, required super payments) stays in the bank.
         if (spareRetired) {
@@ -694,7 +700,8 @@ export function project(p: Profile, quotes: Quotes): Projection {
         const sweepTax = (gross: number) => { const gf = sweepBal > 0 ? Math.max(0, 1 - sweepCost / sweepBal) : 0; return Math.max(0, incomeTax(incNow + gross * gf * 0.5) - incomeTax(incNow)); };
         if (sweepBal > 1) spare += sweepBal - sweepTax(sweepBal);
         // The most a lender would lend now (car loans and cards only count for the first new purchase)
-        const maxLoan = Math.max(0, pv(rate + a.serviceBuffer, 30, serviceSurplus(assessed, youSal, partSal, lenderLivingY, k === 0, year)));
+        const payOffNew = asHome ? plan?.payOff !== false : !!plan?.payOff;
+        const maxLoan = Math.max(0, pv(rate + a.serviceBuffer, payTerm(payOffNew, plan?.ioFirst5 === false ? 0 : 5, year), serviceSurplus(assessed, youSal, partSal, lenderLivingY, k === 0, year)));
         // Cash needed: at least whatever equity can't cover of the deposit, and enough to keep the loan within what a lender allows
         const total = price * (1 + costsPct) - grant;
         const needCash = Math.max(0, deposit - usable, total - maxLoan);

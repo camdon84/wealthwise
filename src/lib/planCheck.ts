@@ -82,6 +82,22 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   if (cap) problems.push(`Your share plan of ${m(r.shareMonthly)} a month uses savings your property plan needs. Based on your property purchasing goals, the most you can invest in shares is about ${money(cap.monthly)} a month, which grows to about ${m(cap.sharesAtRetireReal)} by ${retireAge}.`);
   if (!propsOk(p, r)) {
     if (cap) fixes.push(`Invest ${money(cap.monthly)} a month in shares (set “Monthly investment” in Shares), or lower your share goal to about ${m(round(cap.sharesAtRetireReal, 50000))}.`);
+    // Paying planned investments off by retirement needs big repayments late in the plan: test leaving that off
+    const payOffIdx = planned.map((pp, k) => (pp.use !== 'home' && pp.payOff ? k : -1)).filter((k) => k >= 0);
+    // The smallest change first: one property (latest first), then all of them
+    const tryOff = (ks: number[]) => run((x) => { ks.forEach((k) => { x.plannedPurchases![k].payOff = false; }); });
+    const works = (rr: Projection) => propsOk(p, rr) && cashOk(rr) && lastsOk(rr);
+    let offKs: number[] | null = null, rr: Projection | null = null;
+    for (const k of [...payOffIdx].reverse()) { const t = tryOff([k]); if (works(t)) { offKs = [k]; rr = t; break; } }
+    if (!offKs && payOffIdx.length > 1) { const t = tryOff(payOffIdx); if (works(t)) { offKs = payOffIdx; rr = t; } }
+    if (offKs && rr) {
+      {
+        const names = offKs.map((k) => planned[k].label || `Property ${owned + k + 1}`);
+        const fits = planned.map((pp, k) => ({ name: pp.label || `Property ${owned + k + 1}`, year: rr.purchases[k]?.year, was: r.purchases[k]?.year })).filter((x) => x.year != null && x.year !== x.was);
+        const one = names.length === 1;
+        fixes.push(`Don’t pay ${listJoin(names)} off by ${retireAge}${fits.length ? `: ${listJoin(fits.map((x) => (one && x.name === names[0] ? `it then fits in ${x.year}` : `${x.name} then fits in ${x.year}`)))}` : ''}. Paying ${one ? 'it' : 'them'} off that quickly needs bigger repayments than a lender would allow. Any loan left is cleared by selling ${one ? 'it' : 'them'} when you stop work.`);
+      }
+    }
     // Cheaper properties
     const scale = bisect(0.3, 1, (f) => propsOk(p, run((x) => { x.plannedPurchases?.forEach((pp) => { pp.price *= f; }); })));
     if (scale != null && scale < 0.97) {
