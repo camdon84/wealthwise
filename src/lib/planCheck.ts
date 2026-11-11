@@ -1,4 +1,4 @@
-import { holdingsStats, incomeTax, position, project, propertyStats, type Projection, type Quotes } from './calc';
+import { holdingsStats, incomeTax, position, project, propertyStats, retireCashMin, type Projection, type Quotes } from './calc';
 import { listJoin, money, nProps } from './format';
 import type { Liquidation, Profile } from './types';
 
@@ -128,6 +128,8 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
       const need = Math.ceil(hi / 50) * 50;
       if (need > r.shareMonthly + 50) fixes.push(or(`Invest about ${money(need)} a month in shares while you work, instead of ${m(r.shareMonthly)} (set “Monthly investment” in Shares). That lasts to ${life}.`));
     }
+    // Spare cash left idle in retirement: investing anything over their cash reserve (their own rule, on the Shares tab)
+    if (!g.spareCashRetired && lastsOk(run((x) => { x.goals.spareCashRetired = true; }))) fixes.push(or(`Invest any cash over your ${m(g.retireCash ?? retireCashMin(p))} retirement reserve in shares (set it under “Your spare cash” in Shares). That lasts to ${life}.`));
     if (g.targetProperties > owned && lastsOk(run((x) => { x.goals.targetProperties = Math.max(owned, x.goals.targetProperties - 1); }))) fixes.push(or(`Aim for ${nProps(g.targetProperties - 1)}: the last purchase costs more than it adds by retirement.`));
   }
 

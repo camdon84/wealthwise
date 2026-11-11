@@ -45,8 +45,14 @@ export function hecsCompulsory(income: number) {
 /** Monthly cost of dependants this year, or `yearsAhead` from now (costs stop at each one's support age). */
 /** Average cost of raising a child in Australia, birth to 18 (about $474k in 2026 dollars), spread evenly. */
 export const CHILD_COST_YEAR = 474000 / 18;
-/** Cash we suggest keeping on hand in retirement, today's money. */
-export const RETIRE_CASH_MIN = 50000;
+/** Cash we suggest keeping on hand in retirement, today's money: $200,000 per person (WealthWise's own recommendation, not a rule). */
+export const RETIRE_CASH_PER_PERSON = 200000;
+export const retireCashMin = (p: Profile) => RETIRE_CASH_PER_PERSON * (p.household.hasPartner ? 2 : 1);
+/**
+ * What cash earns when it has no loan to offset and there's no Cash Reserves plan: the RBA's average online
+ * savings rate (table F4, FRDIRSAO10K, 3.3% in October 2026). An estimate: no bonus conditions assumed, held for the whole plan.
+ */
+export const CASH_RATE_FALLBACK = 3.3;
 
 export function dependantsMonthly(p: Profile, yearsAhead = 0) {
   const year = new Date().getFullYear() + yearsAhead;
@@ -214,6 +220,7 @@ export interface YearPoint {
   year: number; age: number; propertyValue: number; propertyDebt: number; propertyEquity: number; shares: number; cashShares: number; super: number; cash: number; crypto: number;
   netWorth: number; passiveIncome: number; passiveIncomeReal: number; properties: number; investProps: number; borrowing: number; monthlySavings: number;
   repayUp2: number; repayBase: number; repayDown2: number; bought?: number;
+  spareToShares: number; // spare cash moved into shares this year (Spare cash rules on the Shares tab)
   spendGoalReal: number; spendFundedReal: number; shareContribution: number; sharePlanned: number; rentIncome: number; superDrawn: number; paidOff?: string[]; sold?: string[]; payNet: number; investNet: number; saleIn: number; giftIn: number; liqIn: number; shareSaleIn: number; propSaleIn: number; propNet: number; spending: number; liquidated?: number;
 }
 export interface PurchaseBlock { year: number; reason: 'deposit' | 'servicing' | 'date'; price: number; deposit: number; available: number; monthlyShort: number }
@@ -223,6 +230,7 @@ export interface Projection {
   events: PlanEvent[]; runsOutAge: number | null; shareMonthly: number; requiredShareMonthly: number; cryptoExcluded: number;
   cashSharesTax: number; // capital gains tax paid selling spare-cash shares for deposits
   sales: { year: number; age: number; name: string; net: number; reason: 'loan' | 'income' | 'move' }[]; // properties the plan sells by itself; net in today's money
+  loansPaid: { year: number; name: string }[]; // property loans paid off in full (sales not included)
 }
 
 const FALLBACK_DEBT_RATE: Record<string, number> = { car: 9.5, personal: 12.5, 'credit-card': 20.99, other: 10 };
@@ -292,6 +300,13 @@ export function project(p: Profile, quotes: Quotes): Projection {
   // Cash plan (Cash tab): where accessible cash sits, and spare cash above the cap invested in shares until a purchase needs it
   const cp = p.cashPlan?.active ? p.cashPlan : null;
   let sweepBal = 0, sweepCost = 0, sweepSaid = false, cashSharesTax = 0;
+  // Spare cash rules (Shares tab): left unset, spare cash stays in the bank
+  const spareAbove = p.goals.spareCashAbove != null ? n(p.goals.spareCashAbove) : null;
+  const spareRetired = !!p.goals.spareCashRetired;
+  let spareSaid = false;
+  const owing = new Set<string>(); const loansPaid: Projection['loansPaid'] = [];
+  /** Cash that stays in offset accounts while their loans are still owing: every loan without a Cash Reserves plan, or the loans it picks. */
+  const offsetHold = () => sims.filter((s) => s.debt > 0 && (!cp || (cp.split.offset > 0 && (cp.offsetProperties.length === 0 || cp.offsetProperties.includes(s.pid ?? ''))))).reduce((t, s) => t + s.debt, 0);
   const sales: Projection['sales'] = [];
   const mtrOf = (inc: number) => (incomeTax(inc + 1000) - incomeTax(inc)) / 1000;
   const reqMonthly = requiredShareMonthly(p, shares);
@@ -305,7 +320,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   let baseLivingAdj = 0; // e.g. rent stops once a first home is bought
   let hecsBal = hecsAnnual(p).balance;
   const buffer = n(p.finances.buffer) || recommendedBuffer(p);
-  const retireBuffer = p.goals.retireCash != null ? n(p.goals.retireCash) : RETIRE_CASH_MIN;
+  const retireBuffer = p.goals.retireCash != null ? n(p.goals.retireCash) : retireCashMin(p);
   // Car and personal loans, one by one, run off on their repayments. Credit cards aren't tracked as debt (balances move too much); only their limit counts, for borrowing.
   const DEBT_NAME: Record<string, string> = { car: 'car loan', personal: 'personal loan', 'credit-card': 'credit card', other: 'loan' };
   const debtSims = p.finances.debts.filter((d) => d.kind !== 'hecs' && d.kind !== 'credit-card' && n(d.balance) > 0).map((d) => {
@@ -350,7 +365,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
     const age = startAge + i;
     const working = age < retireAge;
     let bought: number | undefined;
-    let contribution = 0;
+    let contribution = 0, spareToShares = 0;
     let spendGoal = 0, spendFunded = 0, superDrawn = 0, sharePlanned = 0;
     let payNet = 0, saleIn = 0, giftIn = 0, liqIn = 0, propNetY = 0, liquidated = 0, investNet = 0, rentTax = 0;
     let shareSaleIn = 0, propSaleIn = 0; // money from selling, by what's sold (planned liquidations and the plan's own sales)
@@ -407,7 +422,8 @@ export function project(p: Profile, quotes: Quotes): Projection {
       if (!cp) {
         const debtTotal = sims.reduce((t, s) => t + s.debt, 0);
         const avgRate = debtTotal ? sims.reduce((t, s) => t + s.debt * s.rate, 0) / debtTotal : 0;
-        offsetSaving = Math.min(Math.max(0, cash), debtTotal) * avgRate / 100;
+        const idle = Math.max(0, cash - debtTotal); // cash with no loan left to offset sits in savings
+        offsetSaving = Math.min(Math.max(0, cash), debtTotal) * avgRate / 100 + idle * CASH_RATE_FALLBACK / 100 * (1 - mtrOf(working ? youSal + n(p.household.otherIncome) : 0));
       } else {
         const mtr = mtrOf(working ? youSal + n(p.household.otherIncome) : 0);
         // The emergency fund sits outside the cash plan (in a high-interest account); the split applies to cash above it, up to the cap
@@ -528,6 +544,15 @@ export function project(p: Profile, quotes: Quotes): Projection {
         shares += contribution; shareCost += contribution; cash -= contribution;
         if (sharePlanned > 0 && contribution < sharePlanned * 0.98 && !shareShortSaid && (!n(p.goals.shareStartAfter) || shareStartSaid)) { shareShortSaid = true; say(year, 'shares', `Your savings can’t cover the full ${fmt(shareMonthly)} a month share plan this year, so only ${fmt(contribution / 12 / infl(i))} a month goes in. Shares are only bought from money above your emergency fund.`); }
         if (cash < 0 && shortfallYear == null) shortfallYear = year;
+        // Spare cash rule: once every planned property is bought, cash above their amount (and above what the offsets need) goes into shares
+        if (spareAbove != null && p.properties.length + purchases.length >= p.goals.targetProperties) {
+          const hold = offsetHold();
+          const keep = Math.max(spareAbove, buffer) * infl(i) + hold;
+          if (cash > keep + 1000) {
+            spareToShares = cash - keep; cash -= spareToShares; shares += spareToShares; shareCost += spareToShares;
+            if (!spareSaid) { spareSaid = true; say(year, 'shares', `With every property bought, cash above ${fmt(Math.max(spareAbove, buffer))} (in today’s money) now goes into shares, on top of your monthly investment${hold > 1000 ? '. Enough stays in your offset accounts to cover your loans' : ''}.`); }
+          }
+        }
         // Cash plan: anything above the most they want accessible goes into shares
         if (cp?.sweep && cp.accessMax != null) {
           const capNow = (buffer + n(cp.accessMax)) * infl(i); // emergency fund + what they want within reach
@@ -579,10 +604,13 @@ export function project(p: Profile, quotes: Quotes): Projection {
           if (idx == null) break;
           sellProperty(idx, '', 'income');
         }
-        // Spare cash (extra super drawn, rent, sale money) is invested in shares rather than left idle
-        if (cash > floor * 1.25) {
-          const extra = cash - floor; cash -= extra; shares += extra; shareCost += extra;
-          if (!reinvestSaid) { reinvestSaid = true; say(year, 'shares', 'Money you don’t need straight away (rent, sale proceeds, required super payments) is invested in shares.'); }
+        // Spare cash rule in retirement: only if they chose it. Otherwise spare cash (rent, sale money, required super payments) stays in the bank.
+        if (spareRetired) {
+          const keep = floor + offsetHold();
+          if (cash > keep + 1000) {
+            const extra = cash - keep; cash -= extra; shares += extra; shareCost += extra; spareToShares += extra;
+            if (!reinvestSaid) { reinvestSaid = true; say(year, 'shares', `Cash above the ${fmt(retireBuffer)} you keep in the bank (in today’s money) goes into shares, as you chose.`); }
+          }
         }
         spendFunded = cash >= 0 ? spendGoal : Math.max(0, spendGoal + cash);
         if (cash < 0 && runsOutAge == null) { runsOutAge = age; say(year, 'runout', `Money runs out at ${age}: your super, rent, savings and investments can no longer fund ${fmt(p.goals.passiveIncome)} a year.${sims.some((x) => x.home) ? ' You’d still own your home, which is why the chart keeps a balance after this point.' : ''}`); }
@@ -669,6 +697,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       }
     }
 
+    for (const s of sims) { if (s.debt > 1) owing.add(s.name); else if (owing.delete(s.name)) loansPaid.push({ year, name: s.name }); }
     const propertyValue = sims.reduce((t, s) => t + s.value, 0);
     const propertyDebt = sims.reduce((t, s) => t + s.debt, 0);
     const rentNet = sims.filter((s) => s.invest).reduce((t, s) => t + s.rent * (1 - s.mgmt) - s.costs - (s.debt * s.rate) / 100, 0);
@@ -683,13 +712,13 @@ export function project(p: Profile, quotes: Quotes): Projection {
       crypto: cryptoBal, netWorth: propertyValue - propertyDebt + shares + sweepBal + sup + cash + cryptoBal - Math.max(0, otherDebt) - Math.max(0, hecsBal),
       passiveIncome, passiveIncomeReal: passiveIncome / infl(i), properties: sims.length, investProps: sims.filter((s) => s.invest).length,
       borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, false))) : 0,
-      monthlySavings: monthlyNet, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
+      monthlySavings: monthlyNet, spareToShares, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
       spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, rentIncome: sims.filter((x) => x.invest).reduce((t, x) => t + x.rent, 0), superDrawn, paidOff: paidOff.length ? paidOff : undefined, sold: sold.length ? sold : undefined, payNet, investNet, saleIn, giftIn, liqIn, shareSaleIn, propSaleIn, propNet: propNetY, spending: working ? living : spendGoal, liquidated: liquidated || undefined,
     });
   }
   if (runsOutAge == null) say(y0 + (endAge - startAge), 'goal', `Your money lasts to ${endAge}, with about ${fmt((points[points.length - 1].netWorth) / infl(endAge - startAge))} (in today’s money) left over.`);
   events.sort((x, y) => x.year - y.year);
-  return { points, purchases, retireYear, block: purchases.length + p.properties.length >= p.goals.targetProperties ? null : block, events, runsOutAge, shortfallYear, sharesAtRetire, buffer, shareMonthly, requiredShareMonthly: reqMonthly, cryptoExcluded, cashSharesTax, sales };
+  return { points, purchases, retireYear, block: purchases.length + p.properties.length >= p.goals.targetProperties ? null : block, events, runsOutAge, shortfallYear, sharesAtRetire, buffer, shareMonthly, requiredShareMonthly: reqMonthly, cryptoExcluded, cashSharesTax, sales, loansPaid };
 }
 
 const fmt = (v: number) => {

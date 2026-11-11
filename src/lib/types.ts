@@ -125,6 +125,9 @@ export interface Goals {
   passiveIncome: number; // today's dollars p.a.
   plannedChildren?: { id: string; year: number }[]; // children you plan to have: average costs from birth to 18
   retireCash?: number | null; // cash to keep on hand in retirement, today's money (replaces the emergency buffer once retired)
+  // Spare cash (Shares tab). Left unset, spare cash stays in the bank.
+  spareCashAbove?: number | null; // once every planned property is bought, cash above this (today's money) goes into shares while working
+  spareCashRetired?: boolean; // in retirement, cash above retireCash goes into shares
   targetProperties: number;
   risk: number; // 1-5
   events: LifeEvent[];

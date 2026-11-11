@@ -1,5 +1,5 @@
 import type { InsightState, Profile } from './types';
-import { borrowingCapacity, livingCosts, position, project, propertyStats, type Quotes } from './calc';
+import { borrowingCapacity, livingCosts, position, project, propertyStats, retireCashMin, type Quotes } from './calc';
 import { money, nProps } from './format';
 
 export type InsightKind = 'opportunity' | 'watch' | 'milestone' | 'goal';
@@ -70,6 +70,25 @@ export function wiseInsights(p: Profile, quotes: Quotes): Insight[] {
       body: `On the way to your next deposit you’d hold up to about ${money(pk.v, { compact: true })} in cash (in today’s money) around ${pk.year}. Cash Reserves helps you choose where it sits while it builds: offset, high-interest savings or a savings account.`,
       figure: money(pk.v, { compact: true }), figureLabel: `cash around ${pk.year}`,
       action: { label: 'Choose where your cash sits', to: 'plan:cash' },
+    });
+  }
+
+  // 1d. Spare cash: once every property is bought (or once retired) cash keeps piling up, and no rule says what to do with it
+  if (p.goals.spareCashAbove == null || !p.goals.spareCashRetired) {
+    const real = proj.points.map((x, i) => ({ year: x.year, v: x.cash / Math.pow(1 + a.inflation / 100, i), retired: x.year >= proj.retireYear }));
+    const allBought = p.properties.length + proj.purchases.length >= p.goals.targetProperties;
+    const from = proj.purchases.length ? proj.purchases[proj.purchases.length - 1].year + 1 : year;
+    const keep = p.goals.retireCash ?? retireCashMin(p);
+    const pick = (xs: typeof real) => xs.reduce((m, x) => (x.v > m.v ? x : m), { year: 0, v: 0, retired: false });
+    const work = p.goals.spareCashAbove == null && allBought ? pick(real.filter((x) => !x.retired && x.year >= from)) : null;
+    const ret = !p.goals.spareCashRetired ? pick(real.filter((x) => x.retired)) : null;
+    const pk = work && work.v > Math.max(250000, keep * 1.5) ? work : ret && ret.v > Math.max(250000, keep * 2) ? ret : null;
+    if (pk) out.push({
+      id: 'spare-cash', kind: 'opportunity',
+      title: pk.retired ? 'Your cash keeps building in retirement' : 'Your cash keeps building after your last property',
+      body: `Left in the bank, it reaches about ${money(pk.v, { compact: true })} (in today’s money) around ${pk.year}. You can keep it there, or invest anything over a set amount in shares.`,
+      figure: money(pk.v, { compact: true }), figureLabel: `cash around ${pk.year}`,
+      action: { label: 'Choose what happens to it', to: 'plan:shares' },
     });
   }
 
@@ -280,6 +299,10 @@ export function planSettings(p: Profile, proj: { purchases: { year: number }[]; 
       ownAmount: p.goals.shareMonthly != null,
       alreadyOnHoldUntilPropertyNumber: hold > 0 ? owned + hold : null,
       startsInYear: hold > 0 ? proj.purchases[hold - 1]?.year ?? null : new Date().getFullYear(),
+    },
+    spareCash: {
+      afterLastPurchase: p.goals.spareCashAbove != null ? `cash over $${Math.round(p.goals.spareCashAbove / 1000)}k is invested in shares` : 'kept in the bank',
+      inRetirement: p.goals.spareCashRetired ? `cash over the retirement cash reserve is invested in shares` : 'kept in the bank',
     },
     bigPurchasesTodayDollars: p.goals.events.filter((ev) => ev.amount > 0).map((ev) => ({ what: ev.label || 'big purchase', year: ev.year, cost: Math.round(ev.amount / 1000) * 1000 })),
     plannedPurchases: (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - owned)).map((pp, k) => ({

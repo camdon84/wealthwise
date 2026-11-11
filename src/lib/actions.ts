@@ -1,4 +1,4 @@
-import { position, project, recommendedBuffer, type Quotes } from './calc';
+import { position, project, recommendedBuffer, retireCashMin, type Quotes } from './calc';
 import { listJoin, money } from './format';
 import type { Profile } from './types';
 
@@ -130,6 +130,17 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
     body: `You’ve chosen not to invest in shares until you’ve bought property ${p.properties.length + (p.goals.shareStartAfter ?? 0)}. Once it’s bought, set up a regular automatic buy into a diversified ETF or index fund.`,
     amount: pm(r10(proj.shareMonthly)), sig: `shares-later:${shareStart}:${r10(proj.shareMonthly)}`,
   });
+  // Spare cash rules (Shares tab): a yearly sweep of cash over the amount they keep in the bank
+  const firstSpare = proj.points.find((x) => x.spareToShares > 1000);
+  if (firstSpare) {
+    const retired = firstSpare.year >= proj.retireYear;
+    const keep = retired ? p.goals.retireCash ?? retireCashMin(p) : Math.max(p.goals.spareCashAbove ?? 0, buffer);
+    out.push({
+      key: 'spare-cash', group: 'check', title: `Move spare cash into shares from ${firstSpare.year}`,
+      body: `Your plan invests cash over ${money(keep)} (in today’s money) in shares${retired ? ' once you stop work' : ', on top of your monthly investment'}. Once a year, move anything over that amount into your share trading account.`,
+      amount: `over ${money(keep, { compact: true })}`, sig: `spare:${firstSpare.year}:${Math.round(keep / 1000)}`,
+    });
+  }
   out.push({
     key: 'super', group: 'check', title: 'Check your super is being paid',
     body: 'Your employer should pay 12% of your salary into super at least every quarter. Look for the payments in your fund’s app, and make sure your fund has your tax file number.',

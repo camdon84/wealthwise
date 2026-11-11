@@ -82,7 +82,7 @@ This is one of the most important things.
 - **Backend:** a Cloudflare Worker (`worker/index.ts`) serving static assets, with:
   - **D1** database `wealthwise`
   - Workers AI model `gpt-oss-120b` via `askAI()`
-  - a `cached(env, key, ttl, fn, force)` helper (AI cache key prefix currently `wise3:`; bump it when the AI rules change so old answers are dropped)
+  - a `cached(env, key, ttl, fn, force)` helper (AI cache key prefix currently `wise4:`; bump it when the AI rules change so old answers are dropped)
   - a daily cron (`0 20 * * *`) that refreshes cached data
 - **API routes** include:
   - `/api/wise`, with modes such as `ideas` and `goals`, plus a `fresh` param. Request bodies up to 16,000 characters.
@@ -161,7 +161,7 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
 
 - **Goals**
   - Wealth focus question (property, shares or balanced). It's also asked in onboarding, and it tailors the ideas.
-  - "Accessible cash reserves in retirement". Hint text: "The minimum amount of money you want access to in your everyday bank accounts during retirement (in today's money). This replaces the emergency cash buffer you set in My Details once you retire. We recommend at least $50,000." Zero is allowed.
+  - **Cash reserves in retirement** is its own subheading in "What you want", above "Planning a big purchase?". We recommend $200,000 per person (`RETIRE_CASH_PER_PERSON`, `retireCashMin(p)` = $400,000 for a couple); that's also the default when the field is blank. Field "Accessible cash reserves in retirement" (zero allowed). A box under it says what happens to cash over the minimum and links to "Your spare cash" on the Shares tab.
   - **Share goal short:** the plan check says why (amount too low, savings can't always cover it, or it waits for a purchase) and offers a tested fix: start the share plan now, the monthly amount that actually reaches the goal in the projection, or a lower share goal. It's skipped when shares are already flagged for using deposit savings. Wise suggesting an *earlier* stop-work age is fine.
   - **Stop-work age is the user's choice.** Nothing in the app suggests working longer or retiring later. When money doesn't last, the tested fixes are: a lower retirement income, a bigger share plan while working (smallest tested amount that lasts and still buys every property on time), or one fewer property.
   - **Plan check:**
@@ -194,6 +194,11 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
   - Also includes a "What about investing this extra capital?" statement and the CGT note.
   - No chart, no shares sweep and no scenario table.
 - **Shares:** a "See how your monthly investment rises with inflation" pop-up, viewable by year or by month.
+  - **Your spare cash** (`src/components/SpareCash.tsx`, anchor `#spare-cash`), full width under the share plan. Default: spare cash **stays in the bank** (the old automatic move into shares in retirement is gone). Two choices, each showing tested figures:
+    - Step 1, after your last property: `goals.spareCashAbove` (today's money). Once every planned property is bought, cash over max(amount, emergency fund) plus whatever sits in offsets against loans still owing goes into shares each year, on top of the monthly investment.
+    - Step 2, once you stop work: `goals.spareCashRetired`. Cash over the retirement cash reserve (plus any offset need) goes into shares.
+  - Engine: `YearPoint.spareToShares`, `Projection.loansPaid`. Without a Cash Reserves plan, cash with no loan to offset earns `CASH_RATE_FALLBACK` (3.3%, RBA F4 online saver, Oct 2026) after tax.
+  - Follow-through: plan check fix (when money runs out), "spare-cash" insight, Wise Action "Move spare cash into shares from YEAR", inflation update item, AI facts (`spareCash`) and prompt; AI cache prefix now `wise4:`.
   - "Set a retirement goal or a monthly amount, and we'll work out the other": whichever was set last leads. When the monthly amount leads, the goal is worked out from the plan and kept in step everywhere as the plan changes (synced in `App.tsx`, helper `sharesGoalFromPlan`). Typing a goal, or ticking the delay with a goal set, works out the monthly amount from the later start (`monthlyForShareGoal`).
   - With "don't invest until after I've bought…", the result box says the start year and years of investing, and what starting now would give. If that purchase can't happen by its target year, the note says so and gives the real start year.
 - **Gifts:** a Save button locks each gift into a summary line, with Edit and trash.

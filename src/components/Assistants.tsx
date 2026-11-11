@@ -84,7 +84,7 @@ export function WisePanel({ profile, quotes, go }: { profile: Profile; quotes: Q
     setTimeout(() => setBusy(false), 900);
   };
   const act = (to: string) => {
-    if (to.startsWith('plan:')) { useNavIntent.getState().set({ planTab: to.slice(5) }); go('plan'); } else go(to);
+    if (to.startsWith('plan:')) { useNavIntent.getState().set({ planTab: to.slice(5) }); go('plan'); if (to === 'plan:shares') setTimeout(() => document.getElementById('spare-cash')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250); } else go(to);
   };
 
   return (

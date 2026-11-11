@@ -1,7 +1,8 @@
+import { SpareCash } from '../components/SpareCash';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
 import { applySnapshot, newForecast, PlanProvider, snapshot, useForecast, usePlanMode, usePlanProfile, usePlanUpdate, type PlanCtx } from '../lib/planContext';
-import { CHILD_COST_YEAR, RETIRE_CASH_MIN, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, monthlyForShareGoal, type Quotes } from '../lib/calc';
+import { CHILD_COST_YEAR, RETIRE_CASH_PER_PERSON, retireCashMin, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, monthlyForShareGoal, type Quotes } from '../lib/calc';
 import { holdingValue, liquidationEstimate, maxShareMonthly, planCheck, propertyValueIn } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { CashTab } from './CashTab';
@@ -78,7 +79,7 @@ export function Plan({ quotes }: { quotes: Quotes }) {
         {tab === 'goals' && <Goals quotes={quotes} go={setTab} />}
         {tab === 'assumptions' && <AssumptionsTab />}
         {tab === 'timeline' && <Timeline quotes={quotes} onGoals={() => setTab('goals')} />}
-        {tab === 'shares' && <SharesPlan quotes={quotes} />}
+        {tab === 'shares' && <SharesPlan quotes={quotes} onGoals={() => setTab('goals')} />}
         {tab === 'cash' && <CashTab quotes={quotes} onGo={(t) => setTab(t)} />}
         {tab === 'liquidations' && <LiquidationsTab quotes={quotes} />}
         {tab === 'gifts' && <GiftsTab />}
@@ -193,8 +194,19 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
           <LinkedValue label="Properties owned by retirement" value={`${g.targetProperties} ${g.targetProperties === 1 ? 'property' : 'properties'}`} hint="Set on the Property Portfolio tab." tabLabel="Property Portfolio" onGo={() => go('timeline')} />
           <LinkedValue label="Share portfolio value at retirement" value={g.sharesTarget ? `${money(g.sharesTarget)}` : 'No goal set'} hint="Set on the Shares tab." tabLabel="Shares" onGo={() => go('shares')} />
           <Field label="Yearly income after retirement" hint="What you want to live on each year after you stop work (in today’s money). The plan sells shares and properties if needed.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
-          <div><Field label="Accessible cash reserves in retirement" hint="The minimum amount of money you want access to in your everyday bank accounts during retirement (in today’s money). This replaces the emergency cash buffer you set in My Details once you retire. We recommend at least $50,000.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder="50000" />}</Field>
-            {g.retireCash != null && g.retireCash < RETIRE_CASH_MIN && <p role="status" className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-sm">We recommend keeping at least {money(RETIRE_CASH_MIN)} in cash once you’ve retired, for repairs, health costs and surprises without having to sell anything.</p>}</div>
+          <div className="mt-4 sm:col-span-2">
+            <h2 className="font-display text-xl font-semibold">Cash reserves in retirement</h2>
+            <p className="mt-1 mb-3 text-xs text-muted">It’s worth staying more liquid in retirement, so you can pay for anything unforeseen without having to sell an asset. We recommend at least {money(RETIRE_CASH_PER_PERSON)} per person as a minimum{p.household.hasPartner ? ` (${money(retireCashMin(p))} for the two of you)` : ''}. Once you retire, this replaces the emergency fund you set in My Details.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div><Field label="Accessible cash reserves in retirement" hint="The least you want in your bank accounts at all times (in today’s money).">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder={retireCashMin(p).toLocaleString('en-AU')} />}</Field>
+                {g.retireCash != null && g.retireCash < retireCashMin(p) && <p role="status" className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-sm">That’s below the {money(retireCashMin(p))} we recommend.</p>}</div>
+            </div>
+            <div className="mt-3 rounded-xl bg-raised p-4 ring-1 ring-line">
+              <p className="text-sm">Once you reach your minimum, you may want to keep growing your money in high-interest accounts, or invest anything over it in shares.</p>
+              <p className="mt-1 text-xs text-muted">{g.spareCashRetired ? `You’ve chosen to invest anything over ${money(g.retireCash ?? retireCashMin(p))} in shares.` : `Right now, anything over ${money(g.retireCash ?? retireCashMin(p))} stays in the bank.`}</p>
+              <button className="btn-quiet mt-3 py-1.5 text-sm" onClick={() => { go('shares'); setTimeout(() => document.getElementById('spare-cash')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); }}>{g.spareCashRetired ? 'Change this in Shares' : 'Set this up in Shares'}</button>
+            </div>
+          </div>
           <div className="mt-4 sm:col-span-2">
             <h2 className="font-display text-xl font-semibold">Planning a big purchase?</h2>
             <p className="mt-1 mb-3 text-xs text-muted">Include any large assets you plan to buy, like a car or a boat, or a life event like a wedding: anything you need to factor into your plan. Enter the cost in today’s money. The plan pays for it from your savings in that year.</p>
@@ -532,7 +544,7 @@ function RetirementMetrics({ proj }: { proj: ReturnType<typeof project> }) {
       {at && tile(p.household.hasPartner ? 'Combined net worth' : 'Net worth', c(at.netWorth), `${c(at.super)} in super · ${c(at.shares)} in shares`, 'text-gum')}
       {at && tile('Investment property cash flow', investKept > 0 ? `${propMonthly >= 0 ? '' : '−'}${money(Math.abs(propMonthly))}` : '$0', investKept > 0 ? `a month from the ${investKept} investment ${investKept === 1 ? 'property' : 'properties'} you keep, after loans and costs` : 'No investment properties kept. Set one to be paid off by retirement to keep its rent.', propMonthly < 0 ? 'text-clay' : '')}
       {at && tile('Super paid out in the first year', c(at.superDrawn), at.age >= 60 ? 'Super pays your income first' : `Super opens at 60, ${60 - at.age} ${60 - at.age === 1 ? 'year' : 'years'} after you stop`)}
-      {tile('Cash on hand', money(p.goals.retireCash ?? RETIRE_CASH_MIN, { compact: true }), 'kept in the bank at all times. Set it in Goals.', '', !!at /* fifth tile: full width on phones so there's no empty box */)}
+      {tile('Cash on hand', money(p.goals.retireCash ?? retireCashMin(p), { compact: true }), 'kept in the bank at all times. Set it in Goals.', '', !!at /* fifth tile: full width on phones so there's no empty box */)}
     </div>
   );
 }
@@ -758,7 +770,7 @@ function ShareGrowth({ p, proj, onClose }: { p: Profile; proj: ReturnType<typeof
 }
 
 /* ---------- Shares plan ---------- */
-function SharesPlan({ quotes }: { quotes: Quotes }) {
+function SharesPlan({ quotes, onGoals }: { quotes: Quotes; onGoals: () => void }) {
   const p = usePlanProfile();
   const [growOpen, setGrowOpen] = useState(false);
   const update = usePlanUpdate();
@@ -849,6 +861,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
         {!over && cap && <p className="mt-5 text-sm text-gum">Your property plan still works. You could invest up to {money(cap.monthly)} a month before it starts delaying a purchase.</p>}
       </section>
       <ShareTradeOff quotes={quotes} current={proj.shareMonthly} required={required} cap={cap?.monthly ?? null} onUse={useAmount} />
+      <SpareCash quotes={quotes} onGoals={onGoals} />
     </div>
   );
 }
