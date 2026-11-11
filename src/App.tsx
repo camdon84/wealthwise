@@ -3,6 +3,7 @@ import { actionsNeedingUpdate, reviewDue, wiseActions } from './lib/actions';
 import { useEffect, useMemo, useState } from 'react';
 import { endView, useApp } from './lib/store';
 import { useHashRoute, useQuotes } from './lib/hooks';
+import { sharesGoalFromPlan } from './lib/calc';
 import { Auth } from './pages/Auth';
 import { Onboarding } from './onboarding/Onboarding';
 import { Overview } from './pages/Overview';
@@ -48,6 +49,15 @@ function Shell() {
   const due = eofyItems(profile).outstanding.length;
   const acts = useMemo(() => wiseActions(profile, quotes).actions, [profile, quotes]);
   const actionAlerts = actionsNeedingUpdate(profile, acts).length + (reviewDue(profile) ? 1 : 0);
+  // When the person set a monthly share amount, their shares goal is whatever that reaches, so keep it in step as the plan changes
+  const pricesReady = Object.keys(quotes).length > 0 || !profile.holdings.some((h) => h.kind !== 'crypto' && h.exchange !== 'CRYPTO');
+  const shareGoal = useMemo(() => (profile.goals.shareMonthly != null && pricesReady ? sharesGoalFromPlan(profile, quotes) : null), [profile, quotes, pricesReady]);
+  const updateProfile = useApp((s) => s.update);
+  useEffect(() => {
+    if (shareGoal == null || session?.viewing) return;
+    const want = shareGoal > 0 ? shareGoal : null;
+    if ((profile.goals.sharesTarget ?? null) !== want) updateProfile((d) => { d.goals.sharesTarget = want; });
+  }, [shareGoal, session?.viewing]); // eslint-disable-line react-hooks/exhaustive-deps
   if (profile.firstLookSeen === false && !session?.viewing) return <FirstLook quotes={quotes} />;
 
   const nav = (

@@ -12,7 +12,7 @@ type Split = CashPlan['split'];
 function offsetChoices(p: Profile) {
   return [
     ...p.properties.filter((pr) => pr.loans.some((l) => (l.balance ?? 0) > 0)).map((pr) => ({ id: pr.id, label: pr.address || 'A property', sub: pr.use === 'home' ? 'Your home · loan now' : 'Investment · loan now', home: pr.use === 'home' })),
-    ...(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).map((pp, k) => ({ id: pp.id, label: pp.label || `Property ${p.properties.length + k + 1}`, sub: pp.firstHome ? 'Planned home · once bought' : 'Planned investment · once bought', home: !!pp.firstHome })),
+    ...(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).map((pp, k) => ({ id: pp.id, label: pp.label || `Property ${p.properties.length + k + 1}`, sub: pp.use === 'home' ? 'Planned home · once bought' : 'Planned investment · once bought', home: pp.use === 'home' })),
   ];
 }
 

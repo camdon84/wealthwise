@@ -204,7 +204,10 @@ export interface PlannedPurchase {
   payOff?: boolean; // paid off by retirement; otherwise sold at retirement
   depositPct?: number; costsPct?: number; holdingPct?: number; mgmtPct?: number;
   newBuild?: boolean; // a new build: keeps negative gearing under the 2026 rules
-  firstHome?: boolean; // bought as your first home to live in
+  use?: 'investment' | 'home'; // home = you'll live in it (owner-occupier): no rent, no negative gearing, no capital gains tax
+  firstHome?: boolean; // using first home buyer benefits (only for a first home you live in)
+  oldHome?: 'rent' | 'sell'; // when you move in: what happens to the home you live in now (if you own one)
+  oldHomeYield?: number; // rental yield on the old home if it's rented out
   fhb?: { deposit5?: boolean; grant?: boolean; grantAmount?: number | null; noStampDuty?: boolean };
 }
 

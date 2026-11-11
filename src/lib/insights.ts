@@ -288,6 +288,7 @@ export function planSettings(p: Profile, proj: { purchases: { year: number }[]; 
       earliestYearItFits: proj.purchases[k]?.year ?? null,
       interestOnlyFirst5Years: !!pp.ioFirst5,
       paidOffByRetirement: !!pp.payOff,
+      use: pp.use === 'home' ? 'home to live in (no rent)' : 'investment',
     })),
   };
 }

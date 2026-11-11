@@ -60,7 +60,7 @@ export function planCheck(p: Profile, quotes: Quotes): PlanCheck {
   // 1. Savings running out while still working (usually repayments to pay loans off fast)
   if (!cashOk(r)) {
     problems.push(`Your savings run out in ${r.shortfallYear}, while you’re still working: loan repayments and living expenses would be more than you earn.`);
-    const sellInstead = run((x) => { x.plannedPurchases?.forEach((pp) => { pp.payOff = false; }); x.properties.forEach((pr) => { if (pr.use === 'investment') pr.planPayOff = false; }); });
+    const sellInstead = run((x) => { x.plannedPurchases?.forEach((pp) => { if (pp.use !== 'home') pp.payOff = false; }); x.properties.forEach((pr) => { if (pr.use === 'investment') pr.planPayOff = false; }); });
     if (cashOk(sellInstead)) fixes.push('Don’t pay the investment properties off by retirement. Paying them off that quickly needs bigger repayments than your income covers; selling them when you stop work avoids that.');
     const io = run((x) => { x.plannedPurchases?.forEach((pp) => { pp.ioFirst5 = true; }); });
     if (cashOk(io) && fixes.length === 0) fixes.push('Use interest-only loans for the first 5 years on new purchases, so repayments stay lower while you build up.');
@@ -207,7 +207,7 @@ function buyIdeas(p: Profile, r: Projection, run: (mod: (x: Profile) => void) =>
   if (withDebt.some((pr) => pr.planIo5)) levers.push({ text: 'switch your current loans from interest-only to principal and interest', mod: (x) => { x.properties.forEach((pr) => { pr.planIo5 = false; }); } });
   if (withDebt.some((pr) => !pr.planIo5)) levers.push({ text: 'move your current loans to interest-only for 5 years, so repayments are lower while you save', mod: (x) => { x.properties.forEach((pr) => { pr.planIo5 = true; }); } });
   if (planned.some((pp) => pp.ioFirst5 === false)) levers.push({ text: 'use interest-only for the first 5 years on new purchases', mod: (x) => { x.plannedPurchases?.forEach((pp) => { pp.ioFirst5 = true; }); } });
-  if (withDebt.some((pr) => pr.planPayOff && pr.use === 'investment') || planned.some((pp) => pp.payOff)) levers.push({ text: 'don’t pay the investment loans off by retirement (it means bigger repayments now)', mod: (x) => { x.properties.forEach((pr) => { if (pr.use === 'investment') pr.planPayOff = false; }); x.plannedPurchases?.forEach((pp) => { pp.payOff = false; }); } });
+  if (withDebt.some((pr) => pr.planPayOff && pr.use === 'investment') || planned.some((pp) => pp.payOff && pp.use !== 'home')) levers.push({ text: 'don’t pay the investment loans off by retirement (it means bigger repayments now)', mod: (x) => { x.properties.forEach((pr) => { if (pr.use === 'investment') pr.planPayOff = false; }); x.plannedPurchases?.forEach((pp) => { if (pp.use !== 'home') pp.payOff = false; }); } });
   // Selling some crypto or shares to fund the deposit, after capital gains tax (tested as a liquidation event this year)
   const y0 = new Date().getFullYear();
   for (const kind of (focus === 'shares' ? ['crypto'] : ['crypto', 'shares']) as ('crypto' | 'shares')[]) {

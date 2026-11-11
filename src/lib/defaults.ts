@@ -61,6 +61,8 @@ export function normalize(p: Profile): Profile {
     if (p.finances.cashSavings != null || inOffset) p.finances.cash = (p.finances.cashSavings ?? 0) + inOffset; }
   p.plannedPurchases ??= [];
   for (const pp of p.plannedPurchases) { pp.ioFirst5 ??= true; pp.payOff ??= false; pp.depositPct ??= 20; pp.costsPct ??= 5; pp.holdingPct ??= 1.2; pp.mgmtPct ??= 7; if (pp.buyBy === undefined) pp.buyBy = null; }
+  // Planned purchases are investments unless marked as a home to live in (older plans only had the first-home flag, and homes were always paid off)
+  for (const pp of p.plannedPurchases) if (pp.use === undefined) { pp.use = pp.firstHome ? 'home' : 'investment'; if (pp.firstHome) pp.payOff = true; }
   for (const pr of p.properties) { pr.planIo5 ??= pr.loans.length > 0 && pr.loans.every((l) => l.type === 'io'); pr.planPayOff ??= pr.use === 'home'; }
   return p;
 }

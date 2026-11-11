@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
 import { applySnapshot, newForecast, PlanProvider, snapshot, useForecast, usePlanMode, usePlanProfile, usePlanUpdate, type PlanCtx } from '../lib/planContext';
-import { CHILD_COST_YEAR, RETIRE_CASH_MIN, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, type Quotes } from '../lib/calc';
+import { CHILD_COST_YEAR, RETIRE_CASH_MIN, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, monthlyForShareGoal, type Quotes } from '../lib/calc';
 import { holdingValue, liquidationEstimate, maxShareMonthly, planCheck, propertyValueIn } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { CashTab } from './CashTab';
@@ -394,49 +394,80 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
   block: ReturnType<typeof project>['block']; startYear: number; startAge: number; retireAge: number; onGoals: () => void;
 }) {
   const update = usePlanUpdate();
-  const assumedRate = usePlanProfile().assumptions.newLoanRate;
-  const fhbEligible = usePlanProfile().properties.length === 0 && k === 0;
+  const pp0 = usePlanProfile();
+  const assumedRate = pp0.assumptions.newLoanRate;
+  const fhbEligible = pp0.properties.length === 0 && k === 0;
   const set = (patch: Partial<PlannedPurchase>) => update((d) => { Object.assign(d.plannedPurchases![k], patch); });
   const late = plan.buyBy && bought && bought.year >= plan.buyBy;
   const io5 = plan.ioFirst5 !== false;
+  const home = plan.use === 'home';
+  const payOff = home ? plan.payOff !== false : !!plan.payOff;
   const weeklyRent = (plan.price * plan.yieldPct) / 100 / 52;
-  const chips = [plan.buyBy ? `Before ${plan.buyBy}` : 'As soon as possible', ...(plan.firstHome && fhbEligible ? ['First home'] : [plan.newBuild ? 'New build' : 'Established', io5 ? 'Interest-only for 5 years' : 'Principal and interest', plan.payOff ? `Paid off by ${retireAge}` : `Sold at ${retireAge} if a loan is left`])];
+  // The home you'd be moving out of: one you own now, or an earlier planned home
+  const prevHome = [...pp0.properties.filter((x) => x.use === 'home').map((x) => x.address || 'your current home'), ...(pp0.plannedPurchases ?? []).slice(0, k).map((x, j) => (x.use === 'home' ? x.label || `Property ${pp0.properties.length + j + 1}` : null)).filter((x): x is string => !!x)].pop();
+  const renting = !prevHome && pp0.finances.housing === 'rent';
+  const oldYield = plan.oldHomeYield ?? pp0.assumptions.newPurchaseYield;
+  const chips = [plan.buyBy ? `Before ${plan.buyBy}` : 'As soon as possible', ...(home
+    ? ['Home to live in', ...(plan.firstHome && fhbEligible ? ['First home'] : []), io5 ? 'Interest-only for 5 years' : 'Principal and interest', payOff ? `Paid off by ${retireAge}` : `Loan left at ${retireAge} paid from savings`]
+    : [plan.newBuild ? 'New build' : 'Established', io5 ? 'Interest-only for 5 years' : 'Principal and interest', payOff ? `Paid off by ${retireAge}` : `Sold at ${retireAge} if a loan is left`])];
   const right = bought
     ? <p className={`text-right text-sm ${late ? 'text-clay' : ''}`}><span className="font-semibold">{bought.year}</span><br /><span className="text-muted">age {startAge + (bought.year - startYear)} · {money(bought.price, { compact: true })} then</span></p>
     : <p className="text-sm font-medium text-clay">Doesn’t fit before {retireAge}</p>;
   return (
-    <RowShell n={n} tone={bought && !late ? 'planned' : 'missing'} title={plan.label || `Property ${n}`} sub={`Planned · ${money(plan.price, { compact: true })} (in today’s money) · ${plan.yieldPct}% yield, about ${money(weeklyRent)} a week rent`} right={right} chips={chips} open={open} onToggle={onToggle}>
+    <RowShell n={n} tone={bought && !late ? 'planned' : 'missing'} title={plan.label || `Property ${n}`} sub={home ? `Planned home · ${money(plan.price, { compact: true })} (in today’s money)` : `Planned investment · ${money(plan.price, { compact: true })} (in today’s money) · ${plan.yieldPct}% yield, about ${money(weeklyRent)} a week rent`} right={right} chips={chips} open={open} onToggle={onToggle}>
       {!bought && firstMissing && block && (
         <p className="mb-3 text-sm text-clay">{block.reason === 'servicing' ? `Held back by borrowing power: lenders would want about ${money(block.monthlyShort, { compact: true })} a month more income. Try a cheaper price or a higher yield.` : `Needs about ${money(block.deposit, { compact: true })} for the deposit and costs; you’d have ${money(block.available, { compact: true })}.`}</p>
       )}
       {late && <p className="mb-3 text-sm text-clay">You want to purchase this property before {plan.buyBy}, but the earliest it fits is {bought!.year}. Adjust the price, the purchase year, or go to your <button className="font-semibold underline" onClick={onGoals}>Goals tab</button> for further recommendations.</p>}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium">This property will be</span>
+        <Segmented size="sm" label="How you’ll use this property" value={home ? 'home' : 'investment'}
+          onChange={(v) => set(v === 'home' ? { use: 'home', payOff: true, newBuild: false } : { use: 'investment', firstHome: false, payOff: false })}
+          options={[{ value: 'investment', label: 'An investment' }, { value: 'home', label: 'My home to live in' }]} />
+      </div>
+      {home && (
+        <div className="mb-4 rounded-xl border border-line p-3">
+          <p className="text-sm">You’ll live here, so it earns no rent, can’t be negatively geared, and has no capital gains tax when you sell.{renting ? ' Your rent stops when you move in.' : ''}</p>
+          {prevHome && (
+            <div className="mt-3 border-t border-line pt-3">
+              <p className="text-sm font-medium">What happens to {prevHome} when you move?</p>
+              <div className="mt-2"><Segmented size="sm" label={`What happens to ${prevHome}`} value={plan.oldHome ?? 'rent'} onChange={(v) => set({ oldHome: v })}
+                options={[{ value: 'rent', label: 'Keep it and rent it out' }, { value: 'sell', label: 'Sell it' }]} /></div>
+              {(plan.oldHome ?? 'rent') === 'rent' ? (<>
+                <p className="mt-2 text-xs text-muted">It becomes an investment property. Its rent helps your borrowing for this purchase, and its value when you move out becomes its starting point for capital gains tax.</p>
+                <div className="mt-3 max-w-xs"><Field label="Its rental yield" hint="Rent a year as a share of its value">{(id) => <NumInput id={id} value={oldYield} onChange={(v) => set({ oldHomeYield: v ?? pp0.assumptions.newPurchaseYield })} step={0.1} suffix="%" />}</Field></div>
+              </>) : <p className="mt-2 text-xs text-muted">What’s left after selling costs and its loan goes towards this purchase. There’s no capital gains tax on the home you live in.</p>}
+            </div>
+          )}
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Name (optional)">{(id) => <TextInput id={id} value={plan.label} onChange={(v) => set({ label: v })} placeholder={`Property ${n}`} />}</Field>
         <Field label="Price (in today’s money)">{(id) => <MoneyInput id={id} value={plan.price} onChange={(v) => set({ price: v ?? 0 })} />}</Field>
         <Field label="When">{(id) => <Select id={id} value={String(plan.buyBy ?? '')} onChange={(v) => set({ buyBy: v ? Number(v) : null })}
           options={[{ value: '', label: 'As soon as possible' }, ...Array.from({ length: Math.max(1, retireAge - startAge) }, (_, j) => startYear + 1 + j).map((y) => ({ value: String(y), label: `Before ${y}` }))]} />}</Field>
         <Field label="Interest rate" hint={plan.rate === assumedRate ? 'Same as your assumptions' : <button type="button" className="font-medium text-brass hover:underline" onClick={() => set({ rate: assumedRate })}>Use interest rate from assumptions ({assumedRate}%)</button>}>{(id) => <NumInput id={id} value={plan.rate} onChange={(v) => set({ rate: v ?? 0 })} step={0.05} suffix="%" />}</Field>
-        <Field label="Rental yield" hint={`About ${money(weeklyRent)} a week`}>{(id) => <NumInput id={id} value={plan.yieldPct} onChange={(v) => set({ yieldPct: v ?? 0 })} step={0.1} suffix="%" />}</Field>
+        {!home && <Field label="Rental yield" hint={`About ${money(weeklyRent)} a week`}>{(id) => <NumInput id={id} value={plan.yieldPct} onChange={(v) => set({ yieldPct: v ?? 0 })} step={0.1} suffix="%" />}</Field>}
         <Field label="Price growth">{(id) => <NumInput id={id} value={plan.growth} onChange={(v) => set({ growth: v ?? 0 })} step={0.5} suffix="% / yr" />}</Field>
         <Field label="Deposit" hint="20% avoids mortgage insurance">{(id) => <NumInput id={id} value={plan.depositPct ?? 20} onChange={(v) => set({ depositPct: v ?? 20 })} step={1} suffix="%" />}</Field>
-        <Field label="Stamp duty and buying costs">{(id) => <NumInput id={id} value={plan.costsPct ?? 5} onChange={(v) => set({ costsPct: v ?? 5 })} step={0.5} suffix="%" />}</Field>
+        <Field label="Stamp duty and buying costs" hint={home ? 'A home you live in often gets a stamp duty concession. Check your state’s calculator.' : undefined}>{(id) => <NumInput id={id} value={plan.costsPct ?? 5} onChange={(v) => set({ costsPct: v ?? 5 })} step={0.5} suffix="%" />}</Field>
         <Field label="Rates, insurance, upkeep" hint="Of the price, each year">{(id) => <NumInput id={id} value={plan.holdingPct ?? 1.2} onChange={(v) => set({ holdingPct: v ?? 1.2 })} step={0.1} suffix="%" />}</Field>
-        <Field label="Property management" hint="Of the rent">{(id) => <NumInput id={id} value={plan.mgmtPct ?? 7} onChange={(v) => set({ mgmtPct: v ?? 7 })} step={0.5} suffix="%" />}</Field>
+        {!home && <Field label="Property management" hint="Of the rent">{(id) => <NumInput id={id} value={plan.mgmtPct ?? 7} onChange={(v) => set({ mgmtPct: v ?? 7 })} step={0.5} suffix="%" />}</Field>}
       </div>
       <div className="mt-5 space-y-3">
-        {!plan.firstHome && (
+        {!home && (
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3">
             <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={!!plan.newBuild} onChange={(e) => set({ newBuild: e.target.checked })} />
             <span className="text-sm"><span className="font-medium">This will be a new build and subject to negative gearing</span>
               <span className="block text-xs text-muted">Under the 2026 Budget rules, new builds keep negative gearing: rental losses reduce the tax on your salary. An established home bought now can’t do that from 1 July 2027; its losses carry forward against its own future rent instead.</span></span>
           </label>
         )}
-        {fhbEligible && (
+        {fhbEligible && home && (
           <div className="rounded-xl border border-line p-3">
             <label className="flex cursor-pointer items-start gap-3">
               <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={!!plan.firstHome} onChange={(e) => set({ firstHome: e.target.checked, fhb: plan.fhb ?? { deposit5: true, noStampDuty: true } })} />
               <span className="text-sm"><span className="font-medium">I am using my first home buyer benefits</span>
-                <span className="block text-xs text-muted">This becomes your first home to live in, so there’s no rent from it and your own rent stops when you move in.</span></span>
+                <span className="block text-xs text-muted">First home buyer schemes, grants and stamp duty help in your state.</span></span>
             </label>
             {plan.firstHome && (
               <div className="mt-3 space-y-2 border-t border-line pt-3 pl-7">
@@ -456,8 +487,10 @@ function PlannedRow({ plan, k, n, open, onToggle, bought, firstMissing, block, s
       </div>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Toggle checked={io5} onChange={(v) => set({ ioFirst5: v })} label="Interest-only for the first 5 years?" description="Lower repayments while you build up; principal and interest after that." />
-        <Toggle checked={!!plan.payOff} onChange={(v) => set({ payOff: v })} label={`Pay this property off by ${retireAge}?`}
-          description={plan.payOff ? `Repayments are sized to clear the loan by ${retireAge}, so it’s kept for rent in retirement. Expect much higher repayments, especially if it’s bought late.` : `If a loan is still owing at ${retireAge}, we assume you sell it then and the money goes towards your retirement.`} />
+        <Toggle checked={payOff} onChange={(v) => set({ payOff: v })} label={`Pay this property off by ${retireAge}?`}
+          description={home
+            ? (payOff ? `Repayments are sized to clear the loan by ${retireAge}. Expect higher repayments, especially if it’s bought late.` : `Any home loan still owing at ${retireAge} is paid out from your savings, then your super once you can reach it (60).`)
+            : (payOff ? `Repayments are sized to clear the loan by ${retireAge}, so it’s kept for rent in retirement. Expect much higher repayments, especially if it’s bought late.` : `If a loan is still owing at ${retireAge}, we assume you sell it then and the money goes towards your retirement.`)} />
       </div>
     </RowShell>
   );
@@ -473,7 +506,7 @@ function RetirementMetrics({ proj }: { proj: ReturnType<typeof project> }) {
   const c = (v: number) => money(v / d, { compact: true });
   const next = proj.points.find((x) => x.year === proj.retireYear + 1) ?? at; // first full year after any retirement sales
   const propMonthly = next ? next.investNet / 12 / Math.pow(1 + p.assumptions.inflation / 100, i + 1) : 0;
-  const investKept = next ? next.properties - p.properties.filter((x) => x.use === 'home').length : 0;
+  const investKept = next ? next.investProps : 0;
   const tile = (label: string, value: string, sub: string, tone = '', wide = false) => (
     <div className={`bg-surface p-5 ${wide ? 'col-span-2 lg:col-span-1' : ''}`}><p className="text-xs text-muted">{label}</p><p className={`mt-0.5 font-display text-2xl font-semibold ${tone}`}>{value}</p><p className="text-xs text-muted">{sub}</p></div>
   );
@@ -578,21 +611,23 @@ function LiquidationsTab({ quotes }: { quotes: Quotes }) {
       {auto.length > 0 && (
         <div className="mt-6 rounded-xl border border-line p-4">
           <p className="font-semibold">Property sales already in your plan</p>
-          {(['loan', 'income'] as const).map((why) => {
+          {(['move', 'loan', 'income'] as const).map((why) => {
             // The reason is said once for each group, rather than under every sale
-            const items = auto.filter((e) => (e.reason === 'loan') === (why === 'loan'));
+            const items = auto.filter((e) => e.reason === why);
             if (!items.length) return null;
             const one = items.length === 1;
             return (
               <div key={why} className="mt-3">
-                <p className="text-sm text-muted">{why === 'loan'
+                <p className="text-sm text-muted">{why === 'move'
+                  ? <>{one ? 'Your home is' : 'Your homes are'} sold when you move into the next home you buy, and the money goes towards it. There’s no capital gains tax on the home you live in.</>
+                  : why === 'loan'
                   ? <>{one ? 'This property still has a loan' : 'These properties still have a loan'} when you stop work and {one ? 'isn’t' : 'aren’t'} set to be paid off, so {one ? 'it’s' : 'they’re'} sold. To keep one, tick “pay off by retirement” on the Property Portfolio tab.</>
                   : <>{one ? 'This property is' : 'These properties are'} sold when your savings, super and shares run low, to keep paying your retirement income.</>}</p>
                 <ul className="mt-2 space-y-2">
                   {items.map((e, k) => (
                     <li key={k} className="flex gap-3 text-sm">
                       <span className="mt-0.5 inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-clay bg-surface" aria-hidden="true" />
-                      <p><span className="font-semibold">{e.year} (age {e.age}):</span> {e.name} is sold, leaving about {money(e.net, { compact: true })} (in today’s money) after the loan, selling costs and tax.</p>
+                      <p><span className="font-semibold">{e.year} (age {e.age}):</span> {e.name} is sold, leaving about {money(e.net, { compact: true })} (in today’s money) after the loan{e.reason === 'move' ? ' and selling costs' : ', selling costs and tax'}.</p>
                     </li>
                   ))}
                 </ul>
@@ -731,17 +766,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
     return project(x, quotes).sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years);
   }, [p, quotes, years, delayStart]);
   const over = cap != null && proj.shareMonthly > cap.monthly + 1;
-  // With a delayed start there are fewer years to invest, so work the monthly amount out from the projection itself
-  const neededDelayed = useMemo(() => {
-    const target = p.goals.sharesTarget ?? 0;
-    if (!p.goals.shareStartAfter || target <= 0) return null;
-    const at = (v: number) => { const x: typeof p = JSON.parse(JSON.stringify(p)); x.goals.shareMonthly = v; return project(x, quotes).sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years); };
-    if (at(30000) < target) return null;
-    let lo = 0, hi = 30000;
-    for (let k = 0; k < 16; k++) { const mid = (lo + hi) / 2; if (at(mid) >= target) hi = mid; else lo = mid; }
-    return Math.ceil(hi / 10) * 10;
-  }, [p, quotes, years]);
-  const needed = neededDelayed ?? required;
+  const goalFromMonthly = !auto && proj.shareMonthly > 0 ? Math.round(realAtRetire / 1000) * 1000 : null;
   const useAmount = (v: number) => update((d) => { d.goals.shareMonthly = Math.round(v); });
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
@@ -751,7 +776,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
         <div className="mt-5"><p className="text-xs text-muted">Shares today</p><p className="font-display text-2xl font-semibold">{money(sharesNow)}</p></div>
         <p className="mt-5 text-sm">Set a retirement goal or a monthly amount, and we’ll work out the other.</p>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <Field label="Retirement goal" hint="What you’d like your shares to be worth when you stop work (in today’s money). Leave blank if you don’t have one.">{(id) => <MoneyInput id={id} value={p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = null; })} />}</Field>
+          <Field label="Retirement goal" hint={goalFromMonthly != null ? 'Worked out from your monthly amount (in today’s money). Type a goal to set your own instead.' : 'What you’d like your shares to be worth when you stop work (in today’s money). Leave blank if you don’t have one.'}>{(id) => <MoneyInput id={id} value={goalFromMonthly ?? p.goals.sharesTarget ?? null} onChange={(v) => update((d) => { d.goals.sharesTarget = v; d.goals.shareMonthly = v && p.goals.shareStartAfter ? monthlyForShareGoal({ ...p, goals: { ...p.goals, sharesTarget: v } }, quotes, v) : null; })} />}</Field>
           <Field label="Monthly investment" hint={auto && p.goals.sharesTarget ? 'Worked out from your goal. Type an amount to set your own instead.' : 'The amount goes up with inflation each year.'}>{(id) => <MoneyInput id={id} value={auto ? (p.goals.sharesTarget ? Math.round(required) : null) : p.goals.shareMonthly ?? null} onChange={(v) => {
             // Typing a monthly amount works the retirement goal out from it, so the two boxes always agree
             const x: typeof p = JSON.parse(JSON.stringify(p)); x.goals.shareMonthly = v ?? 0;
@@ -765,7 +790,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
           <div className="mt-4 rounded-xl border border-line p-3">
             <label className="flex cursor-pointer items-start gap-3">
               <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[rgb(var(--brass))]" checked={!!p.goals.shareStartAfter}
-                onChange={(e) => update((d) => { d.goals.shareStartAfter = e.target.checked ? 1 : null; if (e.target.checked && d.goals.shareMonthly == null) d.goals.shareMonthly = Math.round(proj.shareMonthly || required); })} />
+                onChange={(e) => update((d) => { d.goals.shareStartAfter = e.target.checked ? 1 : null; if (e.target.checked && d.goals.shareMonthly == null) { const x: typeof p = JSON.parse(JSON.stringify(p)); x.goals.shareStartAfter = 1; d.goals.shareMonthly = (p.goals.sharesTarget ? monthlyForShareGoal(x, quotes, p.goals.sharesTarget) : null) ?? Math.round(proj.shareMonthly || required); } })} />
               <span className="text-sm">I don’t want to invest in shares until after I’ve bought
                 {p.goals.shareStartAfter ? (
                   <select className="mx-1.5 rounded-md border border-line bg-surface px-1.5 py-0.5 text-sm" value={p.goals.shareStartAfter} onClick={(e) => e.preventDefault()} onChange={(e) => update((d) => { d.goals.shareStartAfter = Number(e.target.value); })}>
@@ -790,9 +815,8 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
           </>) : !auto && proj.shareMonthly > 0 ? (<>
             <p className="text-sm text-muted">{delayStart != null ? `Investing ${money(proj.shareMonthly)} a month from ${delayStart} (${investYears} ${investYears === 1 ? 'year' : 'years'} of investing), you’d have about` : `By investing ${money(proj.shareMonthly)} a month, you’d have about`}</p>
             <p className="font-display text-3xl font-semibold">{money(realAtRetire, { compact: true })} <span className="text-base font-normal text-muted">by {p.goals.retirementAge}</span></p>
-            <p className="text-xs text-muted">In today’s money, at {p.assumptions.shareReturn}% a year.{p.goals.sharesTarget ? (realAtRetire >= p.goals.sharesTarget * 0.98 ? ` That meets your ${money(p.goals.sharesTarget, { compact: true })} target.` : ` That’s short of your ${money(p.goals.sharesTarget, { compact: true })} target.`) : ''}{proj.points.some((x) => x.sharePlanned > 0 && x.shareContribution < x.sharePlanned * 0.98) ? ' Some years your savings can’t cover the full amount, so less goes in.' : ''}</p>
+            <p className="text-xs text-muted">In today’s money, at {p.assumptions.shareReturn}% a year.{proj.points.some((x) => x.sharePlanned > 0 && x.shareContribution < x.sharePlanned * 0.98) ? ' Some years your savings can’t cover the full amount, so less goes in.' : ''}</p>
             {nowAtRetire != null && nowAtRetire > realAtRetire * 1.05 && <p className="mt-2 text-xs text-muted">If you started now instead, the same amount would grow to about <span className="font-semibold text-ink">{money(nowAtRetire, { compact: true })}</span> by {p.goals.retirementAge}.</p>}
-            {p.goals.sharesTarget && realAtRetire < p.goals.sharesTarget * 0.98 ? <button className="btn-quiet mt-3 text-sm" onClick={() => update((d) => { d.goals.shareMonthly = d.goals.shareStartAfter ? needed : null; })}>Invest what’s needed for my target instead ({money(needed)} a month{p.goals.shareStartAfter ? ', from the later start' : ''})</button> : null}
           </>) : (
             <p className="text-sm text-muted">Enter a share portfolio value for retirement, or how much you’d invest each month, to see where it gets you by {p.goals.retirementAge}.</p>
           )}

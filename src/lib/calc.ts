@@ -212,7 +212,7 @@ export function position(p: Profile, quotes: Quotes) {
 /* ---------- Projection ---------- */
 export interface YearPoint {
   year: number; age: number; propertyValue: number; propertyDebt: number; propertyEquity: number; shares: number; cashShares: number; super: number; cash: number; crypto: number;
-  netWorth: number; passiveIncome: number; passiveIncomeReal: number; properties: number; borrowing: number; monthlySavings: number;
+  netWorth: number; passiveIncome: number; passiveIncomeReal: number; properties: number; investProps: number; borrowing: number; monthlySavings: number;
   repayUp2: number; repayBase: number; repayDown2: number; bought?: number;
   spendGoalReal: number; spendFundedReal: number; shareContribution: number; sharePlanned: number; rentIncome: number; superDrawn: number; paidOff?: string[]; sold?: string[]; payNet: number; investNet: number; saleIn: number; giftIn: number; liqIn: number; shareSaleIn: number; propSaleIn: number; propNet: number; spending: number; liquidated?: number;
 }
@@ -222,7 +222,7 @@ export interface Projection {
   points: YearPoint[]; purchases: { year: number; price: number; id?: string }[]; shortfallYear: number | null; sharesAtRetire: number; buffer: number; retireYear: number; block: PurchaseBlock | null;
   events: PlanEvent[]; runsOutAge: number | null; shareMonthly: number; requiredShareMonthly: number; cryptoExcluded: number;
   cashSharesTax: number; // capital gains tax paid selling spare-cash shares for deposits
-  sales: { year: number; age: number; name: string; net: number; reason: 'loan' | 'income' }[]; // properties the plan sells by itself; net in today's money
+  sales: { year: number; age: number; name: string; net: number; reason: 'loan' | 'income' | 'move' }[]; // properties the plan sells by itself; net in today's money
 }
 
 const FALLBACK_DEBT_RATE: Record<string, number> = { car: 9.5, personal: 12.5, 'credit-card': 20.99, other: 10 };
@@ -597,20 +597,28 @@ export function project(p: Profile, quotes: Quotes): Projection {
         const price = (plan?.price ?? a.newPurchasePrice) * Math.pow(1 + growth, i);
         const yieldPct = plan?.yieldPct ?? a.newPurchaseYield;
         const rate = plan?.rate ?? a.newLoanRate;
-        // First home buyer benefits only apply to a first home you live in
-        const fhb = plan?.firstHome && p.properties.length === 0 && k === 0 ? plan.fhb ?? {} : null;
+        // A home you'll live in (owner-occupier) earns no rent and pays no capital gains tax. First home buyer benefits only apply to a first home you live in.
+        const asHome = (plan?.use ?? (plan?.firstHome ? 'home' : 'investment')) === 'home';
+        const fhb = asHome && plan?.firstHome && p.properties.length === 0 && k === 0 ? plan.fhb ?? {} : null;
+        // Moving out of a home you own: either sell it (the money helps fund this purchase) or keep it and rent it out
+        const oldIdx = asHome ? sims.findIndex((s) => s.home) : -1;
+        const old = oldIdx >= 0 ? sims[oldIdx] : null;
+        const sellOld = !!old && plan?.oldHome === 'sell';
+        const oldNet = old && sellOld ? old.value * (1 - SELL_COSTS) - old.debt : 0; // a main residence is free of capital gains tax
+        const oldRent = old && !sellOld ? old.value * ((plan?.oldHomeYield ?? a.newPurchaseYield) / 100) * (50 / 52) : 0;
+        const assessed = sellOld ? sims.filter((_, j) => j !== oldIdx) : old ? sims.map((s, j) => (j === oldIdx ? { ...s, rent: oldRent } : s)) : sims;
         const costsPct = (fhb?.noStampDuty ? 1 : plan?.costsPct ?? 5) / 100; // with no stamp duty, roughly legals and inspections are left
         const grant = fhb?.grant ? n(fhb.grantAmount ?? 15000) : 0;
-        const usable = sims.reduce((t, s) => t + Math.max(0, s.value * (a.lvr / 100) - s.debt), 0);
+        const usable = (sellOld ? assessed : sims).reduce((t, s) => t + Math.max(0, s.value * (a.lvr / 100) - s.debt), 0);
         const deposit = Math.max(0, price * ((fhb?.deposit5 ? 5 : plan?.depositPct ?? 20) / 100 + costsPct) - grant);
-        let spare = Math.max(0, cash - buffer * infl(i));
+        let spare = Math.max(0, cash - buffer * infl(i) + oldNet);
         const cashOnly = spare;
         // Shares bought with spare cash count towards the deposit, after the capital gains tax on selling them
         const incNow = youSal + n(p.household.otherIncome);
         const sweepTax = (gross: number) => { const gf = sweepBal > 0 ? Math.max(0, 1 - sweepCost / sweepBal) : 0; return Math.max(0, incomeTax(incNow + gross * gf * 0.5) - incomeTax(incNow)); };
         if (sweepBal > 1) spare += sweepBal - sweepTax(sweepBal);
         // The most a lender would lend now (car loans and cards only count for the first new purchase)
-        const maxLoan = Math.max(0, pv(rate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, k === 0)));
+        const maxLoan = Math.max(0, pv(rate + a.serviceBuffer, 30, serviceSurplus(assessed, youSal, partSal, living, k === 0)));
         // Cash needed: at least whatever equity can't cover of the deposit, and enough to keep the loan within what a lender allows
         const total = price * (1 + costsPct) - grant;
         const needCash = Math.max(0, deposit - usable, total - maxLoan);
@@ -628,22 +636,31 @@ export function project(p: Profile, quotes: Quotes): Projection {
             sweepCost *= 1 - g / sweepBal; sweepBal -= g; cash += got; liqIn += got; shareSaleIn += got; liquidated += got; cashSharesTax += tax;
             say(year, 'liquidate', `Sell ${fmt(g)} of the shares your spare cash went into, for this deposit. After about ${fmt(tax)} in capital gains tax, ${fmt(got)} goes towards the purchase.`);
           }
-          cash -= fromCash;
           const label = plan?.label || `Property ${ownedNow + 1}`;
-          const asHome = !!plan?.firstHome && p.properties.length === 0 && k === 0;
-          sims.push({ name: label, value: price, cost: price, debt: newLoan, rate, ioLeft: plan?.ioFirst5 === false ? 0 : 5, years: 30, rent: asHome ? 0 : price * (yieldPct / 100) * (50 / 52), costs: price * ((plan?.holdingPct ?? 1.2) / 100), mgmt: (plan?.mgmtPct ?? 7) / 100, g: growth, invest: !asHome, pay: 1, payOff: asHome ? true : !!plan?.payOff, home: asHome,
-            ng: !!plan?.newBuild, ngUntil: plan?.newBuild ? undefined : 2027, carry: 0, pid: plan?.id });
-          if (asHome && renting) { renting = false; baseLivingAdj -= housingMonthly(p); say(year, 'goal', 'You stop paying rent once you move into your first home.'); }
+          if (old && sellOld) {
+            sims.splice(oldIdx, 1);
+            cash += oldNet; saleIn += Math.max(0, oldNet); propSaleIn += Math.max(0, oldNet); sold.push(old.name);
+            sales.push({ year, age, name: old.name, net: oldNet / infl(i), reason: 'move' });
+            say(year, 'sell', `Sell ${old.name}, your current home, when you move into ${label}. After selling costs and paying out its loan, about ${fmt(oldNet)} goes towards the new home. There’s no capital gains tax on the home you live in.`);
+          } else if (old) {
+            // Rented out after being your home: its value now is its starting point for capital gains tax
+            old.home = false; old.invest = true; old.pay = 1; old.rent = oldRent; old.mgmt = (plan?.mgmtPct ?? 7) / 100; old.cost = old.value;
+            say(year, 'goal', `Move out of ${old.name} and rent it out for about ${fmt(oldRent / 52 / infl(i))} a week (in today’s money). From now it’s an investment property; its value today becomes its starting point for capital gains tax.`);
+          }
+          cash -= fromCash;
+          sims.push({ name: label, value: price, cost: price, debt: newLoan, rate, ioLeft: plan?.ioFirst5 === false ? 0 : 5, years: 30, rent: asHome ? 0 : price * (yieldPct / 100) * (50 / 52), costs: price * ((plan?.holdingPct ?? 1.2) / 100), mgmt: (plan?.mgmtPct ?? 7) / 100, g: growth, invest: !asHome, pay: asHome ? share : 1, payOff: asHome ? plan?.payOff !== false : !!plan?.payOff, home: asHome,
+            ng: !asHome && !!plan?.newBuild, ngUntil: !asHome && !plan?.newBuild ? 2027 : undefined, carry: 0, pid: plan?.id });
+          if (asHome && renting) { renting = false; baseLivingAdj -= housingMonthly(p); say(year, 'goal', `You stop paying rent once you move into ${label}.`); }
           if (grant) { giftIn += grant; }
           purchases.push({ year, price, id: plan?.id });
           bought = price;
           const via = [fromEquity > 1000 ? `${fmt(fromEquity)} of equity` : '', fromCash > 1000 ? `${fmt(fromCash)} of savings` : ''].filter(Boolean).join(' and ');
           const waited = prevBlock && waitFrom != null && waitFrom < year - 1 ? (prevBlock.reason === 'servicing' ? ' It can’t happen sooner because a lender wouldn’t lend enough on your income until now.' : ' It can’t happen sooner because your equity and savings don’t cover the deposit and costs until now.') : '';
-          const loanPlan = ` ${plan?.ioFirst5 === false ? 'Principal and interest from day one' : 'Interest-only for 5 years, then principal and interest'}${plan?.payOff ? `, paid off by ${retireAge}` : `. Sold at ${retireAge} if a loan is left`}.`;
+          const loanPlan = ` ${plan?.ioFirst5 === false ? 'Principal and interest from day one' : 'Interest-only for 5 years, then principal and interest'}${asHome ? (plan?.payOff !== false ? `, paid off by ${retireAge}` : `. Any loan left at ${retireAge} is paid from savings, then super`) : plan?.payOff ? `, paid off by ${retireAge}` : `. Sold at ${retireAge} if a loan is left`}.`;
           waitFrom = null;
           const fhbNote = fhb ? ` First home buyer help: ${[fhb.deposit5 && '5% deposit with no mortgage insurance', fhb.grant && `a ${fmt(grant)} First Home Owner Grant`, fhb.noStampDuty && 'no stamp duty'].filter(Boolean).join(', ') || 'none ticked'}.` : '';
-          const ngNote = !(plan?.firstHome && p.properties.length === 0 && k === 0) ? (plan?.newBuild ? ' As a new build it keeps negative gearing.' : ' As an established property bought after Budget night 2026, its rental losses can’t reduce your other tax from July 2027. They carry forward against its future rent.') : '';
-          say(year, 'buy', `Buy ${label}${fhb ? ' as your first home' : ''} for about ${fmt(price / infl(i))} (in today’s money; ${fmt(price)} at the time), using ${via || 'equity'} and borrowing ${fmt(newLoan)}.${waited}${fhb ? '' : loanPlan}${fhbNote}${ngNote}`);
+          const ngNote = !asHome ? (plan?.newBuild ? ' As a new build it keeps negative gearing.' : ' As an established property bought after Budget night 2026, its rental losses can’t reduce your other tax from July 2027. They carry forward against its future rent.') : '';
+          say(year, 'buy', `Buy ${label}${fhb ? ' as your first home' : asHome ? ' as your new home' : ''} for about ${fmt(price / infl(i))} (in today’s money; ${fmt(price)} at the time), using ${via || 'equity'} and borrowing ${fmt(newLoan)}.${waited}${fhb ? '' : loanPlan}${fhbNote}${ngNote}`);
         } else {
           if (waitFrom == null) waitFrom = year;
           block = { year, reason: deposit - usable > spare ? 'deposit' : 'servicing', price, deposit, available: usable + spare, monthlyShort: Math.max(0, pmt(rate + a.serviceBuffer, 30, total - spare) - pmt(rate + a.serviceBuffer, 30, maxLoan)) };
@@ -663,7 +680,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
     points.push({
       year, age, propertyValue, propertyDebt, propertyEquity: propertyValue - propertyDebt, shares: shares + sweepBal, cashShares: sweepBal, super: sup, cash,
       crypto: cryptoBal, netWorth: propertyValue - propertyDebt + shares + sweepBal + sup + cash + cryptoBal - Math.max(0, otherDebt) - Math.max(0, hecsBal),
-      passiveIncome, passiveIncomeReal: passiveIncome / infl(i), properties: sims.length,
+      passiveIncome, passiveIncomeReal: passiveIncome / infl(i), properties: sims.length, investProps: sims.filter((s) => s.invest).length,
       borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, false))) : 0,
       monthlySavings: monthlyNet, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
       spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, rentIncome: sims.filter((x) => x.invest).reduce((t, x) => t + x.rent, 0), superDrawn, paidOff: paidOff.length ? paidOff : undefined, sold: sold.length ? sold : undefined, payNet, investNet, saleIn, giftIn, liqIn, shareSaleIn, propSaleIn, propNet: propNetY, spending: working ? living : spendGoal, liquidated: liquidated || undefined,
@@ -681,3 +698,18 @@ const fmt = (v: number) => {
   if (x >= 1e4) return `${s}$${Math.round(x / 1e3)}k`;
   return `${s}$${Math.round(x).toLocaleString('en-AU')}`;
 };
+
+/** What the shares reach by retirement (today's money, to the nearest $1,000) as the plan stands. Used as the goal when the person set a monthly amount. */
+export function sharesGoalFromPlan(p: Profile, quotes: Quotes): number {
+  const years = Math.max(1, p.goals.retirementAge - (p.household.you.age ?? 35));
+  return Math.round(project(p, quotes).sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years) / 1000) * 1000;
+}
+
+/** The monthly amount (today's money, to the nearest $10) that reaches a shares goal by retirement, allowing for a delayed start. Null if it can't be reached. */
+export function monthlyForShareGoal(p: Profile, quotes: Quotes, target: number): number | null {
+  const at = (v: number) => { const x: Profile = JSON.parse(JSON.stringify(p)); x.goals.shareMonthly = v; return sharesGoalFromPlan(x, quotes); };
+  if (target <= 0 || at(30000) < target) return null;
+  let lo = 0, hi = 30000;
+  for (let k = 0; k < 16; k++) { const mid = (lo + hi) / 2; if (at(mid) >= target) hi = mid; else lo = mid; }
+  return Math.ceil(hi / 10) * 10;
+}
