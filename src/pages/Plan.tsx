@@ -721,6 +721,15 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
   const startAge = p.household.you.age ?? 35;
   const years = Math.max(1, p.goals.retirementAge - startAge);
   const realAtRetire = proj.sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years);
+  // A delayed start means fewer years of investing, so say so and show what starting now would give
+  const investing = proj.points.filter((x) => x.sharePlanned > 0);
+  const delayStart = p.goals.shareStartAfter && investing.length ? investing[0].year : null;
+  const investYears = investing.length;
+  const nowAtRetire = useMemo(() => {
+    if (delayStart == null) return null;
+    const x: typeof p = JSON.parse(JSON.stringify(p)); x.goals.shareStartAfter = null;
+    return project(x, quotes).sharesAtRetire / Math.pow(1 + p.assumptions.inflation / 100, years);
+  }, [p, quotes, years, delayStart]);
   const over = cap != null && proj.shareMonthly > cap.monthly + 1;
   // With a delayed start there are fewer years to invest, so work the monthly amount out from the projection itself
   const neededDelayed = useMemo(() => {
@@ -763,7 +772,7 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
                     {(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).map((pp, k) => <option key={pp.id} value={k + 1}>{pp.label || `property ${p.properties.length + k + 1}`}</option>)}
                   </select>
                 ) : ' my next property'}.
-                <span className="block text-xs text-muted">Your monthly amount stays the same. It just starts after that purchase.{p.goals.shareStartAfter && proj.purchases[p.goals.shareStartAfter - 1] ? ` On these numbers that’s ${proj.purchases[p.goals.shareStartAfter - 1].year + 1}.` : p.goals.shareStartAfter ? ' On these numbers that purchase doesn’t happen before you stop work, so no shares would be bought.' : ''}</span>
+                <span className="block text-xs text-muted">Your monthly amount stays the same. It just starts after that purchase.{p.goals.shareStartAfter && proj.purchases[p.goals.shareStartAfter - 1] && delayStart != null ? ` On these numbers that’s ${delayStart}.` : p.goals.shareStartAfter ? ' On these numbers that purchase doesn’t happen before you stop work, so no shares would be bought.' : ''}</span>
               </span>
             </label>
           </div>
@@ -774,9 +783,10 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
             <p className="font-display text-3xl font-semibold">{money(required)} <span className="text-base font-normal text-muted">a month</span></p>
             <p className="text-xs text-muted">{money(required * 12)} a year (in today’s money), rising with inflation, for {years} years.</p>
           </>) : !auto && proj.shareMonthly > 0 ? (<>
-            <p className="text-sm text-muted">By investing {money(proj.shareMonthly)} a month, you’d have about</p>
+            <p className="text-sm text-muted">{delayStart != null ? `Investing ${money(proj.shareMonthly)} a month from ${delayStart} (${investYears} ${investYears === 1 ? 'year' : 'years'} of investing), you’d have about` : `By investing ${money(proj.shareMonthly)} a month, you’d have about`}</p>
             <p className="font-display text-3xl font-semibold">{money(realAtRetire, { compact: true })} <span className="text-base font-normal text-muted">by {p.goals.retirementAge}</span></p>
             <p className="text-xs text-muted">In today’s money, at {p.assumptions.shareReturn}% a year.{p.goals.sharesTarget ? (realAtRetire >= p.goals.sharesTarget * 0.98 ? ` That meets your ${money(p.goals.sharesTarget, { compact: true })} target.` : ` That’s short of your ${money(p.goals.sharesTarget, { compact: true })} target.`) : ''}{proj.points.some((x) => x.sharePlanned > 0 && x.shareContribution < x.sharePlanned * 0.98) ? ' Some years your savings can’t cover the full amount, so less goes in.' : ''}</p>
+            {nowAtRetire != null && nowAtRetire > realAtRetire * 1.05 && <p className="mt-2 text-xs text-muted">If you started now instead, the same amount would grow to about <span className="font-semibold text-ink">{money(nowAtRetire, { compact: true })}</span> by {p.goals.retirementAge}.</p>}
             {p.goals.sharesTarget && realAtRetire < p.goals.sharesTarget * 0.98 ? <button className="btn-quiet mt-3 text-sm" onClick={() => update((d) => { d.goals.shareMonthly = d.goals.shareStartAfter ? needed : null; })}>Invest what’s needed for my target instead ({money(needed)} a month{p.goals.shareStartAfter ? ', from the later start' : ''})</button> : null}
           </>) : (
             <p className="text-sm text-muted">Enter a share portfolio value for retirement, or how much you’d invest each month, to see where it gets you by {p.goals.retirementAge}.</p>
