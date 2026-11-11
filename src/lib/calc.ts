@@ -60,9 +60,9 @@ export const retireCashLow = (p: Profile) => RETIRE_CASH_LOW_PER_PERSON * people
  */
 export const CASH_RATE_FALLBACK = 3.3;
 
-export function dependantsMonthly(p: Profile, yearsAhead = 0) {
+export function dependantsMonthly(p: Profile, yearsAhead = 0, withPlanned = true) {
   const year = new Date().getFullYear() + yearsAhead;
-  const planned = (p.goals.plannedChildren ?? []).filter((c) => year >= c.year && year < c.year + 18).length * CHILD_COST_YEAR / 12;
+  const planned = withPlanned ? (p.goals.plannedChildren ?? []).filter((c) => year >= c.year && year < c.year + 18).length * CHILD_COST_YEAR / 12 : 0;
   return planned + (p.household.dependantsDetail ?? []).reduce((a, d) => {
     if (d.age != null && d.age + yearsAhead >= d.supportUntil) return a;
     const year = new Date().getFullYear() + yearsAhead;
@@ -171,19 +171,45 @@ export function holdingsStats(holdings: Holding[], quotes: Quotes) {
 }
 
 /* ---------- Household position ---------- */
-export function livingFloor(p: Profile) {
-  const couple = p.household.hasPartner;
-  return (couple ? 3600 : 2400) + p.household.dependants.length * 650;
+/** Dependants being supported in a given year: children you have (until their support age) plus planned children under 18. */
+export function dependantCount(p: Profile, yearsAhead = 0) {
+  const year = new Date().getFullYear() + yearsAhead;
+  const detail = p.household.dependantsDetail ?? [];
+  const now = detail.length ? detail.filter((d) => d.age == null || d.age + yearsAhead < d.supportUntil).length : p.household.dependants.length;
+  return now + (p.goals.plannedChildren ?? []).filter((c) => year >= c.year && year < c.year + 18).length;
 }
+/**
+ * Living-cost floor a lender applies: an estimate of the HEM benchmark (Melbourne Institute) by household, before housing.
+ * Each dependant adds about $650 a month; published estimates put HEM at roughly $7,000 to $10,000 a year per child. Estimate.
+ */
+export function livingFloor(p: Profile, yearsAhead = 0) {
+  const couple = p.household.hasPartner;
+  return (couple ? 3600 : 2400) + dependantCount(p, yearsAhead) * 650;
+}
+/**
+ * Monthly living costs a lender uses (before housing): the higher of what you spend (with the costs you entered for
+ * children you have) and the HEM floor. Planned children count at the HEM amount, not the average cost of raising a child,
+ * because that's how lenders assess dependants.
+ */
+export const lenderLiving = (p: Profile, yearsAhead = 0) => Math.max(livingCosts(p) + dependantsMonthly(p, yearsAhead, false), livingFloor(p, yearsAhead));
+/**
+ * Rent counted for tax in a lender's test: 80% of the rent, less interest and property costs. Most lenders add back the tax
+ * saving from a rental loss, but since the May 2026 Budget only where negative gearing still applies (properties held before
+ * Budget night, and new builds); otherwise a loss doesn't reduce tax. Sources: Macquarie broker serviceability guide;
+ * The Adviser, "Macquarie scraps negative gearing add-backs for investors" (2026).
+ */
+const taxableRentForLender = (rent: number, interest: number, costs: number, geared: boolean) => { const net = rent * 0.8 - interest - costs; return geared ? net : Math.max(0, net); };
 
 export function borrowingCapacity(p: Profile, overrides: { cardLimitCut?: number } = {}) {
   const hh = p.household;
   const a = p.assumptions;
-  const rent = p.properties.reduce((s, pr) => s + n(pr.weeklyRent) * 52, 0) * 0.8;
-  const youGross = n(hh.you.salary) + n(hh.otherIncome) * 0.8 + rent;
+  const invest = p.properties.filter((pr) => pr.use === 'investment');
+  const rent = invest.reduce((s, pr) => s + n(pr.weeklyRent) * 52, 0) * 0.8;
+  const taxableRent = invest.reduce((s, pr) => s + taxableRentForLender(n(pr.weeklyRent) * 52, pr.loans.reduce((t, l) => t + n(l.balance) * rateOf(l) / 100, 0), n(pr.annualCosts) + n(pr.weeklyRent) * 52 * n(pr.managementPct) / 100, pr.oldNegGearing ?? (!pr.purchaseDate || pr.purchaseDate < '2026-05')), 0);
+  const youBase = n(hh.you.salary) + n(hh.otherIncome) * 0.8;
   const partnerGross = hh.hasPartner ? n(hh.partner.salary) : 0;
-  const netMonthly = (afterTax(youGross) + (partnerGross ? afterTax(partnerGross) : 0)) / 12;
-  const living = Math.max(livingCosts(p) + dependantsMonthly(p), livingFloor(p)) + housingMonthly(p);
+  const netMonthly = (afterTax(youBase + taxableRent) - taxableRent + rent + (partnerGross ? afterTax(partnerGross) : 0)) / 12;
+  const living = lenderLiving(p) + housingMonthly(p);
   const cardLimits = p.finances.debts.filter((d) => d.kind === 'credit-card').reduce((s, d) => s + n(d.limit), 0) - n(overrides.cardLimitCut);
   const commitments = p.finances.debts.filter((d) => d.kind !== 'credit-card' && d.kind !== 'hecs').reduce((s, d) => s + n(d.monthlyRepayment), 0) + Math.max(0, cardLimits) * 0.038
     + hecsAnnual(p).compulsory / 12;
@@ -324,6 +350,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
   const baseLiving = Math.max(livingCosts(p), livingFloor(p) - dependantsMonthly(p)) + housingMonthly(p);
   let living = (baseLiving + dependantsMonthly(p)) * 12;
   let baseLivingAdj = 0; // e.g. rent stops once a first home is bought
+  let lenderLivingY = (lenderLiving(p) + housingMonthly(p)) * 12; // what a lender counts: HEM for planned children, not their average cost
   let hecsBal = hecsAnnual(p).balance;
   const buffer = n(p.finances.buffer) || recommendedBuffer(p);
   const retireBuffer = p.goals.retireCash != null ? n(p.goals.retireCash) : retireCashMin(p);
@@ -338,9 +365,11 @@ export function project(p: Profile, quotes: Quotes): Projection {
   const otherRepay = () => debtSims.filter((d) => d.bal > 0).reduce((t, d) => t + d.monthly, 0) * 12;
   const cardLoad = p.finances.debts.filter((d) => d.kind === 'credit-card').reduce((t, d) => t + n(d.limit), 0) * 0.038 * 12;
   /** Monthly surplus as a lender would assess it. Car loans and cards only count against the first new purchase; after that they're assumed paid off. */
-  const serviceSurplus = (list: Sim[], ys: number, ps: number, liv: number, countOtherDebts: boolean) => {
+  const serviceSurplus = (list: Sim[], ys: number, ps: number, liv: number, countOtherDebts: boolean, year: number) => {
     const rent80 = list.reduce((t, s) => t + s.rent, 0) * 0.8;
-    const net = afterTax(ys + n(p.household.otherIncome) * 0.8 + rent80) + (ps ? afterTax(ps) : 0) - (hecsBal > 0 ? hecsAnnual(p, ys, ps).compulsory : 0);
+    const taxable = list.filter((s) => s.invest).reduce((t, s) => t + taxableRentForLender(s.rent, s.debt * s.rate / 100, s.costs + s.rent * s.mgmt, s.ng || (s.ngUntil != null && year <= s.ngUntil)), 0);
+    const base = ys + n(p.household.otherIncome) * 0.8;
+    const net = afterTax(base + taxable) - taxable + rent80 + (ps ? afterTax(ps) : 0) - (hecsBal > 0 ? hecsAnnual(p, ys, ps).compulsory : 0);
     const assessed = list.reduce((t, s) => t + pmt(s.rate + a.serviceBuffer, 30, s.debt) * 12, 0);
     const others = countOtherDebts ? otherRepay() + cardLoad : 0;
     return (net - liv - assessed - others) / 12;
@@ -456,6 +485,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       youSal = working ? nextSalary('you', youSal) : 0;
       partSal = working && p.household.hasPartner ? nextSalary('partner', partSal) : 0;
       living = (baseLiving + baseLivingAdj + dependantsMonthly(p, i)) * 12 * infl(i);
+      lenderLivingY = (lenderLiving(p, i) + housingMonthly(p) + baseLivingAdj) * 12 * infl(i);
       for (const c of p.goals.plannedChildren ?? []) {
         if (c.year === year) say(year, 'kids', `A new baby is planned. About ${fmt(CHILD_COST_YEAR)} a year (in today’s money) is added to your costs until they turn 18, based on the Australian average.`);
         if (c.year + 18 === year) say(year, 'kids', 'Your planned child turns 18: their costs drop out of your budget.');
@@ -654,7 +684,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         const sweepTax = (gross: number) => { const gf = sweepBal > 0 ? Math.max(0, 1 - sweepCost / sweepBal) : 0; return Math.max(0, incomeTax(incNow + gross * gf * 0.5) - incomeTax(incNow)); };
         if (sweepBal > 1) spare += sweepBal - sweepTax(sweepBal);
         // The most a lender would lend now (car loans and cards only count for the first new purchase)
-        const maxLoan = Math.max(0, pv(rate + a.serviceBuffer, 30, serviceSurplus(assessed, youSal, partSal, living, k === 0)));
+        const maxLoan = Math.max(0, pv(rate + a.serviceBuffer, 30, serviceSurplus(assessed, youSal, partSal, lenderLivingY, k === 0, year)));
         // Cash needed: at least whatever equity can't cover of the deposit, and enough to keep the loan within what a lender allows
         const total = price * (1 + costsPct) - grant;
         const needCash = Math.max(0, deposit - usable, total - maxLoan);
@@ -718,7 +748,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
       year, age, propertyValue, propertyDebt, propertyEquity: propertyValue - propertyDebt, shares: shares + sweepBal, cashShares: sweepBal, super: sup, cash,
       crypto: cryptoBal, netWorth: propertyValue - propertyDebt + shares + sweepBal + sup + cash + cryptoBal - Math.max(0, otherDebt) - Math.max(0, hecsBal),
       passiveIncome, passiveIncomeReal: passiveIncome / infl(i), properties: sims.length, investProps: sims.filter((s) => s.invest).length,
-      borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, living, false))) : 0,
+      borrowing: i === 0 ? pos.bc.capacity : working ? Math.max(0, pv(a.newLoanRate + a.serviceBuffer, 30, serviceSurplus(sims, youSal, partSal, lenderLivingY, false, year))) : 0,
       monthlySavings: monthlyNet, spareToShares, repayUp2: totalRepay(2), repayBase: totalRepay(0), repayDown2: totalRepay(-2), bought,
       spendGoalReal: working ? p.goals.passiveIncome : spendGoal / infl(i), spendFundedReal: working ? passiveIncome / infl(i) : spendFunded / infl(i), shareContribution: contribution, sharePlanned, rentIncome: sims.filter((x) => x.invest).reduce((t, x) => t + x.rent, 0), superDrawn, paidOff: paidOff.length ? paidOff : undefined, sold: sold.length ? sold : undefined, payNet, investNet, saleIn, giftIn, liqIn, shareSaleIn, propSaleIn, propNet: propNetY, spending: working ? living : spendGoal, liquidated: liquidated || undefined,
     });
