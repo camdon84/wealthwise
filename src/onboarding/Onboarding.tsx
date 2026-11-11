@@ -297,6 +297,21 @@ export function Spending(_: { thorough: boolean }) {
                   {isHecs && <Field label="Extra repayments">{(id) => <MoneyInput id={id} value={d.voluntaryMonthly ?? null} onChange={(v) => setDebt(d.id, { voluntaryMonthly: v })} suffix="/ mo" />}</Field>}
                   <div className="flex items-end"><button type="button" className="btn-ghost" onClick={() => update((x) => { x.finances.debts = x.finances.debts.filter((y) => y.id !== d.id); })}><Icon name="trash" className="h-4 w-4" />Remove</button></div>
                 </div>
+                {!isHecs && d.kind !== 'credit-card' && (d.balance ?? 0) > 0 && (d.monthlyRepayment ?? 0) > 0 && (() => {
+                  // Same yearly method as the projection: interest on what's owing, less a year of repayments
+                  const rate = (d.rate ?? DEBT_RATE[d.kind] ?? 10) / 100, pay = (d.monthlyRepayment ?? 0) * 12;
+                  let bal = d.balance ?? 0, years = 0;
+                  while (bal > 1 && years < 60 && pay > bal * rate) { bal = bal + bal * rate - pay; years++; }
+                  const never = pay <= (d.balance ?? 0) * rate;
+                  const long = years > 7;
+                  return (
+                    <p className={`mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${never || long ? 'bg-brass/10' : 'bg-raised'}`}>
+                      {(never || long) && <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0 text-brass" />}
+                      <span>{never ? 'This repayment doesn’t cover the interest, so the loan would never be paid off. Check it’s your monthly amount.'
+                        : `At this repayment, it’s paid off in ${years === 1 ? 'about a year' : `about ${years} years`} (${new Date().getFullYear() + years}).${long ? ' Check it’s your monthly amount.' : ''}`}</span>
+                    </p>
+                  );
+                })()}
                 {isHecs && (d.balance ?? 0) > 0 && (
                   <p className="mt-3 rounded-lg bg-raised px-3 py-2 text-sm">
                     {income > 0

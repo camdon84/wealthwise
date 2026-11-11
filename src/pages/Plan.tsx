@@ -390,7 +390,7 @@ function OwnedRow({ pr, n, open, onToggle, retireAge, startAge }: { pr: Property
   const home = pr.use === 'home';
   const io5 = !!pr.planIo5;
   const payOff = !!pr.planPayOff;
-  const years = Math.max(1, retireAge - startAge - (io5 ? 5 : 0));
+  const years = Math.max(1, retireAge - startAge - 1 - (io5 ? 5 : 0)); // repayments run from next year to the last working year, as in the projection
   const payOffMonthly = s.debt > 0 ? pmt(s.avgRate || p.assumptions.newLoanRate, years, s.debt) : 0;
   const chips = [home ? 'Home' : 'Investment', s.debt > 0 ? (io5 ? 'Interest-only for 5 years' : 'Principal and interest') : 'No loan', s.debt > 0 ? (payOff ? `Paid off by ${retireAge}` : home ? `Loan cleared from super at retirement` : `Sold at ${retireAge} if a loan is left`) : 'Owned outright'];
   return (

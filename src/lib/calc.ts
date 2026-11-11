@@ -388,13 +388,14 @@ export function project(p: Profile, quotes: Quotes): Projection {
         s.rent *= 1 + a.rentGrowth / 100;
         s.costs *= 1 + a.inflation / 100;
         const interest = (s.debt * s.rate) / 100;
-        const toRetire = retireYear - year + 1; // years of repayments left before work stops, counting this one
+        const toRetire = retireYear - year; // working years left, counting this one (the stop-work year itself has no pay, so it isn't one)
         let repay = interest;
         if (s.debt > 0) {
           if (s.ioLeft > 0 && !(s.payOff && working && toRetire <= 1)) { s.ioLeft--; }
           else {
             const term = s.payOff && working ? Math.max(1, Math.min(s.years, toRetire)) : s.years;
-            repay = Math.min(s.debt + interest, pmt(s.rate, term, s.debt) * 12);
+            // Set to be paid off by retirement: the last working year clears whatever is left
+            repay = s.payOff && working && toRetire <= 1 ? s.debt + interest : Math.min(s.debt + interest, pmt(s.rate, term, s.debt) * 12);
             s.debt = Math.max(0, s.debt - (repay - interest));
           }
         }

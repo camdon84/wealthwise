@@ -175,6 +175,7 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
   - The boxes size to their content and don't stretch to the bottom.
   - **"Planning a big purchase?"** (just above "Planning to have children?"): description, cost (today's money) and year for each, stored in `goals.events`. The engine inflates each cost to its year and takes it from savings (this year's ones land next year, like gifts). It's also in onboarding, the inflation update, Wise Actions ("Set money aside: …" within 2 years) and the AI facts.
 - **Property Portfolio:** each planned purchase is "An investment" or "My home to live in" (`use`).
+  - **Paid off by retirement** means the loan is cleared in the last working year (the year before the stop-work age). Fixed November 2026: the engine used to count the stop-work year as a repayment year, so these loans were only partly repaid and dragged on for decades. Paying everything off by retirement can now show (correctly) as unaffordable; Plan Check's tested fix is to sell the investments at retirement instead.
   - A home earns no rent, has no negative gearing or capital gains tax, and its loan is paid off by retirement by default (otherwise paid from savings, then super). Rental yield, management and the new-build box are hidden for a home, and the stamp duty field notes the home concession.
   - Moving out of a home you own (or an earlier planned home): "Keep it and rent it out" (its rent counts for borrowing; its CGT cost base resets to its value then) or "Sell it" (no CGT; the money goes towards the new home, and it's listed under "Property sales already in your plan").
   - Rent stops when you first move into a home you own. First home buyer benefits only show for a first home you live in.
@@ -237,7 +238,7 @@ In the sidebar under Wise Plan, with a badge that counts items needing attention
   - The range buttons sit next to the title, with the arrows on the same line.
   - Holdings: a table from `sm` up; on phones a compact list (code, units, price, today's move, value and gain).
 - **My Details:**
-  - Tabs: "Work and Income", "Home and Living Costs", "Cash, Superannuation and Debts", "Dependants".
+  - Tabs: "Work and Income", "Living Costs and Debt" (housing, living costs and debts), "Savings and Superannuation" (cash, offsets, emergency buffer and super), "Dependants". Each debt with a repayment shows when it's paid off; an alert asks them to check it's monthly if it never clears or takes over 7 years.
   - Cash is entered as "Total cash and savings at bank, excluding any offset accounts", plus an offset block for each property.
   - The offset is read-only in the property editor, with the hint "This value can only be edited in your My Details tab."
   - Super is shown as "Cameron's superannuation balance", with optional Provider and Policy / account number fields.

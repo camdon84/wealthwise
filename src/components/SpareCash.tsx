@@ -17,6 +17,15 @@ function Pick({ label, value, onChange, options }: { label: string; value: Choic
     </div>
   );
 }
+/** "All your loans are paid off by 2048." or "Loans paid off: A and B in 2041, C in 2048." */
+function loansLine(paid: { year: number; name: string }[], all: boolean) {
+  if (!paid.length) return null;
+  const years = [...new Set(paid.map((x) => x.year))].sort((a, b) => a - b);
+  const groups = years.map((y) => `${listJoin(paid.filter((x) => x.year === y).map((x) => x.name))} in ${y}`);
+  if (all && years.length === 1) return <> All your loans are paid off in <strong>{years[0]}</strong>.</>;
+  if (paid.length === 1) return <> The {paid[0].name} loan is paid off in {paid[0].year}.</>;
+  return <> {all ? 'All your loans are paid off by' : 'Loans paid off:'} {all ? <><strong>{years[years.length - 1]}</strong> ({groups.join('; ')})</> : groups.join('; ')}.</>;
+}
 const withGoals = (p: Profile, g: Partial<Profile['goals']>): Profile => ({ ...p, goals: { ...p.goals, ...g } });
 
 /**
@@ -43,7 +52,10 @@ export function SpareCash({ quotes, onGoals }: { quotes: Quotes; onGoals: () => 
     const planned = Math.max(0, g.targetProperties - owned);
     const lastBuy = planned > 0 ? noWork.purchases[planned - 1] ?? null : null;
     const lastName = planned > 0 ? (p.plannedPurchases ?? [])[planned - 1]?.label || `Property ${g.targetProperties}` : '';
-    const paid = noWork.loansPaid.filter((x) => x.year < cur.retireYear);
+    const paid = noWork.loansPaid.filter((x) => x.year <= cur.retireYear);
+    const later = noWork.loansPaid.filter((x) => x.year > cur.retireYear); // cleared from savings or super after work stops
+    const fromYear = lastBuy?.year ?? noWork.points[0].year;
+    const owingAfterBuy = noWork.points.slice(0, ri).some((x) => x.year >= fromYear && x.propertyDebt > 1000);
     const soldAtRetire = noWork.sales.filter((x) => x.year === cur.retireYear && x.reason === 'loan').map((x) => x.name);
     const moved = cur.points.slice(0, ri).reduce((t, x, i) => t + x.spareToShares / inf(i), 0);
     const sharesAt = (r: typeof cur) => r.sharesAtRetire / inf(ri);
@@ -51,8 +63,8 @@ export function SpareCash({ quotes, onGoals }: { quotes: Quotes; onGoals: () => 
     const peak = retired.reduce((m, x) => (x.v > m.v ? x : m), { year: 0, v: 0 });
     const endOf = (r: typeof cur) => Math.max(0, r.points[r.points.length - 1].netWorth) / inf(r.points.length - 1);
     return {
-      cur, ri, owned, planned, lastBuy, lastName, paid, soldAtRetire, moved, peak,
-      cashBefore: before ? before.cash / inf(ri - 1) : 0, debtBefore: before?.propertyDebt ?? 0,
+      cur, ri, owned, planned, lastBuy, lastName, paid, later, owingAfterBuy, soldAtRetire, moved, peak,
+      cashBefore: before ? before.cash / inf(ri - 1) : 0,
       sharesWith: sharesAt(cur), sharesWithout: sharesAt(noWork),
       endKeep: endOf(noRetire), endInvest: endOf(yesRetire), lastsKeep: noRetire.runsOutAge, lastsInvest: yesRetire.runsOutAge,
     };
@@ -79,9 +91,9 @@ export function SpareCash({ quotes, onGoals }: { quotes: Quotes; onGoals: () => 
               : f.lastBuy
                 ? <>You buy your last property, {f.lastName}, in <strong>{f.lastBuy.year}</strong>.</>
                 : <>{f.lastName} doesn’t fit before you stop work yet, so this step only starts once it’s bought.</>}
-              {f.paid.length === 1 && <> The loan on {f.paid[0].name} is paid off in {f.paid[0].year}.</>}
-              {f.paid.length > 1 && <> Loans paid off: {listJoin(f.paid.map((x) => `${x.name} in ${x.year}`))}.</>}
-              {f.debtBefore > 1000 && <> {f.soldAtRetire.length ? `${listJoin(f.soldAtRetire)} ${f.soldAtRetire.length === 1 ? 'still has a loan' : 'still have loans'} when you stop work.` : 'Some loans are still owing when you stop work.'}</>}
+              {loansLine(f.paid, f.soldAtRetire.length + f.later.length === 0)}
+              {f.soldAtRetire.length > 0 && <> {listJoin(f.soldAtRetire)} {f.soldAtRetire.length === 1 ? 'isn’t' : 'aren’t'} set to be paid off, so {f.soldAtRetire.length === 1 ? 'it’s' : 'they’re'} sold when you stop work.</>}
+              {f.later.map((x) => <span key={x.name}> The rest of the {x.name} loan is paid from savings and super by {x.year}.</span>)}
             </p>
             {allBought && <p>Left in the bank, your cash reaches about <strong>{money(f.cashBefore, { compact: true })}</strong> by {f.cur.retireYear - 1} (in today’s money).</p>}
           </div>
@@ -92,11 +104,11 @@ export function SpareCash({ quotes, onGoals }: { quotes: Quotes; onGoals: () => 
           {work === 'invest' && (
             <div className="mt-4 space-y-3">
               <div className="max-w-xs"><Field label="Keep this much in the bank" hint={`Anything over this goes into shares (in today’s money). It never drops below your ${money(buffer)} emergency fund.`}>{(id) => <MoneyInput id={id} value={g.spareCashAbove ?? null} onChange={(v) => update((d) => { d.goals.spareCashAbove = v ?? 0; })} />}</Field></div>
-              {f.debtBefore > 1000 && <p className="text-xs text-muted">Cash in your offset accounts stays there until those loans are paid off, so only cash beyond that is invested.</p>}
+              {f.owingAfterBuy && <p className="text-xs text-muted">Cash in your offset accounts stays there until those loans are paid off, so only cash beyond that is invested.</p>}
               <p className="rounded-lg bg-gum/10 px-3 py-2 text-sm ring-1 ring-gum/30">{f.moved > 1000
                 ? <>About <strong>{money(f.moved, { compact: true })}</strong> goes into shares by {stopAge}, so your shares reach about <strong>{money(f.sharesWith, { compact: true })}</strong> instead of {money(f.sharesWithout, { compact: true })} (in today’s money).</>
                 : !allBought ? 'Nothing extra goes into shares until your last property is bought.'
-                  : f.debtBefore > 1000 ? 'On these numbers, your offset accounts need all your cash until you stop work, so nothing extra goes into shares before then.'
+                  : f.owingAfterBuy ? 'On these numbers, your offset accounts need all your cash while your loans are owing, so nothing extra goes into shares before you stop work.'
                     : 'On these numbers, your cash doesn’t pass this amount before you stop work, so nothing extra goes into shares.'}</p>
             </div>
           )}
@@ -107,7 +119,7 @@ export function SpareCash({ quotes, onGoals }: { quotes: Quotes; onGoals: () => 
           <p className="text-xs font-semibold uppercase tracking-wide text-brass">Step 2</p>
           <h3 className="font-display text-lg font-semibold">Once you stop work</h3>
           <div className="mt-2 space-y-1.5 text-sm leading-relaxed">
-            <p>You stop work at {stopAge}{f.soldAtRetire.length ? <> and sell {listJoin(f.soldAtRetire)}</> : null}. You want to keep at least <strong>{money(keepMin)}</strong> in the bank (in today’s money).{' '}
+            <p>You stop work at {stopAge}. You want to keep at least <strong>{money(keepMin)}</strong> in the bank (in today’s money).{' '}
               <button className="font-medium text-brass hover:underline" onClick={onGoals}>Change it in Goals</button></p>
             {f.peak.v > keepMin * 1.2 && <p>Left in the bank, your cash reaches about <strong>{money(f.peak.v, { compact: true })}</strong> by {f.peak.year} (in today’s money).</p>}
           </div>
