@@ -43,8 +43,17 @@ export function hecsCompulsory(income: number) {
 }
 
 /** Monthly cost of dependants this year, or `yearsAhead` from now (costs stop at each one's support age). */
-/** Average cost of raising a child in Australia, birth to 18 (about $474k in 2026 dollars), spread evenly. */
-export const CHILD_COST_YEAR = 474000 / 18;
+/**
+ * Average cost of raising a child in Australia, birth to 18: about $474k in 2026 dollars. Weighted to when it's spent
+ * (Cameron's call): $5,000 a year for the first 6 years, and the rest spread over ages 6 to 17 (about $37,000 a year).
+ */
+export const CHILD_COST_TOTAL = 474000;
+export const CHILD_COST_EARLY = 5000; // a year, first 6 years
+export const CHILD_EARLY_YEARS = 6;
+export const CHILD_COST_LATER = (CHILD_COST_TOTAL - CHILD_COST_EARLY * CHILD_EARLY_YEARS) / (18 - CHILD_EARLY_YEARS); // a year, ages 6 to 17
+/** Yearly cost of a planned child in its nth year (0 = the year it's born), today's money. */
+const full = (v: number) => `$${(Math.round(v / 100) * 100).toLocaleString('en-AU')}`;
+export const childCostYear = (n: number) => (n < 0 || n >= 18 ? 0 : n < CHILD_EARLY_YEARS ? CHILD_COST_EARLY : CHILD_COST_LATER);
 /**
  * Cash we suggest keeping on hand in retirement, today's money: $100,000 to $200,000 per person (WealthWise's own
  * recommendation, not a rule). The top of the range is the default when they leave it blank; below the bottom we flag it.
@@ -62,7 +71,7 @@ export const CASH_RATE_FALLBACK = 3.3;
 
 export function dependantsMonthly(p: Profile, yearsAhead = 0, withPlanned = true) {
   const year = new Date().getFullYear() + yearsAhead;
-  const planned = withPlanned ? (p.goals.plannedChildren ?? []).filter((c) => year >= c.year && year < c.year + 18).length * CHILD_COST_YEAR / 12 : 0;
+  const planned = withPlanned ? (p.goals.plannedChildren ?? []).reduce((t, c) => t + childCostYear(year - c.year), 0) / 12 : 0;
   return planned + (p.household.dependantsDetail ?? []).reduce((a, d) => {
     if (d.age != null && d.age + yearsAhead >= d.supportUntil) return a;
     const year = new Date().getFullYear() + yearsAhead;
@@ -487,7 +496,8 @@ export function project(p: Profile, quotes: Quotes): Projection {
       living = (baseLiving + baseLivingAdj + dependantsMonthly(p, i)) * 12 * infl(i);
       lenderLivingY = (lenderLiving(p, i) + housingMonthly(p) + baseLivingAdj) * 12 * infl(i);
       for (const c of p.goals.plannedChildren ?? []) {
-        if (c.year === year) say(year, 'kids', `A new baby is planned. About ${fmt(CHILD_COST_YEAR)} a year (in today’s money) is added to your costs until they turn 18, based on the Australian average.`);
+        if (c.year === year) say(year, 'kids', `A new baby is planned. About ${full(CHILD_COST_EARLY)} a year (in today’s money) is added to your costs for the first ${CHILD_EARLY_YEARS} years, then about ${full(CHILD_COST_LATER)} a year until they turn 18, based on the Australian average.`);
+        if (c.year + CHILD_EARLY_YEARS === year) say(year, 'kids', `Your planned child turns ${CHILD_EARLY_YEARS}: their costs rise to about ${full(CHILD_COST_LATER)} a year (in today’s money) until they turn 18.`);
         if (c.year + 18 === year) say(year, 'kids', 'Your planned child turns 18: their costs drop out of your budget.');
       }
       for (const d of p.household.dependantsDetail ?? []) if (d.age != null && d.age + i === d.supportUntil && !kidsEnd.has(d.id)) { kidsEnd.add(d.id); say(year, 'kids', `${d.name || 'A dependant'} turns ${d.supportUntil}: their costs drop out of your budget.`); }

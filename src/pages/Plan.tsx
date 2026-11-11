@@ -2,7 +2,7 @@ import { SpareCash } from '../components/SpareCash';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
 import { applySnapshot, newForecast, PlanProvider, snapshot, useForecast, usePlanMode, usePlanProfile, usePlanUpdate, type PlanCtx } from '../lib/planContext';
-import { CHILD_COST_YEAR, RETIRE_CASH_LOW_PER_PERSON, RETIRE_CASH_PER_PERSON, retireCashLow, retireCashMin, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, monthlyForShareGoal, type Quotes } from '../lib/calc';
+import { CHILD_COST_EARLY, CHILD_COST_LATER, CHILD_EARLY_YEARS, RETIRE_CASH_LOW_PER_PERSON, RETIRE_CASH_PER_PERSON, retireCashLow, retireCashMin, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, monthlyForShareGoal, type Quotes } from '../lib/calc';
 import { holdingValue, liquidationEstimate, maxShareMonthly, planCheck, propertyValueIn } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { CashTab } from './CashTab';
@@ -229,7 +229,7 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
           </div>
           <div className="mt-4 sm:col-span-2">
             <h2 className="font-display text-xl font-semibold">Planning to have children?</h2>
-            <p className="mt-1 mb-3 text-xs text-muted">Add the year you expect each one. We allow the Australian average of about {money(CHILD_COST_YEAR)} a year per child until 18 (in today’s money). Children you already have go in My Details, under Dependants.</p>
+            <p className="mt-1 mb-3 text-xs text-muted">Add the year you expect each one. We allow the Australian average cost of raising a child: about {money(CHILD_COST_EARLY)} a year for the first {CHILD_EARLY_YEARS} years, then about {money(CHILD_COST_LATER)} a year until 18 (in today’s money). Children you already have go in My Details, under Dependants.</p>
             <div className="space-y-2">
               {(g.plannedChildren ?? []).map((c, k) => (
                 <div key={c.id} className="flex items-center gap-2">
