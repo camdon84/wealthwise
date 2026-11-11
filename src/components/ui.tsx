@@ -148,6 +148,7 @@ export function Icon({ name, className = 'h-5 w-5' }: { name: string; className?
     trash: <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />,
     menu: <path d="M4 6h16M4 12h16M4 18h16" />,
     details: <path d="M5 4h14v16H5zM9 8h6M9 12h6M9 16h4" />,
+    alert: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5v6M12 16.5v.01" /></>,
     family: <path d="M8 11a3 3 0 100-6 3 3 0 000 6zM17 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM2 20c.6-3.4 3-5 6-5s5.4 1.6 6 5M14 20c.3-2.3 1.6-3.8 3.5-3.8S21 17.7 21.5 20" />,
   };
   return (

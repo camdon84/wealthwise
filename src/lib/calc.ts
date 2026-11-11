@@ -45,9 +45,15 @@ export function hecsCompulsory(income: number) {
 /** Monthly cost of dependants this year, or `yearsAhead` from now (costs stop at each one's support age). */
 /** Average cost of raising a child in Australia, birth to 18 (about $474k in 2026 dollars), spread evenly. */
 export const CHILD_COST_YEAR = 474000 / 18;
-/** Cash we suggest keeping on hand in retirement, today's money: $200,000 per person (WealthWise's own recommendation, not a rule). */
+/**
+ * Cash we suggest keeping on hand in retirement, today's money: $100,000 to $200,000 per person (WealthWise's own
+ * recommendation, not a rule). The top of the range is the default when they leave it blank; below the bottom we flag it.
+ */
 export const RETIRE_CASH_PER_PERSON = 200000;
-export const retireCashMin = (p: Profile) => RETIRE_CASH_PER_PERSON * (p.household.hasPartner ? 2 : 1);
+export const RETIRE_CASH_LOW_PER_PERSON = 100000;
+const people = (p: Profile) => (p.household.hasPartner ? 2 : 1);
+export const retireCashMin = (p: Profile) => RETIRE_CASH_PER_PERSON * people(p);
+export const retireCashLow = (p: Profile) => RETIRE_CASH_LOW_PER_PERSON * people(p);
 /**
  * What cash earns when it has no loan to offset and there's no Cash Reserves plan: the RBA's average online
  * savings rate (table F4, FRDIRSAO10K, 3.3% in October 2026). An estimate: no bonus conditions assumed, held for the whole plan.

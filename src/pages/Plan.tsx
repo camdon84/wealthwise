@@ -2,7 +2,7 @@ import { SpareCash } from '../components/SpareCash';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, useNavIntent } from '../lib/store';
 import { applySnapshot, newForecast, PlanProvider, snapshot, useForecast, usePlanMode, usePlanProfile, usePlanUpdate, type PlanCtx } from '../lib/planContext';
-import { CHILD_COST_YEAR, RETIRE_CASH_PER_PERSON, retireCashMin, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, monthlyForShareGoal, type Quotes } from '../lib/calc';
+import { CHILD_COST_YEAR, RETIRE_CASH_LOW_PER_PERSON, RETIRE_CASH_PER_PERSON, retireCashLow, retireCashMin, pmt, position, project, propertyStats, recommendedBuffer, requiredShareMonthly, monthlyForShareGoal, type Quotes } from '../lib/calc';
 import { holdingValue, liquidationEstimate, maxShareMonthly, planCheck, propertyValueIn } from '../lib/planCheck';
 import { PlanCheckBox } from '../components/PlanCheck';
 import { CashTab } from './CashTab';
@@ -196,10 +196,15 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
           <Field label="Yearly income after retirement" hint="What you want to live on each year after you stop work (in today’s money). The plan sells shares and properties if needed.">{(id) => <MoneyInput id={id} value={g.passiveIncome} onChange={(v) => update((d) => { d.goals.passiveIncome = v ?? 0; })} suffix="/ year" />}</Field>
           <div className="mt-4 sm:col-span-2">
             <h2 className="font-display text-xl font-semibold">Cash reserves in retirement</h2>
-            <p className="mt-1 mb-3 text-xs text-muted">It’s worth staying more liquid in retirement, so you can pay for anything unforeseen without having to sell an asset. We recommend at least {money(RETIRE_CASH_PER_PERSON)} per person as a minimum{p.household.hasPartner ? ` (${money(retireCashMin(p))} for the two of you)` : ''}. Once you retire, this replaces the emergency fund you set in My Details.</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div><Field label="Accessible cash reserves in retirement" hint="The least you want in your bank accounts at all times (in today’s money).">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder={retireCashMin(p).toLocaleString('en-AU')} />}</Field>
-                {g.retireCash != null && g.retireCash < retireCashMin(p) && <p role="status" className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-sm">That’s below the {money(retireCashMin(p))} we recommend.</p>}</div>
+            <p className="mt-1 mb-3 text-xs text-muted">It’s worth staying more liquid in retirement, so you can pay for anything unforeseen without having to sell an asset. We recommend {money(RETIRE_CASH_LOW_PER_PERSON)} to {money(RETIRE_CASH_PER_PERSON)} per person as a minimum{p.household.hasPartner ? ` (${money(retireCashLow(p))} to ${money(retireCashMin(p))} for the two of you)` : ''}. Once you retire, this replaces the emergency fund you set in My Details.</p>
+            <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+              <Field label="Accessible cash reserves in retirement" hint="The least you want in your bank accounts at all times (in today’s money).">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder={retireCashMin(p).toLocaleString('en-AU')} />}</Field>
+              {g.retireCash != null && g.retireCash < retireCashLow(p) && (
+                <p role="status" className="flex items-start gap-2 self-start rounded-lg bg-brass/10 px-3 py-2 text-sm sm:mt-7">
+                  <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0 text-brass" />
+                  <span>We recommend at least {money(retireCashLow(p))}{p.household.hasPartner ? ' for the two of you' : ''}.</span>
+                </p>
+              )}
             </div>
             <div className="mt-3 rounded-xl bg-raised p-4 ring-1 ring-line">
               <p className="text-sm">Once you reach your minimum, you may want to keep growing your money in high-interest accounts, or invest anything over it in shares.</p>
