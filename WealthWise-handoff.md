@@ -275,7 +275,7 @@ These rules are enforced in the prompts and also by filters in `worker/index.ts`
 ## 8. Open ideas (not started; ask me before doing any)
 
 1. Update the engine for the 2027 CGT rules.
-2. Change the default assumption when there's no cash plan (currently all cash is treated as offset against debt).
+2. Change the default assumption when there's no cash plan (currently all cash is treated as offset against debt, and any cash beyond the debt earns 3.3%).
 3. Add an interest-only loan premium.
 4. Add a borrowing capacity explainer.
 5. Add suburb data (see below).
