@@ -772,7 +772,12 @@ function SharesPlan({ quotes }: { quotes: Quotes }) {
                     {(p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - p.properties.length)).map((pp, k) => <option key={pp.id} value={k + 1}>{pp.label || `property ${p.properties.length + k + 1}`}</option>)}
                   </select>
                 ) : ' my next property'}.
-                <span className="block text-xs text-muted">Your monthly amount stays the same. It just starts after that purchase.{p.goals.shareStartAfter && proj.purchases[p.goals.shareStartAfter - 1] && delayStart != null ? ` On these numbers that’s ${delayStart}.` : p.goals.shareStartAfter ? ' On these numbers that purchase doesn’t happen before you stop work, so no shares would be bought.' : ''}</span>
+                <span className="block text-xs text-muted">Your monthly amount stays the same. It just starts after that purchase.{p.goals.shareStartAfter && proj.purchases[p.goals.shareStartAfter - 1] && delayStart != null ? (() => {
+                  const pp = (p.plannedPurchases ?? [])[p.goals.shareStartAfter - 1];
+                  const got = proj.purchases[p.goals.shareStartAfter - 1].year;
+                  const name = pp?.label || `Property ${p.properties.length + p.goals.shareStartAfter}`;
+                  return pp?.buyBy && got >= pp.buyBy ? ` You want to buy ${name} before ${pp.buyBy}, but on your numbers the earliest it fits is ${got}, so shares start in ${delayStart}.` : ` On these numbers that’s ${delayStart}.`;
+                })() : p.goals.shareStartAfter ? ' On these numbers that purchase doesn’t happen before you stop work, so no shares would be bought.' : ''}</span>
               </span>
             </label>
           </div>
