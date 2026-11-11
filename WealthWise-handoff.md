@@ -94,7 +94,7 @@ This is one of the most important things.
 - **Claude preview artifact.** A copy of the app runs as a Claude artifact on demo data:
   - slug `426277df-a86e-4fce-b44a-40e1f0c7bdee`
   - URL https://claude.ai/artifact/9CTFY1vT9D9F4XH3Yo8him
-  - latest version `1794365735-37fa`
+  - latest version `1794367668-05e7`
   - Build it with `npx vite build --mode preview --outDir dist-preview`.
   - Publish with mode `replace`, including `index.html`, `assets/index-*.js`, `assets/index-*.css`, `samples/{loan,super,valuation}-sample.pdf` and `demo/*.jpg`.
 - **Admin portal:** https://wealthwise-admin.cam-donley.workers.dev (separate Worker `wealthwise-admin`, same D1 database).
