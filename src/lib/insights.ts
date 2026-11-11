@@ -281,6 +281,7 @@ export function planSettings(p: Profile, proj: { purchases: { year: number }[]; 
       alreadyOnHoldUntilPropertyNumber: hold > 0 ? owned + hold : null,
       startsInYear: hold > 0 ? proj.purchases[hold - 1]?.year ?? null : new Date().getFullYear(),
     },
+    bigPurchasesTodayDollars: p.goals.events.filter((ev) => ev.amount > 0).map((ev) => ({ what: ev.label || 'big purchase', year: ev.year, cost: Math.round(ev.amount / 1000) * 1000 })),
     plannedPurchases: (p.plannedPurchases ?? []).slice(0, Math.max(0, p.goals.targetProperties - owned)).map((pp, k) => ({
       name: pp.label || `Property ${owned + k + 1}`,
       priceTodayDollars: Math.round(pp.price / 5000) * 5000,

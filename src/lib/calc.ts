@@ -516,7 +516,8 @@ export function project(p: Profile, quotes: Quotes): Projection {
         say(year, 'sell', `Sell ${s.name} for about ${fmt(s.value / infl(i))} (in today’s money)${why}, freeing about ${fmt(proceeds / infl(i))} after the loan, selling costs and tax.`);
       };
 
-      const eventCost = p.goals.events.filter((ev) => ev.year === year).reduce((t, ev) => t + n(ev.amount), 0) + renoCost;
+      const bigBuys = p.goals.events.filter((ev) => Math.max(ev.year, y0 + 1) === year && n(ev.amount) > 0); // big purchases, in today's money
+      const eventCost = bigBuys.reduce((t, ev) => t + n(ev.amount) * infl(i), 0) + renoCost;
       if (working) {
         cash += net + propNet + offsetSaving - living - debtRepay - eventCost - rentTax; // planned one-off costs come before investing
         // Shares are bought only from savings above the emergency fund: you can't invest money you don't have
@@ -586,7 +587,7 @@ export function project(p: Profile, quotes: Quotes): Projection {
         spendFunded = cash >= 0 ? spendGoal : Math.max(0, spendGoal + cash);
         if (cash < 0 && runsOutAge == null) { runsOutAge = age; say(year, 'runout', `Money runs out at ${age}: your super, rent, savings and investments can no longer fund ${fmt(p.goals.passiveIncome)} a year.${sims.some((x) => x.home) ? ' You’d still own your home, which is why the chart keeps a balance after this point.' : ''}`); }
       }
-      for (const ev of p.goals.events) if (ev.year === year) { if (!working) cash -= ev.amount; say(year, 'cost', `${ev.label || 'Planned cost'}: ${fmt(ev.amount)}.`); }
+      for (const ev of bigBuys) { if (!working) cash -= n(ev.amount) * infl(i); say(year, 'cost', `${ev.label || 'Big purchase'}: about ${fmt(n(ev.amount))} (in today’s money; ${fmt(n(ev.amount) * infl(i))} at the time), paid from your savings.`); }
 
       // Buying: when equity + spare cash covers the deposit and a lender would approve the loan
       const ownedNow = p.properties.length + purchases.length;

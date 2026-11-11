@@ -141,6 +141,11 @@ export function wiseActions(p: Profile, quotes: Quotes): { actions: WiseAction[]
     body: 'Your plan buys its next property soon. About 3 to 6 months before, talk to a mortgage broker about pre-approval, and keep the deposit in your offset or high-interest account so it’s ready.',
     amount: `${money(next.price, { compact: true })} purchase`, sig: `prebuy:${next.year}:${Math.round(next.price / 1000)}`,
   });
+  for (const ev of p.goals.events.filter((x) => x.amount > 0 && x.year <= y0 + 2)) out.push({
+    key: `big:${ev.id}`, group: 'check', title: `Set money aside: ${ev.label || 'big purchase'} (${ev.year})`,
+    body: 'Keep it in your high-interest account, separate from your emergency fund, so it’s ready when you need it and isn’t spent on something else.',
+    amount: money(ev.amount, { compact: true }), sig: `big:${ev.id}:${ev.year}:${Math.round(ev.amount / 1000)}`,
+  });
   for (const lq of (p.liquidations ?? []).filter((x) => x.year <= y0 + 1)) {
     const what = lq.asset === 'property' ? (p.properties.find((x) => x.id === lq.propertyId)?.address ?? 'a property') : `some ${lq.asset}`;
     out.push({

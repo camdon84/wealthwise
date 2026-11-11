@@ -480,18 +480,18 @@ function Goals({ thorough }: { thorough: boolean }) {
       </div>
       {thorough && (
         <div>
-          <p className="field-label">Big costs coming up</p>
-          <p className="text-sm text-muted mb-3">Renovations, school fees, a wedding, a car. The plan sets cash aside for them.</p>
+          <p className="field-label">Planning a big purchase?</p>
+          <p className="text-sm text-muted mb-3">Include any large assets you plan to buy, like a car or a boat, or a life event like a wedding. Enter the cost in today’s money and the year.</p>
           <div className="space-y-3">
             {g.events.map((ev) => (
               <div key={ev.id} className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-[1fr_120px_160px_auto]">
-                <TextInput value={ev.label} onChange={(v) => update((d) => { d.goals.events.find((x) => x.id === ev.id)!.label = v; })} placeholder="What is it?" />
+                <TextInput value={ev.label} onChange={(v) => update((d) => { d.goals.events.find((x) => x.id === ev.id)!.label = v; })} placeholder="e.g. Wedding, new car" />
                 <NumInput value={ev.year} onChange={(v) => update((d) => { d.goals.events.find((x) => x.id === ev.id)!.year = v ?? ev.year; })} />
                 <MoneyInput value={ev.amount} onChange={(v) => update((d) => { d.goals.events.find((x) => x.id === ev.id)!.amount = v ?? 0; })} />
                 <button className="btn-ghost" aria-label="Remove" onClick={() => update((d) => { d.goals.events = d.goals.events.filter((x) => x.id !== ev.id); })}><Icon name="trash" className="h-4 w-4" /></button>
               </div>
             ))}
-            <button className="btn-quiet" onClick={() => update((d) => { d.goals.events.push({ id: uid(), label: '', year: new Date().getFullYear() + 2, amount: 20000 }); })}><Icon name="plus" className="h-4 w-4" />Add a cost</button>
+            <button className="btn-quiet" onClick={() => update((d) => { d.goals.events.push({ id: uid(), label: '', year: new Date().getFullYear() + 2, amount: 20000 }); })}><Icon name="plus" className="h-4 w-4" />Add a big purchase</button>
           </div>
         </div>
       )}

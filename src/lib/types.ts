@@ -113,7 +113,7 @@ export interface Holding {
   kind: 'share' | 'etf' | 'crypto' | 'fund';
 }
 
-export interface LifeEvent { id: string; label: string; year: number; amount: number }
+export interface LifeEvent { id: string; label: string; year: number; amount: number } // a big purchase or life event; amount in today's money
 
 export interface Goals {
   retirementAge: number;

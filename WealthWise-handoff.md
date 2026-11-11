@@ -173,6 +173,11 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
   - **Lock note:** "Now that your plan is complete, it's a good time to lock it in. To try different scenarios, you can always use Forecast mode." It has a Lock button and sits above the plan check result. It only shows when the plan works and it's the live plan.
   - **Late purchase message:** "You want to purchase this property before X, but the earliest it fits is Y. Adjust the price, the purchase year, or go to your Goals tab for further recommendations."
   - The boxes size to their content and don't stretch to the bottom.
+  - **"Planning a big purchase?"** (just above "Planning to have children?"): description, cost (today's money) and year for each, stored in `goals.events`. The engine inflates each cost to its year and takes it from savings (this year's ones land next year, like gifts). It's also in onboarding, the inflation update, Wise Actions ("Set money aside: …" within 2 years) and the AI facts.
+- **Property Portfolio:** each planned purchase is "An investment" or "My home to live in" (`use`).
+  - A home earns no rent, has no negative gearing or capital gains tax, and its loan is paid off by retirement by default (otherwise paid from savings, then super). Rental yield, management and the new-build box are hidden for a home, and the stamp duty field notes the home concession.
+  - Moving out of a home you own (or an earlier planned home): "Keep it and rent it out" (its rent counts for borrowing; its CGT cost base resets to its value then) or "Sell it" (no CGT; the money goes towards the new home, and it's listed under "Property sales already in your plan").
+  - Rent stops when you first move into a home you own. First home buyer benefits only show for a first home you live in.
 - **Liquidation Events**
   - **Intro:** "Plan the sale of shares, crypto or a property you own. Selling shares or crypto can free up capital for another property purchase, and selling any of your assets can strengthen your cash reserves."
   - **Selling a property:**
@@ -189,6 +194,8 @@ The tabs are Goals, Assumptions, Property Portfolio, Shares, Cash Reserves, Liqu
   - Also includes a "What about investing this extra capital?" statement and the CGT note.
   - No chart, no shares sweep and no scenario table.
 - **Shares:** a "See how your monthly investment rises with inflation" pop-up, viewable by year or by month.
+  - "Set a retirement goal or a monthly amount, and we'll work out the other": whichever was set last leads. When the monthly amount leads, the goal is worked out from the plan and kept in step everywhere as the plan changes (synced in `App.tsx`, helper `sharesGoalFromPlan`). Typing a goal, or ticking the delay with a goal set, works out the monthly amount from the later start (`monthlyForShareGoal`).
+  - With "don't invest until after I've bought…", the result box says the start year and years of investing, and what starting now would give. If that purchase can't happen by its target year, the note says so and gives the real start year.
 - **Gifts:** a Save button locks each gift into a summary line, with Edit and trash.
 - **Your Wise Future**
   - The net worth chart (or cash flow chart) plus retirement metrics, along with the retirement-income and lock notes only. It has no plan check and no ideas.

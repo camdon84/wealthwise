@@ -21,6 +21,7 @@ function indexItems(p: Profile, m: number): Item[] {
   add('shareMonthly', 'Monthly investment into shares', g.shareMonthly, 'a month', (d, v) => { d.goals.shareMonthly = v; });
   add('sharesTarget', 'Share portfolio goal at retirement', g.sharesTarget, '', (d, v) => { d.goals.sharesTarget = v; });
   add('retireCash', 'Accessible cash reserves in retirement', g.retireCash, '', (d, v) => { d.goals.retireCash = v; });
+  for (const ev of g.events ?? []) add(`big:${ev.id}`, `Big purchase, ${ev.label || 'unnamed'}`, ev.amount, '', (d, v) => { const x = d.goals.events.find((y) => y.id === ev.id); if (x) x.amount = v; });
   (p.plannedPurchases ?? []).forEach((pp, k) => add(`buy:${pp.id}`, `Purchase price, ${pp.label || `property ${p.properties.length + k + 1}`}`, pp.price, '', (d, v) => { const x = d.plannedPurchases?.find((y) => y.id === pp.id); if (x) x.price = v; }));
   return out;
 }

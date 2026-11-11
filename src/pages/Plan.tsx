@@ -196,6 +196,21 @@ function Goals({ quotes, go }: { quotes: Quotes; go: (t: Tab) => void }) {
           <div><Field label="Accessible cash reserves in retirement" hint="The minimum amount of money you want access to in your everyday bank accounts during retirement (in today’s money). This replaces the emergency cash buffer you set in My Details once you retire. We recommend at least $50,000.">{(id) => <MoneyInput id={id} value={g.retireCash ?? null} onChange={(v) => update((d) => { d.goals.retireCash = v; })} placeholder="50000" />}</Field>
             {g.retireCash != null && g.retireCash < RETIRE_CASH_MIN && <p role="status" className="mt-2 rounded-lg bg-brass/10 px-3 py-2 text-sm">We recommend keeping at least {money(RETIRE_CASH_MIN)} in cash once you’ve retired, for repairs, health costs and surprises without having to sell anything.</p>}</div>
           <div className="sm:col-span-2">
+            <p className="field-label">Planning a big purchase?</p>
+            <p className="-mt-1 mb-2 text-xs text-muted">Include any large assets you plan to buy, like a car or a boat, or a life event like a wedding: anything you need to factor into your plan. Enter the cost in today’s money. The plan pays for it from your savings in that year.</p>
+            <div className="space-y-3">
+              {g.events.map((ev, k) => (
+                <div key={ev.id} className="grid gap-2 rounded-xl border border-line p-3 sm:grid-cols-[minmax(0,1fr)_150px_110px_auto] sm:items-end">
+                  <Field label="Description">{(id) => <TextInput id={id} value={ev.label} onChange={(v) => update((d) => { d.goals.events[k].label = v; })} placeholder="e.g. Wedding, new car" />}</Field>
+                  <Field label="Cost">{(id) => <MoneyInput id={id} value={ev.amount || null} onChange={(v) => update((d) => { d.goals.events[k].amount = v ?? 0; })} />}</Field>
+                  <Field label="Year">{(id) => <Select id={id} value={String(ev.year)} onChange={(v) => update((d) => { d.goals.events[k].year = Number(v); })} options={Array.from({ length: Math.max(1, g.retirementAge - (p.household.you.age ?? 35)) + 15 }, (_, j) => new Date().getFullYear() + j).map((y) => ({ value: String(y), label: String(y) }))} />}</Field>
+                  <button className="btn-ghost mb-0.5 p-2" aria-label={`Remove ${ev.label || 'big purchase'}`} onClick={() => update((d) => { d.goals.events.splice(k, 1); })}><Icon name="trash" className="h-4 w-4" /></button>
+                </div>
+              ))}
+            </div>
+            <button className="btn-quiet mt-2 text-sm" onClick={() => update((d) => { d.goals.events.push({ id: uid(), label: '', year: new Date().getFullYear() + 1, amount: 0 }); })}><Icon name="plus" className="h-4 w-4" />{g.events.length ? 'Add another big purchase' : 'Add a big purchase'}</button>
+          </div>
+          <div className="sm:col-span-2">
             <p className="field-label">Planning to have children?</p>
             <p className="-mt-1 mb-2 text-xs text-muted">Add the year you expect each one. We allow the Australian average of about {money(CHILD_COST_YEAR)} a year per child until 18 (in today’s money). Children you already have go in My Details, under Dependants.</p>
             <div className="space-y-2">
